@@ -31,12 +31,13 @@ yarn-error.log
 /.claude/settings.local.json
 /.amp
 /.codex
-/.cursor
+/.cursor/*
+!/.cursor/mcp.json
+!/.cursor/skills/
 /.factory
 /.grok
 /.junie
 /.kiro
 /.pi
-/AGENTS.md
 /opencode.json
 /opencode.jsonc

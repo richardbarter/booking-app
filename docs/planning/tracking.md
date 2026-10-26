@@ -4,13 +4,12 @@ Last updated: 2026-10-26
 
 ## Current status
 
-Building sub-plan 01. The Laravel 13 Vue starter kit runs in Docker (PostgreSQL 18, PHP 8.5, Node 26, Mailpit), tests run on PostgreSQL in the container and on the host, and the production image builds. Laravel Boost is still to be set up.
+Sub-plan 01 is done. The Laravel 13 Vue starter kit runs in Docker (PostgreSQL 18, PHP 8.5, Node 26, Mailpit), tests run on PostgreSQL in the container and on the host, the production image builds, and Laravel Boost is set up for Claude Code and Cursor.
 
 ## Next up
 
-1. Finish sub-plan 01: run `php artisan boost:install`, add the shadcn-vue MCP server, then merge.
-2. Write the next sub-plans from a Claude Code session opened in this project, so Laravel Boost's docs search is available.
-3. Choose a product name before sub-plan 02, because it sets the Fly app name and URL.
+1. Write the next sub-plans from a Claude Code session opened in this project, so Laravel Boost's docs search is available.
+2. Choose a product name before sub-plan 02, because it sets the Fly app name and URL.
 
 ## Sub-plan status
 
@@ -19,7 +18,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | # | Sub-plan | Status | PR | Notes |
 |---|---|---|---|---|
 | | **Phase 1: Foundations** | | | |
-| 01 | Project setup | In progress | | Uses newer versions than the plan; see the decisions log |
+| 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 02 | CI and deployment | Not started | | |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
@@ -71,13 +70,15 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-26 | PHP-FPM listens on `127.0.0.1:9000` only | The base image listens on every interface, which would expose FastCGI to anything on the same network (including Fly's private network) |
 | 2026-10-26 | `phpunit.xml` sets `APP_ENV`, `DB_CONNECTION`, `DB_DATABASE` and `DB_URL` as `<server>` variables as well as forced `<env>` ones | Laravel reads `$_SERVER` first, and `force="true"` doesn't touch it, so the app container's `APP_ENV=local` was leaking into tests (CSRF then failed). `DatabaseConnectionTest` confirms tests stay on `testing` even when `DB_DATABASE` or `DB_URL` point elsewhere |
 | 2026-10-26 | Vite+'s built-in `vp test` (Vitest 5) with jsdom; no separate Vitest install | Worked without changes |
-| 2026-10-26 | `docs/` is left out of Oxfmt | Keeps the hand-written docs as they are; Oxfmt would reflow every table |
+| 2026-10-26 | `docs/` and Boost's generated files are left out of Oxfmt | Keeps the hand-written docs as they are (Oxfmt would reflow every table), and stops Boost updates from failing `npm run check` |
+| 2026-10-26 | Boost is set up for Claude Code and Cursor. The project's own guidelines live in `.ai/guidelines/project.md`, and Boost writes them into both `CLAUDE.md` and `AGENTS.md` | One source for both agents. Edit `.ai/guidelines/project.md`, then run `php artisan boost:update`; don't edit the generated files |
+| 2026-10-26 | MCP servers start through `cmd /c` (Boost's as well as shadcn-vue's) | On native Windows, Claude Code and Cursor start commands without a shell, so they skip Herd's `php.bat` and found an old PHP 8.4.0 instead. `boost:install` writes plain `php` back, so re-apply this after reinstalling |
 
 ## Notes for the next session
 
 - `D:\projects\booking-app` already contains `docs/` (with `planning/` inside), so `laravel new` and `composer create-project` can't install straight into it. Create the app in a temporary folder and move the files across. **Don't use the Laravel installer's `--force` flag here: it deletes the existing folder, `docs/` included.**
 - This repo will be public, so keep the planning docs about the product. Leave out personal or job-search notes.
-- The host's Node (22.17.1) is below Vite+'s minimum (22.18). Host commands still work but print warnings. Upgrading the host to Node 26 and Herd's PHP to 8.5 would match the containers.
+- The host's tools are older than the containers'. Node 22.17.1 is below Vite+'s minimum (22.18): host commands still work but print warnings. Herd's PHP is 8.4.16, and an old Herd Lite PHP 8.4.0 is also on the PATH; neither has the 21 October 2026 security fixes. Upgrade the host to Node 26 and Herd's PHP to 8.5, remove Herd Lite from the PATH, then run `php artisan boost:update` so Boost's guidelines say PHP 8.5.
 - For sub-plan 02:
   - Laravel builds URLs, including password reset links, from the request's Host header. Configure trusted proxies for Fly and consider `trustHosts()`, checking that Fly's health checks still pass.
   - Supervisor keeps the container running even if nginx or PHP-FPM gives up, so Fly's HTTP health check on `/up` is what catches a broken machine.
