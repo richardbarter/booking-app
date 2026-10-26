@@ -32,15 +32,29 @@ export default defineConfig({
         }),
     ]),
     server: {
+        port: 5174,
+        strictPort: true,
+        hmr: {
+            host: 'localhost',
+        },
         watch: {
+            // Docker Desktop on Windows doesn't pass file-change events
+            // through to containers, so the vite container polls instead.
+            usePolling: process.env.WATCH_USE_POLLING === 'true',
+            interval: 300,
             ignored: [
                 '**/.agents/**',
                 '**/.claude/**',
                 '**/.cursor/**',
                 '**/.junie/**',
+                '**/storage/**',
                 '**/vendor/**',
             ],
         },
+    },
+    test: {
+        environment: 'jsdom',
+        include: ['resources/js/**/*.test.ts'],
     },
     lint: {
         ignorePatterns: [
@@ -68,6 +82,12 @@ export default defineConfig({
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
             '.github/**',
+            // Hand-written docs, and files that Boost generates.
+            'docs/**',
+            '.ai/**',
+            '.claude/**',
+            'AGENTS.md',
+            'CLAUDE.md',
             'composer.json',
             'resources/js/components/ui/*',
             'resources/views/mail/*',

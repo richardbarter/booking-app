@@ -1,0 +1,85 @@
+# Local development. Host ports are chosen to avoid clashing with other projects.
+
+x-app: &app
+    build:
+        context: .
+        target: dev
+    image: booking-app-dev
+    volumes:
+        - .:/var/www/html
+        # Kept in container volumes: bind mounts on Windows are slow, and the
+        # host's own vendor and node_modules are built for Windows.
+        - vendor:/var/www/html/vendor
+        - node_modules:/var/www/html/node_modules
+        - bootstrap-cache:/var/www/html/bootstrap/cache
+        - ./docker/php-dev.ini:/usr/local/etc/php/conf.d/zz-dev.ini:ro
+
+x-app-environment: &app-environment
+    APP_ENV: local
+    APP_DEBUG: 'true'
+    DB_HOST: postgres
+    DB_PORT: 5432
+    MAIL_HOST: mailpit
+    MAIL_PORT: 1025
+
+services:
+    postgres:
+        image: postgres:18-trixie
+        environment:
+            POSTGRES_DB: booking
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: password
+        ports:
+            - 127.0.0.1:5434:5432
+        volumes:
+            - postgres-data:/var/lib/postgresql
+            - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U postgres -d booking']
+            interval: 5s
+            timeout: 5s
+            retries: 10
+
+    app:
+        <<: *app
+        environment:
+            <<: *app-environment
+        ports:
+            - 127.0.0.1:8001:8080
+        depends_on:
+            postgres:
+                condition: service_healthy
+            mailpit:
+                condition: service_started
+
+    vite:
+        <<: *app
+        # Vite deletes public/hot when it stops, but the stop signal (SIGQUIT,
+        # set by the php-fpm base image) doesn't reach it through npm, so this
+        # shell deletes it instead. A stale hot file would point the app at a
+        # dev server that isn't running.
+        command:
+            - sh
+            - -c
+            - |
+                npm run dev -- --host 0.0.0.0 &
+                trap 'rm -f public/hot; exit 0' TERM INT QUIT
+                wait $$!
+        environment:
+            <<: *app-environment
+            # Docker Desktop on Windows doesn't pass file-change events through.
+            WATCH_USE_POLLING: 'true'
+        ports:
+            - 127.0.0.1:5174:5174
+
+    mailpit:
+        image: axllent/mailpit
+        ports:
+            - 127.0.0.1:8026:8025
+            - 127.0.0.1:1026:1025
+
+volumes:
+    postgres-data:
+    vendor:
+    node_modules:
+    bootstrap-cache:

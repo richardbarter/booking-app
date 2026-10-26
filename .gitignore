@@ -28,8 +28,8 @@ yarn-error.log
 /.vscode
 /.zed
 /.agents
+/.claude/settings.local.json
 /.amp
-/.claude
 /.codex
 /.cursor
 /.factory
@@ -37,9 +37,6 @@ yarn-error.log
 /.junie
 /.kiro
 /.pi
-/.mcp.json
 /AGENTS.md
-/CLAUDE.md
-/boost.json
 /opencode.json
 /opencode.jsonc
