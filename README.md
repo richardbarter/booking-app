@@ -27,3 +27,7 @@ Run the tests with `docker compose exec app php artisan test` and `npm run test`
 
 - [Background](docs/background.md): the scheduling problem and the research behind the approach
 - [Planning](docs/planning/): the overview, progress tracking and a sub-plan for each piece of work
+
+## Licence
+
+Copyright © 2026 Richard Barter. All rights reserved. The code is public so it can be read, but it isn't licensed for reuse.
