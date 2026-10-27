@@ -1,15 +1,18 @@
 # Tracking
 
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 
 ## Current status
 
 Sub-plan 01 is done. The Laravel 13 Vue starter kit runs in Docker (PostgreSQL 18, PHP 8.5, Node 26, Mailpit), tests run on PostgreSQL in the container and on the host, the production image builds, and Laravel Boost is set up for Claude Code and Cursor.
 
+Sub-plan 01b, which moves development into WSL 2, is planned and comes next.
+
 ## Next up
 
-1. Write the next sub-plans from a Claude Code session opened in this project, so Laravel Boost's docs search is available.
-2. Choose a product name before sub-plan 02, because it sets the Fly app name and URL.
+1. Do sub-plan 01b: steps 1 to 4 by hand, then step 5 in Claude Code inside Ubuntu.
+2. Write the next sub-plans from a Claude Code session opened in this project (in WSL from now on), so Laravel Boost's docs search is available.
+3. Choose a product name before sub-plan 02, because it sets the Fly app name and URL.
 
 ## Sub-plan status
 
@@ -19,6 +22,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 |---|---|---|---|---|
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
+| 01b | WSL development environment | Planned | | Added after 01: moves development off the Windows filesystem |
 | 02 | CI and deployment | Not started | | |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
@@ -73,13 +77,24 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-26 | `docs/` and Boost's generated files are left out of Oxfmt | Keeps the hand-written docs as they are (Oxfmt would reflow every table), and stops Boost updates from failing `npm run check` |
 | 2026-10-26 | Boost is set up for Claude Code and Cursor. The project's own guidelines live in `.ai/guidelines/project.md`, and Boost writes them into both `CLAUDE.md` and `AGENTS.md` | One source for both agents. Edit `.ai/guidelines/project.md`, then run `php artisan boost:update`; don't edit the generated files |
 | 2026-10-26 | MCP servers start through `cmd /c` (Boost's as well as shadcn-vue's) | On native Windows, Claude Code and Cursor start commands without a shell, so they skip Herd's `php.bat` and found an old PHP 8.4.0 instead. `boost:install` writes plain `php` back, so re-apply this after reinstalling |
+| 2026-10-27 | Develop inside WSL 2 (Ubuntu), with the code on the Linux filesystem (sub-plan 01b) | Faster file access and tests; file names case-sensitive as in production; removes the Windows-only workarounds (Vite polling, `cmd /c` MCP commands, Herd PATH clashes). Docker recommends it with Docker Desktop's WSL 2 backend |
 
 ## Notes for the next session
 
 - `D:\projects\booking-app` already contains `docs/` (with `planning/` inside), so `laravel new` and `composer create-project` can't install straight into it. Create the app in a temporary folder and move the files across. **Don't use the Laravel installer's `--force` flag here: it deletes the existing folder, `docs/` included.**
 - This repo will be public, so keep the planning docs about the product. Leave out personal or job-search notes.
-- The host's tools are older than the containers'. Node 22.17.1 is below Vite+'s minimum (22.18): host commands still work but print warnings. Herd's PHP is 8.4.16, and an old Herd Lite PHP 8.4.0 is also on the PATH; neither has the 21 October 2026 security fixes. Upgrade the host to Node 26 and Herd's PHP to 8.5, remove Herd Lite from the PATH, then run `php artisan boost:update` so Boost's guidelines say PHP 8.5.
+- The Windows host's tools are out of date (Herd's PHP 8.4.16, Node 22.17.1). Sub-plan 01b replaces them with PHP 8.5 and Node 26 inside Ubuntu, so don't upgrade them for this project.
 - For sub-plan 02:
+  - The starter kit already ships `.github/workflows/tests.yml` and `.github/dependabot.yml`. Rework them rather than starting again:
+    - The workflow would fail as it stands: it has no PostgreSQL service and uses PHP 8.3 and Node 22. Give it a PostgreSQL 18 service, PHP 8.5 and Node 26.
+    - It runs `composer ci:check`, which covers Pint, Larastan, PHPUnit, `npm run check` and `npm run types:check`. Add `npm run test` (Vitest), which `ci:check` leaves out.
+    - It already uses least-privilege `permissions` and actions pinned to commit SHAs. Keep both.
+    - `dependabot.yml` only covers GitHub Actions. Add Composer, npm and the Docker base images.
+  - Protect `main`: merge only through pull requests, and require CI to pass first.
+  - Add `composer audit` and `npm audit` to CI. Turn on GitHub's secret scanning and push protection, which are free for public repos.
+  - Raise Larastan from level 7 to 8, which adds null checks. Level 8 currently reports 10 errors. All of them come from `$request->user()` possibly being null in the settings controllers and request, and Laravel's `#[CurrentUser]` attribute fixes them properly. Levels 9 and 10 mostly flag framework code, so stop at 8.
+  - Decide on production error monitoring, for example Laravel Nightwatch or Sentry.
+  - Settle the commit author email before the first push (see 01b, step 3).
   - Laravel builds URLs, including password reset links, from the request's Host header. Configure trusted proxies for Fly and consider `trustHosts()`, checking that Fly's health checks still pass.
   - Supervisor keeps the container running even if nginx or PHP-FPM gives up, so Fly's HTTP health check on `/up` is what catches a broken machine.
   - The production image is about 970MB, mostly the official `php:8.5-fpm` base image.
