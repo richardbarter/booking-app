@@ -38,10 +38,6 @@ export default defineConfig({
             host: 'localhost',
         },
         watch: {
-            // Docker Desktop on Windows doesn't pass file-change events
-            // through to containers, so the vite container polls instead.
-            usePolling: process.env.WATCH_USE_POLLING === 'true',
-            interval: 300,
             ignored: [
                 '**/.agents/**',
                 '**/.claude/**',

@@ -270,7 +270,7 @@ The Docker and Fly setup uses a proven pattern:
 - a multi-stage Dockerfile (Composer, then the Node build, then PHP-FPM + Nginx managed by Supervisor)
 - an entrypoint that caches config at runtime so Fly secrets are available
 - migrations run by Fly's `release_command`
-- file polling for Vite, because Docker Desktop on Windows doesn't pass file-change events through
+- in development, containers that run as the developer's own user and share the code, `vendor` and `node_modules` with the host, as Laravel Sail does. On Windows, development happens inside WSL 2, so the code is on a Linux filesystem
 
 ### CI (GitHub Actions)
 

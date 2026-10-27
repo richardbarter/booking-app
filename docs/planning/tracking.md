@@ -6,12 +6,20 @@ Last updated: 2026-10-27
 
 Sub-plan 01 is done. The Laravel 13 Vue starter kit runs in Docker (PostgreSQL 18, PHP 8.5, Node 26, Mailpit), tests run on PostgreSQL in the container and on the host, the production image builds, and Laravel Boost is set up for Claude Code and Cursor.
 
-Sub-plan 01b, which moves development into WSL 2, is planned and comes next.
+Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-app` in Ubuntu, the dev containers run as the developer's user and share `vendor` and `node_modules` with Ubuntu, and the Windows-only workarounds are gone. PHPUnit's 42 tests take about 2.5s, in the container or in Ubuntu, against 7.3s on Windows.
+
+**Development environment** (installed for 01b, 2026-10-27):
+- WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
+- Docker 29.9.2 and Compose v5.6.1, through Docker Desktop's WSL integration
+- PHP 8.5.4 from Ubuntu's packages; Composer 2.10.3 from the official installer
+- Node 26.12.1 and npm 11.20.0 from NodeSource
+- GitHub CLI 2.103.3
+- Claude Code 2.1.311 (native installer); Cursor through Anysphere's WSL extension
 
 ## Next up
 
-1. Do sub-plan 01b: steps 1 to 4 by hand, then step 5 in Claude Code inside Ubuntu.
-2. Write the next sub-plans from a Claude Code session opened in this project (in WSL from now on), so Laravel Boost's docs search is available.
+1. Delete the Windows copy at `D:\projects\booking-app`, then the Docker volumes only it used: `docker volume rm booking-app_vendor booking-app_node_modules booking-app_bootstrap-cache`.
+2. Write the next sub-plans from a Claude Code session opened in this project, so Laravel Boost's docs search is available.
 3. Choose a product name before sub-plan 02, because it sets the Fly app name and URL.
 
 ## Sub-plan status
@@ -22,7 +30,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 |---|---|---|---|---|
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
-| 01b | WSL development environment | Planned | | Added after 01: moves development off the Windows filesystem |
+| 01b | WSL development environment | In progress | | Added after 01: moves development off the Windows filesystem |
 | 02 | CI and deployment | Not started | | |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
@@ -76,15 +84,19 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-26 | Vite+'s built-in `vp test` (Vitest 5) with jsdom; no separate Vitest install | Worked without changes |
 | 2026-10-26 | `docs/` and Boost's generated files are left out of Oxfmt | Keeps the hand-written docs as they are (Oxfmt would reflow every table), and stops Boost updates from failing `npm run check` |
 | 2026-10-26 | Boost is set up for Claude Code and Cursor. The project's own guidelines live in `.ai/guidelines/project.md`, and Boost writes them into both `CLAUDE.md` and `AGENTS.md` | One source for both agents. Edit `.ai/guidelines/project.md`, then run `php artisan boost:update`; don't edit the generated files |
-| 2026-10-26 | MCP servers start through `cmd /c` (Boost's as well as shadcn-vue's) | On native Windows, Claude Code and Cursor start commands without a shell, so they skip Herd's `php.bat` and found an old PHP 8.4.0 instead. `boost:install` writes plain `php` back, so re-apply this after reinstalling |
+| 2026-10-26 | ~~MCP servers start through `cmd /c` (Boost's as well as shadcn-vue's)~~ Superseded on 2026-10-27 by the move to WSL (01b) | On native Windows, Claude Code and Cursor start commands without a shell, so they skip Herd's `php.bat` and found an old PHP 8.4.0 instead. `boost:install` writes plain `php` back, so re-apply this after reinstalling |
 | 2026-10-27 | Develop inside WSL 2 (Ubuntu), with the code on the Linux filesystem (sub-plan 01b) | Faster file access and tests; file names case-sensitive as in production; removes the Windows-only workarounds (Vite polling, `cmd /c` MCP commands, Herd PATH clashes). Docker recommends it with Docker Desktop's WSL 2 backend |
 | 2026-10-27 | Test the scheduling engine with randomised rule checks (plain PHPUnit, fixed seed) and mutation testing (Infection, engine only). Check pages for accessibility with axe in Playwright. `infection/infection` and `@axe-core/playwright` are approved as dev dependencies | The engine is the hardest part to get right. Random diaries find edge cases that hand-written examples miss, and mutation testing shows whether the tests would actually catch a bug. axe is cheap to add once Playwright arrives in 08 |
+| 2026-10-27 | PHP in Ubuntu comes from Ubuntu's own packages, not a third-party package source | It's only used for tools (Composer, Boost's MCP server, Pint, Larastan, the editor). The app and its tests run on the container's PHP, and apt keeps Ubuntu's PHP patched |
+| 2026-10-27 | The GitHub CLI logs in with expiring tokens (`gh auth login --expiring`): an 8-hour token, renewed automatically with a 6-month refresh token | WSL has no system keyring, so `gh` stores its token in a plain-text file. A short-lived token limits the damage if that file ever leaks |
+| 2026-10-27 | Drop the `vendor`, `node_modules` and `bootstrap/cache` container volumes. Ubuntu and the containers share one install through the bind mount, as in Laravel Sail | Both are glibc x64 Linux with PHP 8.5 and Node 26, so the same packages work in each. There are no longer two installs to keep in step, or named volumes going stale after a rebuild, and the editor and Boost see the same packages as the app. `bootstrap/cache` was only separate because the two installs differed. The dev image shrinks from 1.96GB to 1.19GB. A fresh clone runs `composer install` and `npm ci` before `docker compose up` |
+| 2026-10-27 | The dev containers run as the developer's user: in the `dev` image, `www-data` takes the UID and GID from the `WWWUSER` and `WWWGROUP` build arguments (default 1000), as in Sail. The production `php` stage keeps UID 33 | Linux enforces file ownership on the bind mount. As UID 33 the containers couldn't write to `storage/`, and the files they created (logs, compiled views, Wayfinder output, `make:` files) couldn't be edited in Ubuntu. Named like Sail's, and not `UID`/`GID`, because bash's `UID` is read-only |
+| 2026-10-27 | Vite watches files natively; `WATCH_USE_POLLING` and the polling option are gone | With the code on the Linux filesystem, file-change events reach the containers |
+| 2026-10-27 | MCP servers start with plain `php artisan boost:mcp` and `npx shadcn-vue@latest mcp` again, in `.mcp.json` and `.cursor/mcp.json` | Claude Code and the editor run inside Ubuntu, where `php` is Ubuntu's PHP 8.5. Run inside WSL, `boost:install` writes a `wsl.exe` command with absolute paths instead (meant for editors running on Windows), so put the plain commands back after reinstalling. `boost:update` leaves them alone |
 
 ## Notes for the next session
 
-- `D:\projects\booking-app` already contains `docs/` (with `planning/` inside), so `laravel new` and `composer create-project` can't install straight into it. Create the app in a temporary folder and move the files across. **Don't use the Laravel installer's `--force` flag here: it deletes the existing folder, `docs/` included.**
 - This repo will be public, so keep the planning docs about the product. Leave out personal or job-search notes.
-- The Windows host's tools are out of date (Herd's PHP 8.4.16, Node 22.17.1). Sub-plan 01b replaces them with PHP 8.5 and Node 26 inside Ubuntu, so don't upgrade them for this project.
 - For sub-plan 02:
   - The starter kit already ships `.github/workflows/tests.yml` and `.github/dependabot.yml`. Rework them rather than starting again:
     - The workflow would fail as it stands: it has no PostgreSQL service and uses PHP 8.3 and Node 22. Give it a PostgreSQL 18 service, PHP 8.5 and Node 26.
