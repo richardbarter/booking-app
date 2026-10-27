@@ -82,27 +82,25 @@ EXPOSE 8080
 
 ENTRYPOINT ["entrypoint.sh"]
 
-# Local development: adds Node and the dev dependencies. Used by the app and
-# vite services, which mount the code over /var/www/html.
+# Local development: adds Node. Used by the app and vite services, which mount
+# the code over /var/www/html, vendor and node_modules included.
 FROM php AS dev
 
 USER root
+
+# www-data takes the host user's IDs (as in Laravel Sail), so the containers
+# can write to the mounted code and the files they create belong to you.
+ARG WWWUSER=1000
+ARG WWWGROUP=1000
+RUN groupmod -g "$WWWGROUP" www-data \
+    && usermod -u "$WWWUSER" -g "$WWWGROUP" www-data
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-# vendor and node_modules are copied into the compose volumes on first start,
-# so they're installed here as www-data, which owns the volumes.
-RUN rm -rf vendor \
-    && chown www-data:www-data /var/www/html
-
 ENV COMPOSER_HOME=/tmp/composer \
     NPM_CONFIG_CACHE=/tmp/npm
 
 USER www-data
-
-RUN composer install --no-scripts --no-interaction --prefer-dist \
-    && npm ci \
-    && rm -rf "$COMPOSER_HOME" "$NPM_CONFIG_CACHE"

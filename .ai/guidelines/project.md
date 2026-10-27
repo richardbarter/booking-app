@@ -19,7 +19,7 @@ Docker is the main way to run the app. The app is at http://localhost:8001 and M
 - `npm run types:check`: `vue-tsc`
 - `npm run test`: Vitest
 
-`vendor` and `node_modules` live in container volumes. After changing dependencies on the host, also run `docker compose exec app composer install` or `docker compose exec app npm install`.
+The containers share the code, `vendor` and `node_modules` with the host and run as the host user, so install packages once, on the host or in the `app` container. On Windows, the host is Ubuntu in WSL 2.
 
 ## Conventions
 
