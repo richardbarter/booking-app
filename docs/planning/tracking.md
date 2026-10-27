@@ -30,7 +30,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 |---|---|---|---|---|
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
-| 01b | WSL development environment | In progress | | Added after 01: moves development off the Windows filesystem |
+| 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Not started | | |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
