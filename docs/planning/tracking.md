@@ -32,7 +32,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
-| 02 | CI and deployment | Not started | | |
+| 02 | CI and deployment | Planned | | |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
@@ -111,7 +111,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
     - `dependabot.yml` only covers GitHub Actions. Add Composer, npm and the Docker base images.
   - Protect `main`: merge only through pull requests, and require CI to pass first.
   - Add `composer audit` and `npm audit` to CI. Turn on GitHub's secret scanning and push protection, which are free for public repos.
-  - Raise Larastan from level 7 to 8, which adds null checks. Level 8 currently reports 10 errors. All of them come from `$request->user()` possibly being null in the settings controllers and request, and Laravel's `#[CurrentUser]` attribute fixes them properly. Levels 9 and 10 mostly flag framework code, so stop at 8.
+  - Raise Larastan from level 7 to 9 (see sub-plan 02, step 5). Level 9 reports 13 errors, including a real bug: the login and passkey rate limiters return a 500 when the input is an array. Level 10 only adds errors from Inertia's `Route::inertia()` helper, so stop at 9.
   - Decide on production error monitoring, for example Laravel Nightwatch or Sentry.
   - In GitHub's email settings, turn on "Keep my email addresses private", so commits made on github.com (such as pull request merges) also use the no-reply address, and "Block command line pushes that expose my email".
   - Use the name Bookalive: `APP_NAME` in `.env.example` and on Fly, the README, and the heading in `.ai/guidelines/project.md` (then run `boost:update`). `VITE_APP_NAME` is compiled into the frontend, and the Dockerfile doesn't pass it yet, so the production build would fall back to "Laravel". Pass it as a build argument.
