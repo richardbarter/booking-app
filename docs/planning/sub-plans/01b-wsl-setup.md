@@ -77,7 +77,7 @@ composer --version
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_26.x -o nodesource_setup.sh
-sudo -E bash nodesource_setup.sh
+sudo bash nodesource_setup.sh
 sudo apt install -y nodejs
 rm nodesource_setup.sh
 node -v
@@ -111,7 +111,7 @@ The repo becomes public in 02, and every commit's author email goes public with 
     && sudo apt install gh -y
 ```
 
-Then log in with `gh auth login`:
+Then log in with `gh auth login --expiring`. WSL has no system keyring, so `gh` saves its login token in a plain-text file that only your user can read (it warns about this). Expiring tokens (`gh` 2.103 or later) limit the damage if that file ever leaks: the token stops working within hours, and `gh` refreshes it automatically.
 - Choose **GitHub.com**, then **HTTPS**.
 - Say **Yes** to authenticating Git with your GitHub credentials, so `git push` uses this login.
 - Choose **Login with a web browser**. If no browser opens, go to https://github.com/login/device in Windows and enter the code shown.
