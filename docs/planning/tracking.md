@@ -18,9 +18,11 @@ Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-ap
 
 ## Next up
 
-1. Delete the Windows copy at `D:\projects\booking-app`, then the Docker volumes only it used: `docker volume rm booking-app_vendor booking-app_node_modules booking-app_bootstrap-cache`.
-2. Write the next sub-plans from a Claude Code session opened in this project, so Laravel Boost's docs search is available.
-3. Choose a product name before sub-plan 02, because it sets the Fly app name and URL.
+1. Choose a product name, because it sets the Fly app name and URL in sub-plan 02. Also decide which email the commits use before the first push makes it public (see the notes below).
+2. Write sub-plan 02, then build it. Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
+3. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
+
+Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
 
 ## Sub-plan status
 
@@ -95,6 +97,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-27 | MCP servers start with plain `php artisan boost:mcp` and `npx shadcn-vue@latest mcp` again, in `.mcp.json` and `.cursor/mcp.json` | Claude Code and the editor run inside Ubuntu, where `php` is Ubuntu's PHP 8.5. Run inside WSL, `boost:install` writes a `wsl.exe` command with absolute paths instead (meant for editors running on Windows), so put the plain commands back after reinstalling. `boost:update` leaves them alone |
 | 2026-10-27 | Backend code is organised by type, Laravel's default (controllers, models, requests, policies and so on), with subfolders by area such as `Http/Controllers/Admin/`. Single-purpose actions go in `app/Actions`, other services in `app/Services`, and the scheduling engine in its own folder, `app/Scheduling` | The most common Laravel layout, and the one `make:` commands, the starter kit and Boost's guidelines expect. Feature folders don't suit this app, because the playground, admin area, public booking page and statistics all share the same models. The engine is plain PHP that's tested on its own and is the only code Infection mutation-tests, so its own folder keeps it separate and easy to target |
 | 2026-10-27 | Frontend code is organised by type, as in the starter kit (`pages`, `layouts`, `components`, `composables`), with subfolders by area. Components and composables used by one area go in that area's folder (e.g. `components/admin/`). Shared ones go in a folder named after their topic (e.g. `components/scheduling/`), not loose at the top of `components/`. An area's component moves to a topic folder once a second area needs it | Keeps what's good about feature folders, since a component's folder shows who uses it, without their cost. Inertia finds pages by name in `resources/js/pages`, so feature folders would need a custom page resolver and extra paths in `config/inertia.php`, and Boost's Inertia guidance assumes `pages`. The areas also overlap a lot (the playground timeline becomes the admin calendar, and the strictness slider appears in both), so many components are shared anyway |
+| 2026-10-27 | Write sub-plans a few at a time, shortly before building them, rather than all at once. The overview's sub-plan table already sketches every one | Later plans depend on what earlier ones settle (the tables from 03, the engine's interfaces from 04, the queue setup from 02), so detailed plans written too early would need rewriting |
 
 ## Notes for the next session
 
