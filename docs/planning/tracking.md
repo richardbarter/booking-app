@@ -8,6 +8,14 @@ Sub-plan 01 is done. The Laravel 13 Vue starter kit runs in Docker (PostgreSQL 1
 
 Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-app` in Ubuntu, the dev containers run as the developer's user and share `vendor` and `node_modules` with Ubuntu, and the Windows-only workarounds are gone. PHPUnit's 42 tests take about 2.5s, in the container or in Ubuntu, against 7.3s on Windows.
 
+Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
+- **Step 1.1 is done:** flyctl 0.4.123 is installed in Ubuntu and logged in, and Bookalive goes in the existing `personal` organization (step 4).
+- **Step 2 is done:** the repo is public at https://github.com/richardbarter/booking-app. It has the `main` ruleset, the security features and the `production` environment, which still needs its `FLY_API_TOKEN` in step 4.
+- **Expected failures until the 02 pull request merges:**
+  - The starter kit's old `tests` workflow fails on `main`.
+  - No pull request can merge, because the ruleset requires the `checks` and `audit` jobs, which arrive with the 02 pull request.
+- **Still to check in step 6:** CodeQL's language list, which was empty while its first scan ran.
+
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
 - Docker 29.9.2 and Compose v5.6.1, through Docker Desktop's WSL integration
@@ -18,7 +26,7 @@ Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-ap
 
 ## Next up
 
-1. Write sub-plan 02, then build it. Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
+1. Finish building sub-plan 02, starting at steps 1.2 and 1.3 (Neon and Nightwatch sign-ups), then step 3. Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
 2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
 
 Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
@@ -32,7 +40,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
-| 02 | CI and deployment | Planned | | |
+| 02 | CI and deployment | In progress | | Steps 1.1 and 2 done |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
