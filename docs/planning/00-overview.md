@@ -1,6 +1,6 @@
-# Booking App — Overview
+# Bookalive — Overview
 
-> Working title. Progress, decisions and next steps are in [tracking.md](tracking.md). Each piece of work is planned in its own file in `sub-plans/`. For background on the scheduling problem, how other industries handle it and the research behind it, see [../background.md](../background.md).
+> Progress, decisions and next steps are in [tracking.md](tracking.md). Each piece of work is planned in its own file in `sub-plans/`. For background on the scheduling problem, how other industries handle it and the research behind it, see [../background.md](../background.md).
 
 ## 1. Summary
 
@@ -433,7 +433,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | Question | Needed by |
 |---|---|
-| Product name (for the Fly app, domain and branding; the repo can stay `booking-app`) | 02 |
+| When to add the custom domain: before links are shared at the playground milestone, or in 22 as planned (`bookalive.io` was unregistered on 2026-10-27) | 08 / 22 |
 | Queue driver, and how the scheduler, worker and Reverb run on Fly without keeping Neon awake all the time | 02 / 12 |
 | Default strictness and relaxation window | 07 |
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
