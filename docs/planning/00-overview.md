@@ -363,6 +363,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | # | Sub-plan | Delivers |
 |---|---|---|
 | 01 | Project setup | Laravel + official Vue starter kit; Docker dev environment (PostgreSQL, app, Vite, Mailpit); tests running on PostgreSQL; Laravel Boost; `CLAUDE.md` |
+| 01b | WSL development environment | Development moved into WSL 2 on Windows, so the code lives on a Linux filesystem; Windows-only workarounds removed |
 | 02 | CI and deployment | GitHub repo; Actions for lint, tests and build; Fly.io (London) + Neon + automatic deploys; a live URL from day one |
 | 03 | Core data model | Businesses with automatic tenant scoping; practitioners; services and who offers what; working hours; time off; business settings; factories and a sample clinic seeder; isolation tests. No admin screens yet |
 
