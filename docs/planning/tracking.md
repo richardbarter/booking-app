@@ -18,9 +18,8 @@ Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-ap
 
 ## Next up
 
-1. Decide which email the commits use before the first push makes it public (see the notes below). The product name is settled: Bookalive (see the decisions log).
-2. Write sub-plan 02, then build it. Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
-3. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
+1. Write sub-plan 02, then build it. Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
+2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
 
 Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
 
@@ -99,6 +98,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-27 | Frontend code is organised by type, as in the starter kit (`pages`, `layouts`, `components`, `composables`), with subfolders by area. Components and composables used by one area go in that area's folder (e.g. `components/admin/`). Shared ones go in a folder named after their topic (e.g. `components/scheduling/`), not loose at the top of `components/`. An area's component moves to a topic folder once a second area needs it | Keeps what's good about feature folders, since a component's folder shows who uses it, without their cost. Inertia finds pages by name in `resources/js/pages`, so feature folders would need a custom page resolver and extra paths in `config/inertia.php`, and Boost's Inertia guidance assumes `pages`. The areas also overlap a lot (the playground timeline becomes the admin calendar, and the strictness slider appears in both), so many components are shared anyway |
 | 2026-10-27 | Write sub-plans a few at a time, shortly before building them, rather than all at once. The overview's sub-plan table already sketches every one | Later plans depend on what earlier ones settle (the tables from 03, the engine's interfaces from 04, the queue setup from 02), so detailed plans written too early would need rewriting |
 | 2026-10-27 | The product is called Bookalive, with only the B capitalised. The Fly app is `bookalive` (`bookalive.fly.dev`), and the repo stays `booking-app` | Short, and it reads as one word. "Alive" suits availability that's always worked out from the current diary. Two UK booking systems have similar names (BookingLive, BookItLive); that's accepted. The name is cheap to change until links are shared, but a Fly app can't be renamed, so changing it later means a new app and a new URL |
+| 2026-10-27 | Commits use GitHub's no-reply address, set in the global git config. The existing commits were rewritten to use it before the first push | Commit emails become public with the repo and can't be removed once pushed. Commits still link to the GitHub account. The rewrite changed only the email: the files, dates, messages and merges are the same |
 
 ## Notes for the next session
 
@@ -113,7 +113,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
   - Add `composer audit` and `npm audit` to CI. Turn on GitHub's secret scanning and push protection, which are free for public repos.
   - Raise Larastan from level 7 to 8, which adds null checks. Level 8 currently reports 10 errors. All of them come from `$request->user()` possibly being null in the settings controllers and request, and Laravel's `#[CurrentUser]` attribute fixes them properly. Levels 9 and 10 mostly flag framework code, so stop at 8.
   - Decide on production error monitoring, for example Laravel Nightwatch or Sentry.
-  - Settle the commit author email before the first push (see 01b, step 3).
+  - In GitHub's email settings, turn on "Keep my email addresses private", so commits made on github.com (such as pull request merges) also use the no-reply address, and "Block command line pushes that expose my email".
   - Use the name Bookalive: `APP_NAME` in `.env.example` and on Fly, the README, and the heading in `.ai/guidelines/project.md` (then run `boost:update`). `VITE_APP_NAME` is compiled into the frontend, and the Dockerfile doesn't pass it yet, so the production build would fall back to "Laravel". Pass it as a build argument.
   - Laravel builds URLs, including password reset links, from the request's Host header. Configure trusted proxies for Fly and consider `trustHosts()`, checking that Fly's health checks still pass.
   - Supervisor keeps the container running even if nginx or PHP-FPM gives up, so Fly's HTTP health check on `/up` is what catches a broken machine.
