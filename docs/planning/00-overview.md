@@ -244,7 +244,7 @@ Later, the same import could bring a business's future bookings across when it s
 | Queues and scheduling | Laravel queues and scheduler (driver decided in sub-plan 02) |
 | Email | Mailpit locally; production provider decided in sub-plan 12 |
 | Embed widget | TypeScript, built as its own Vite entry, no framework |
-| Testing | PHPUnit, Vitest, Playwright |
+| Testing | PHPUnit, Vitest, Playwright; Infection for mutation testing (scheduling engine only); axe for accessibility checks in Playwright |
 | Code style | Laravel Pint; ESLint and Prettier if the starter kit includes them |
 | AI tooling | Laravel Boost (MCP), shadcn-vue MCP |
 | CI/CD | GitHub Actions, deploying to Fly.io |
@@ -308,6 +308,13 @@ The final schema for each table is set in the sub-plan that creates it.
 ## 10. Testing strategy
 
 - **Availability engine and waste score:** unit tests that take a timetable and check the expected slots. They cover clock-change days, buffers, gap edges, multiple practitioners, the booking window, strictness levels and the relaxation window.
+- **Randomised rule checks for the engine:** hundreds of random diaries, generated from a fixed seed so any failure can be reproduced, checked against rules that must always hold. They're written in plain PHPUnit, with no extra package. They start in 04, and new rules are added in 05 to 07:
+  - every offered slot, plus its buffer, fits inside working hours, without overlapping time off or any booking's blocked time
+  - every offered slot is inside the booking window
+  - raising strictness only ever hides slots, never adds any, so strictness 100 offers a subset of strictness 0
+  - at any strictness, every free gap with room for the service still offers at least one time
+  - within the relaxation window, strictness has no effect
+- **Mutation testing (Infection), on the scheduling engine only:** Infection makes small changes to the engine's code and checks that a test fails each time, which shows the tests would actually catch a bug. It's set up in 04. It needs a coverage driver (PCOV) in the dev image, and its PHPUnit 13 support needs confirming then. It's too slow for the whole app; 04 also decides whether it runs in CI and what minimum score it needs.
 - **Diary statistics:** a known diary produces known booked, stranded and fragmented minutes, and a known search log produces the right number of missed bookings.
 - **Imports:** sample CSV, Excel and .ics files; column detection; day-first and month-first dates; missing columns; cancelled appointments; calendar files that mix time zones.
 - **Feature tests:** every endpoint and policy, plus tenant isolation. One business must never see another's data, and one playground sandbox must never see another's.
@@ -319,6 +326,7 @@ The final schema for each table is set in the sub-plan that creates it.
   - admin setup
   - the widget embedded on another site
   - a booked slot disappearing from a second open browser window
+  - every page these tests visit is also checked for accessibility problems with axe (`@axe-core/playwright`)
 - Every sub-plan lists its own tests, and it isn't done until they pass in CI.
 
 ## 11. Ways of working
@@ -371,7 +379,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | # | Sub-plan | Delivers |
 |---|---|---|
-| 04 | Availability engine | Slot calculation (5.1), including time zones and the booking window; thorough unit tests |
+| 04 | Availability engine | Slot calculation (5.1), including time zones and the booking window; thorough unit tests; randomised rule checks; mutation testing with Infection |
 | 05 | Making bookings | Booking action; customers; locking + exclusion constraint; best-fit practitioner for "anyone available" |
 | 06 | Waste score | Waste score (5.3) in the engine and practitioner assignment; a day's stranded and fragmented time |
 | 07 | Strictness and relaxation | Strictness filter and relaxation window in the engine (5.4); settings stored on the business |
@@ -380,7 +388,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | # | Sub-plan | Delivers |
 |---|---|---|
-| 08 | Scheduling playground | Public page with per-visitor sandboxes (5.5): timeline, booking panel, strictness slider, hidden-time explanations, day figures, fill randomly and reset; first README with a GIF |
+| 08 | Scheduling playground | Public page with per-visitor sandboxes (5.5): timeline, booking panel, strictness slider, hidden-time explanations, day figures, fill randomly and reset; Playwright end-to-end tests with axe accessibility checks; first README with a GIF |
 | ★ | **Playground milestone** | **The core idea is live and shareable** |
 
 ### Phase 4: Full product

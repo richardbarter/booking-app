@@ -78,6 +78,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-26 | Boost is set up for Claude Code and Cursor. The project's own guidelines live in `.ai/guidelines/project.md`, and Boost writes them into both `CLAUDE.md` and `AGENTS.md` | One source for both agents. Edit `.ai/guidelines/project.md`, then run `php artisan boost:update`; don't edit the generated files |
 | 2026-10-26 | MCP servers start through `cmd /c` (Boost's as well as shadcn-vue's) | On native Windows, Claude Code and Cursor start commands without a shell, so they skip Herd's `php.bat` and found an old PHP 8.4.0 instead. `boost:install` writes plain `php` back, so re-apply this after reinstalling |
 | 2026-10-27 | Develop inside WSL 2 (Ubuntu), with the code on the Linux filesystem (sub-plan 01b) | Faster file access and tests; file names case-sensitive as in production; removes the Windows-only workarounds (Vite polling, `cmd /c` MCP commands, Herd PATH clashes). Docker recommends it with Docker Desktop's WSL 2 backend |
+| 2026-10-27 | Test the scheduling engine with randomised rule checks (plain PHPUnit, fixed seed) and mutation testing (Infection, engine only). Check pages for accessibility with axe in Playwright. `infection/infection` and `@axe-core/playwright` are approved as dev dependencies | The engine is the hardest part to get right. Random diaries find edge cases that hand-written examples miss, and mutation testing shows whether the tests would actually catch a bug. axe is cheap to add once Playwright arrives in 08 |
 
 ## Notes for the next session
 
