@@ -1,8 +1,8 @@
-# Booking App
+# Bookalive
 
 ## About
 
-An online booking system for small appointment-based businesses (clinics, therapists, salons, groomers). Customers book without an account through a public page or an embeddable widget. What sets it apart is how it chooses which times to offer: it scores each possible slot by how much unbookable time it would leave, and a per-business strictness slider controls how tightly the diary is packed.
+Bookalive is an online booking system for small appointment-based businesses (clinics, therapists, salons, groomers). Customers book without an account through a public page or an embeddable widget. What sets it apart is how it chooses which times to offer: it scores each possible slot by how much unbookable time it would leave, and a per-business strictness slider controls how tightly the diary is packed.
 
 **Before starting any work, read [docs/planning/00-overview.md](docs/planning/00-overview.md) and [docs/planning/tracking.md](docs/planning/tracking.md).** Each piece of work has its own sub-plan in [docs/planning/sub-plans/](docs/planning/sub-plans/). Background on the scheduling problem is in [docs/background.md](docs/background.md).
 
@@ -18,6 +18,7 @@ Docker is the main way to run the app. The app is at http://localhost:8001 and M
 - `npm run check`: lint and format check (Vite+: Oxlint and Oxfmt)
 - `npm run types:check`: `vue-tsc`
 - `npm run test`: Vitest
+- `composer ci:check`: every check CI runs (all of the above, plus a Pint check and PHPUnit). Run it before opening a pull request
 
 The containers share the code, `vendor` and `node_modules` with the host and run as the host user, so install packages once, on the host or in the `app` container. On Windows, the host is Ubuntu in WSL 2.
 
@@ -31,6 +32,7 @@ The containers share the code, `vendor` and `node_modules` with the host and run
 - Order inside `<script setup>`: imports, types, constants, reactive state, functions, watchers, lifecycle hooks, side effects.
 - Use Pinia only when props, events and Inertia props aren't enough.
 - shadcn-vue components are thin wrappers around reka-ui. When one misbehaves, check the reka-ui docs.
+- Docs and UI text use British English (organise, colour, licence, diary). Code follows the framework's spelling (`authorize`, `color`).
 
 ## Code layout
 
@@ -55,8 +57,15 @@ Organise code by type, Laravel's and the starter kit's default, with subfolders 
 - Store times in UTC.
 - Scheduling code receives the business it works on, rather than reading it from the logged-in user.
 - Every tenant-owned table has a `business_id`.
+- Nothing in production may query the database on a timer, so Neon's free compute can sleep: no database queue, no polling, and health checks stay off the database. Sub-plan 02 explains why.
+- Fix the cause of every Larastan error (level 9 from sub-plan 02). No ignore rules, baselines, or casts and `@var` tags that only silence it.
+- Use the newest stable versions of tools and packages, not the ones a plan happens to name. Record any reason to stay on an older version in `tracking.md`.
 
 ## Workflow
 
-- One sub-plan per branch (`feature/NN-short-name`) and pull request, then update `tracking.md`.
-- The repo is public, so docs stay about the product.
+- `main` only accepts pull requests that pass CI (the `checks` and `audit` jobs), so never push to it directly. Every change goes on a branch with its own pull request: `feature/NN-short-name` for a sub-plan, `docs/short-name` for docs-only changes. Pull requests are merged with a merge commit.
+- Update `tracking.md` as part of each sub-plan's pull request.
+- Once sub-plan 02 is done, merging to `main` deploys to production automatically.
+- Check how the framework or a package behaves (in `vendor/`, its docs, or by reproducing it locally) before relying on it in a plan or a fix. Silencing a type error isn't the same as fixing the bug.
+- Secrets never go in the repo, in chat, or in a command that lands in shell history. Production secrets live in Fly (`fly secrets import`) and the GitHub `production` environment (`gh secret set`), piped in from standard input.
+- The repo is public, so docs stay about the product: no personal, account or billing details.
