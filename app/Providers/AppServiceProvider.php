@@ -3,10 +3,13 @@
 namespace App\Providers;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Nightwatch\Facades\Nightwatch;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureMonitoring();
     }
 
     /**
@@ -46,5 +50,16 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
+    }
+
+    /**
+     * Keep Fly's health checks out of Nightwatch.
+     *
+     * Fly calls /up every 30 seconds while the Machine is running, and
+     * recording each one would use up Nightwatch's event allowance for nothing.
+     */
+    protected function configureMonitoring(): void
+    {
+        Event::listen(DiagnosingHealth::class, fn () => Nightwatch::dontSample());
     }
 }
