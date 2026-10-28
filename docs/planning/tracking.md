@@ -16,10 +16,11 @@ Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
 - **Step 3 is done:** the Neon project `bookalive` is in AWS Europe (London), with Postgres 18, a `bookalive` database and autoscaling from 0.25 to 0.5 CU. The first deploy (step 7) proves the app can connect to it.
 - **Step 4 is done:** the Fly app `bookalive` is in the existing `personal` organization. Its secrets `APP_KEY`, `DB_URL` and `NIGHTWATCH_TOKEN` are staged and take effect on the first deploy. The `production` environment's `FLY_API_TOKEN` is a deploy token named `github-actions`, limited to this app, which **expires on 2027-10-28**. CI deploys fail after that until it's replaced with the command in step 4.3.
 - **Step 5 is done:** the Bookalive name, `fly.toml`, the Dockerfile's `VITE_APP_NAME`, Nightwatch (1.30, off locally, its agent under Supervisor in production only), trusted proxies and hosts, security headers (`bepsvpt/secure-headers` 9.1), sign-up off in production, and Larastan at level 9 with no errors. PHPUnit has 53 tests. The production image was built and run locally: `/up` returns 200 with Fly's `Host` header and 400 with any other, the headers and HSTS are sent, there are no register routes, PHP is 8.5.12 and the Nightwatch agent starts. PHPUnit 13.4.5 and `symfony/mime` 8.1.10 fixed two advisories published on 2026-10-27 and 2026-10-28.
+- **Step 6 is done on the branch, to be proven by CI on the pull request:** `ci.yml` replaces the starter kit's `tests` workflow, with the `checks`, `audit` and `deploy` jobs and every action pinned to a commit (actionlint finds no problems). Dependabot covers Composer, npm, the Dockerfile, Docker Compose and GitHub Actions. It ignores TypeScript 7, `@laravel/passkeys` from 0.3 (until the PHP package moves) and PostgreSQL majors in Docker Compose (which follow Neon). CodeQL's default setup scans `actions` and `javascript-typescript`.
 - **Expected failures until the 02 pull request merges:**
-  - The starter kit's old `tests` workflow fails on `main`.
+  - The starter kit's old `tests` workflow still fails on `main`. The 02 branch deletes it.
   - No pull request can merge, because the ruleset requires the `checks` and `audit` jobs, which arrive with the 02 pull request.
-- **Still to check in step 6:** CodeQL's language list, which was empty while its first scan ran.
+  - Dependabot only reads its config from `main`, so its config errors (if any) show under **Insights → Dependency graph → Dependabot** after the merge.
 
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
@@ -31,7 +32,7 @@ Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
 
 ## Next up
 
-1. Finish building sub-plan 02, starting at step 6 (CI and Dependabot). Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
+1. Finish building sub-plan 02: open the pull request as a draft so CI runs, then step 7 (the first deploy from the branch). Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
 2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
 
 Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
@@ -45,7 +46,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
-| 02 | CI and deployment | In progress | | Steps 1 to 5 done |
+| 02 | CI and deployment | In progress | | Steps 1 to 6 done |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |

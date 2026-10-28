@@ -207,10 +207,10 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
 - **`deploy` job:**
   - runs only on pushes to `main`, after `checks` and `audit` pass
   - uses the `production` environment, in a concurrency group that never cancels a deploy in progress
-  - sets up `flyctl` with `superfly/flyctl-actions/setup-flyctl`, pinned to a SHA, then runs `flyctl deploy --remote-only` with `FLY_API_TOKEN`
+  - sets up `flyctl` with `superfly/flyctl-actions/setup-flyctl`, pinned to a SHA, then runs `flyctl deploy --remote-only` with `FLY_API_TOKEN`. Use tag `1.6`: the latest GitHub release, `1.5`, still runs on Node 20, which GitHub Actions has retired, and `1.6` moved it to Node 24
 - Give every job a `timeout-minutes`.
 
-**Dependabot.** Add the `composer`, `npm`, `docker` (the Dockerfile) and `docker-compose` ecosystems next to `github-actions`. Check them weekly, group minor and patch updates per ecosystem, and keep the existing 5-day cooldown, so a newly published release has time to be pulled if it turns out to be bad. GitHub reports config errors under **Insights → Dependency graph → Dependabot**.
+**Dependabot.** Add the `composer`, `npm`, `docker` (the Dockerfile) and `docker-compose` ecosystems next to `github-actions`. Check them weekly, group minor and patch updates per ecosystem, and keep the existing 5-day cooldown, so a newly published release has time to be pulled if it turns out to be bad. It ignores the updates the decisions log holds back: TypeScript 7, `@laravel/passkeys` beyond the PHP package's version, and PostgreSQL majors in Docker Compose, which follow Neon. GitHub reports config errors under **Insights → Dependency graph → Dependabot**.
 
 ### 7. First deploy (from the branch)
 
