@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ca280e0a60da09391dd4ef75bfa2a8e2",
+    "content-hash": "3b0544094e181dc4620ad8c80f628ebf",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -60,6 +60,88 @@
                 "source": "https://github.com/Bacon/BaconQrCode/tree/v3.1.1"
             },
             "time": "2026-04-05T21:06:35+00:00"
+        },
+        {
+            "name": "bepsvpt/secure-headers",
+            "version": "9.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/bepsvpt/secure-headers.git",
+                "reference": "dd972411f9a231259cdd7a66c2d9fa3f1c39858a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/bepsvpt/secure-headers/zipball/dd972411f9a231259cdd7a66c2d9fa3f1c39858a",
+                "reference": "dd972411f9a231259cdd7a66c2d9fa3f1c39858a",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^7.1 || ^8.0"
+            },
+            "require-dev": {
+                "ergebnis/composer-normalize": "^2.48",
+                "ext-xdebug": "*",
+                "laravel/pint": "^1.25",
+                "orchestra/testbench": "^3.1 || ^4.18 || ^5.20 || ^6.47 || ^7.55 || ^8.36 || ^9.15 || ^10.6 || ^11.0",
+                "phpstan/extension-installer": "^1.4",
+                "phpstan/phpstan": "^2.1",
+                "phpstan/phpstan-deprecation-rules": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "phpunit/phpunit": "^5.7 || ^6.5 || ^7.5 || ^8.5 || ^9.6 || ^10.5 || ^11.5 || ^12.4"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Bepsvpt\\SecureHeaders\\SecureHeadersServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "Bepsvpt\\SecureHeaders\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "bepsvpt",
+                    "email": "6ibrl@cpp.tw"
+                }
+            ],
+            "description": "Add security related headers to HTTP response. The package includes Service Providers for easy Laravel integration.",
+            "homepage": "https://github.com/bepsvpt/secure-headers",
+            "keywords": [
+                "clear-site-data",
+                "content-security-policy",
+                "csp",
+                "except-ct",
+                "feature-policy",
+                "header",
+                "hsts",
+                "https",
+                "laravel",
+                "permissions-policy",
+                "referrer-policy"
+            ],
+            "support": {
+                "issues": "https://github.com/bepsvpt/secure-headers/issues",
+                "source": "https://github.com/bepsvpt/secure-headers/tree/9.1.1"
+            },
+            "funding": [
+                {
+                    "url": "https://opencollective.com/secure-headers",
+                    "type": "open_collective"
+                }
+            ],
+            "time": "2026-07-21T05:26:45+00:00"
         },
         {
             "name": "brick/math",

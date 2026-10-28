@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\UseFlyClientIp;
+use Bepsvpt\SecureHeaders\SecureHeadersMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -31,7 +31,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Only APP_URL's host and its subdomains. Laravel skips this locally and in tests.
         $middleware->trustHosts();
 
-        $middleware->append(AddSecurityHeaders::class);
+        // Security headers, set in config/secure-headers.php.
+        $middleware->append(SecureHeadersMiddleware::class);
 
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
