@@ -15,7 +15,7 @@ Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
 - **Step 2 is done:** the repo is public at https://github.com/richardbarter/booking-app. It has the `main` ruleset, the security features and the `production` environment.
 - **Step 3 is done:** the Neon project `bookalive` is in AWS Europe (London), with Postgres 18, a `bookalive` database and autoscaling from 0.25 to 0.5 CU. The first deploy (step 7) proves the app can connect to it.
 - **Step 4 is done:** the Fly app `bookalive` is in the existing `personal` organization. Its secrets `APP_KEY`, `DB_URL` and `NIGHTWATCH_TOKEN` are staged and take effect on the first deploy. The `production` environment's `FLY_API_TOKEN` is a deploy token named `github-actions`, limited to this app, which **expires on 2027-10-28**. CI deploys fail after that until it's replaced with the command in step 4.3.
-- **Step 5.4 is partly done:** `laravel/nightwatch` 1.30 is installed and turned off locally (`NIGHTWATCH_ENABLED=false` in `.env.example`). The Supervisor setup for its agent is still to do. Boost added its `configure-nightwatch` skill. PHPUnit 13.4.5 and `symfony/mime` 8.1.10 fix two advisories published on 2026-10-27 and 2026-10-28, so `composer audit` is clean again.
+- **Step 5 is done:** the Bookalive name, `fly.toml`, the Dockerfile's `VITE_APP_NAME`, Nightwatch (1.30, off locally, its agent under Supervisor in production only), trusted proxies and hosts, security headers, sign-up off in production, and Larastan at level 9 with no errors. PHPUnit has 53 tests. The production image was built and run locally: `/up` returns 200 with Fly's `Host` header and 400 with any other, the headers and HSTS are sent, there are no register routes, PHP is 8.5.12 and the Nightwatch agent starts. PHPUnit 13.4.5 and `symfony/mime` 8.1.10 fixed two advisories published on 2026-10-27 and 2026-10-28.
 - **Expected failures until the 02 pull request merges:**
   - The starter kit's old `tests` workflow fails on `main`.
   - No pull request can merge, because the ruleset requires the `checks` and `audit` jobs, which arrive with the 02 pull request.
@@ -31,7 +31,7 @@ Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
 
 ## Next up
 
-1. Finish building sub-plan 02, starting at step 5 (the app changes; 5.4 is partly done). Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
+1. Finish building sub-plan 02, starting at step 6 (CI and Dependabot). Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
 2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
 
 Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
@@ -45,7 +45,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
-| 02 | CI and deployment | In progress | | Steps 1 to 4 done |
+| 02 | CI and deployment | In progress | | Steps 1 to 5 done |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
@@ -113,6 +113,8 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-27 | The product is called Bookalive, with only the B capitalised. The Fly app is `bookalive` (`bookalive.fly.dev`), and the repo stays `booking-app` | Short, and it reads as one word. "Alive" suits availability that's always worked out from the current diary. Two UK booking systems have similar names (BookingLive, BookItLive); that's accepted. The name is cheap to change until links are shared, but a Fly app can't be renamed, so changing it later means a new app and a new URL |
 | 2026-10-27 | Commits use GitHub's no-reply address, set in the global git config. The existing commits were rewritten to use it before the first push | Commit emails become public with the repo and can't be removed once pushed. Commits still link to the GitHub account. The rewrite changed only the email: the files, dates, messages and merges are the same |
 | 2026-10-28 | Set Neon up in its console only. Don't follow the agent prompt Neon shows after creating a project (install the `neon` CLI, `neon init`, `neon deploy`) | That prompt is for JavaScript apps that use Neon in local development. `neon deploy` would write the production connection string into the local `.env`, and `neon init` adds Neon's own config file (`neon.ts`) to the repo. Here Neon is production only: local development and tests use the Docker PostgreSQL, and Laravel's `pgsql` connection reads `DB_URL`, which goes straight from the console to Fly as a secret |
+| 2026-10-28 | Trust only the address that connects (`trustProxies(at: 'REMOTE_ADDR')`), and take the client IP from Fly's `Fly-Client-IP` header through a `UseFlyClientIp` middleware. Production checks that forged IPs still get rate limited | Laravel 13's `at: '*'` trusts every address in `X-Forwarded-For`, so `ip()` returned an address the client wrote itself, and the IP-based rate limiters could be dodged. Fly's `X-Forwarded-For` ends with the app's own IP, so no position in it is reliably the client, and Fly recommends `Fly-Client-IP`. Its docs don't say whether a client can forge that header, hence the production check |
+| 2026-10-28 | Sign-up is switched off with its own setting, `REGISTRATION_ENABLED` (on by default, `"false"` in `fly.toml`), not by `APP_ENV`. A shared `canRegister` prop hides the links | The image's assets stage has no `APP_ENV`, so Laravel treats it as production. Wayfinder wouldn't generate the register routes, and the pages that import them would break the build. 09 removes the setting when owner sign-up arrives |
 
 ## Notes for the next session
 

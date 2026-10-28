@@ -167,21 +167,23 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
      size = "shared-cpu-1x"
      memory = "512mb"
    ```
-   The entrypoint already caches config at startup and runs `release_command` through `exec "$@"`, so it needs no changes. `NIGHTWATCH_REQUEST_SAMPLE_RATE` is left out on purpose, so Nightwatch records every request (see Notes).
+   The entrypoint already caches config at startup and runs `release_command` through `exec "$@"`, so it needs no changes. `NIGHTWATCH_REQUEST_SAMPLE_RATE` is left out on purpose, so Nightwatch records every request (see Notes). The real `fly.toml` also sets `REGISTRATION_ENABLED = "false"` (item 7) and gives the health check a `Host` header (item 5).
 3. **Dockerfile.** Add `ARG VITE_APP_NAME` to the `assets` stage before `npm run build`. Vite reads `VITE_*` variables from the environment, and the image has no `.env`, so without it page titles would say "Laravel".
 4. **Nightwatch** (a new dependency, approved with this plan). Run `composer require laravel/nightwatch`. Add `NIGHTWATCH_ENABLED=false` to `.env.example`, because there's no agent locally; `phpunit.xml` already turns it off for tests. Run the agent under Supervisor in production only: add an `[include]` for `/etc/supervisor/conf.d/*.conf` to `supervisord.conf`, copy a `nightwatch.conf` (running `php artisan nightwatch:agent`) into that folder in the `php` stage, and delete it again in the `dev` stage.
 5. **Proxies and hosts** in `bootstrap/app.php`:
-   - `trustProxies(at: '*', headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO)`. Trusting every proxy is safe on Fly, because a Machine can only be reached from the internet through Fly's proxy. Only these two headers are trusted: Fly passes the browser's `Host` header through unchanged, so `X-Forwarded-Host` and `X-Forwarded-Port` are never needed, and trusting them would let anyone rewrite the host in password reset links.
-   - `trustHosts()`, which accepts only `APP_URL`'s host (and its subdomains) outside local and tests. If Fly's health checks then fail, give the check a `Host` header in `fly.toml`.
+   - `trustProxies(at: 'REMOTE_ADDR', headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO)`, which trusts whichever address connected. That's safe on Fly, because a Machine can only be reached from the internet through Fly's proxy. Not `at: '*'`: in Laravel 13 that trusts every address in `X-Forwarded-For`, so `ip()` returns the leftmost entry, which the client writes itself. Only these two headers are trusted: Fly passes the browser's `Host` header through unchanged, so `X-Forwarded-Host` and `X-Forwarded-Port` are never needed, and trusting them would let anyone rewrite the host in password reset links.
+   - A `UseFlyClientIp` middleware, prepended to the global stack, puts Fly's `Fly-Client-IP` header in place of `X-Forwarded-For`. Fly's `X-Forwarded-For` holds whatever the client sent, with the app's own IP as the rightmost entry, so no position in it is reliably the client. Fly recommends `Fly-Client-IP` instead. Its docs don't say whether Fly overwrites one a client sends, so a production check tests it.
+   - `trustHosts()`, which accepts only `APP_URL`'s host (and its subdomains) outside local and tests. `TrustProxies` reads the host too, so a request with any other `Host` is rejected with a 400 before it reaches a route. Fly's health checks reach the Machine directly rather than through `bookalive.fly.dev`, so the check sends `Host: bookalive.fly.dev`.
 6. **Security headers.** Add an `AddSecurityHeaders` middleware in `app/Http/Middleware`, appended to every response:
    - `X-Content-Type-Options: nosniff`
    - `Referrer-Policy: strict-origin-when-cross-origin`
    - `X-Frame-Options: DENY` (18 relaxes this for `/embed/*`)
    - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
    - `Strict-Transport-Security: max-age=31536000` on HTTPS responses only, without `includeSubDomains` or `preload` until the custom domain is set up
-7. **Sign-up off in production until 09.** In `config/fortify.php`, only include `Features::registration()` outside production. Until 09 there's nothing behind an account, and with mail going to the log, nobody could verify their email or reset their password. This keeps strangers' personal data out of the live database. 09 turns registration back on, as the owner sign-up.
+7. **Sign-up off in production until 09.** In `config/fortify.php`, include `Features::registration()` only while `REGISTRATION_ENABLED` is true (the default), and set it to `"false"` in `fly.toml`. It can't follow `APP_ENV`: the image's assets stage runs without one, so Laravel treats the build as production, and Wayfinder wouldn't generate the register routes that `Welcome.vue`, `Login.vue` and `Register.vue` import, which breaks the build. A shared `canRegister` Inertia prop hides the Register and Sign up links when registration is off. Until 09 there's nothing behind an account, and with mail going to the log, nobody could verify their email or reset their password. This keeps strangers' personal data out of the live database. 09 turns registration back on, as the owner sign-up.
 8. **Larastan level 9.** Raise `level` in `phpstan.neon` to 9 and fix its 13 errors properly, with no ignore rules or baseline:
-   - 10 come from `$request->user()` possibly being null in the settings controllers and request. Laravel's `#[CurrentUser]` attribute fixes them.
+   - 9 come from `$request->user()` possibly being null in the settings controllers and request. Laravel's `#[CurrentUser]` attribute fixes them.
+   - 1 is a passkey's `created_at`, which the passkeys package types as nullable (its table uses `timestamps()`). The security page now handles a missing date, in PHP, the `Passkey` type and `PasskeyItem.vue`.
    - 2 are a real bug in the login and passkey rate limiters in `FortifyServiceProvider`. They use form input as a string without checking, so a login request with `email[]=x` returns a 500 error instead of a validation error. Check the value with `is_string()` before using it, and fall back to the IP address alone (or the session ID, for passkeys). `$request->string()` isn't enough, because it converts an array to a string, which PHP still reports as an error.
    - 1 is `parse_url(config('app.url'))` in `config/fortify.php`. Use `config()->string('app.url')`, which throws if the value isn't a string.
 
@@ -238,7 +240,8 @@ Open the pull request from `feature/02-ci-deployment`. Once `checks` and `audit`
 ## Tests
 
 **Automated**
-- A feature test for the trusted proxy settings: behind a trusted proxy, `request()->ip()` is the address Fly appends to `X-Forwarded-For` (not one the client sent itself), `X-Forwarded-Proto: https` makes generated URLs `https`, and `X-Forwarded-Host` is ignored.
+- A feature test for the trusted proxy settings: behind a trusted proxy, `request()->ip()` is `Fly-Client-IP` rather than anything in `X-Forwarded-For`; without it, entries before the proxy are ignored; `X-Forwarded-Proto: https` makes generated URLs `https`; and `X-Forwarded-Host` and `X-Forwarded-Port` are ignored.
+- A feature test that pages share `canRegister`, false when registration is off.
 - A feature test that pages carry the security headers, and that HSTS is only sent over HTTPS.
 - Feature tests that a login request with an array email (`email[]=x`), and a passkey login with an array `credential.id`, get a validation error, not a 500.
 - The whole suite and every check pass in CI on the pull request: Pint, Larastan at level 9, PHPUnit on PostgreSQL 18, Oxlint and Oxfmt, `vue-tsc`, the build, Vitest and both audits.
@@ -250,6 +253,12 @@ Open the pull request from `feature/02-ci-deployment`. Once `checks` and `audit`
 - There's no Register link, and `/register` returns 404.
 - Links and assets use `https://bookalive.fly.dev`, with no `:8080`.
 - `curl -s -H 'X-Forwarded-Host: evil.example' https://bookalive.fly.dev/login | grep -c evil.example` prints 0.
+- Forged client IPs don't get round rate limiting. The passkey limiter allows 10 requests a minute per session and IP, so with one session cookie and a different made-up IP each time, the 11th request returns 429. If all 11 return 200, Fly passes a client's `Fly-Client-IP` through, and the IP setup needs another approach before relying on it:
+  ```bash
+  jar=$(mktemp); for i in $(seq 1 11); do curl -s -o /dev/null -w '%{http_code} ' -b "$jar" -c "$jar" \
+      -H "Fly-Client-IP: 198.51.100.$i" -H "X-Forwarded-For: 198.51.100.$i" \
+      https://bookalive.fly.dev/passkeys/login/options; done; echo; rm "$jar"
+  ```
 - A test exception (`fly ssh console -C "php artisan tinker --execute 'report(new Exception(\"Nightwatch test\"));'"`) shows up in Nightwatch.
 - After 5 minutes with no visitors, Neon's console shows the compute as idle even though Fly's health checks keep running. `fly status` shows the Machine suspended, and the next visit wakes both.
 
