@@ -78,6 +78,10 @@ jobs:
 
       - name: Run the checks
         run: composer ci:check
+        env:
+          # Vitest loads vite.config.ts in dev-server mode, which the Laravel
+          # Vite plugin refuses when CI is set. Nothing serves HMR here.
+          LARAVEL_BYPASS_ENV_CHECK: '1'
 
   # Reads only the lock files, so nothing needs installing.
   audit:
