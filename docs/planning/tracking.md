@@ -9,11 +9,12 @@ Sub-plan 01 is done. The Laravel 13 Vue starter kit runs in Docker (PostgreSQL 1
 Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-app` in Ubuntu, the dev containers run as the developer's user and share `vendor` and `node_modules` with Ubuntu, and the Windows-only workarounds are gone. PHPUnit's 42 tests take about 2.5s, in the container or in Ubuntu, against 7.3s on Windows.
 
 Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
-- **Step 1.1 is done:** flyctl 0.4.123 is installed in Ubuntu and logged in, and Bookalive goes in the existing `personal` organization (step 4).
+- **Step 1.1 is done:** flyctl is installed in Ubuntu and logged in. It updates itself, and went from 0.4.123 to 0.5.0 on 2026-10-28.
 - **Step 1.2 is done:** Neon is set up, through an existing account signed in with GitHub.
-- **Step 1.3 is done:** the Nightwatch application Bookalive is in the EU region (Frankfurt), with a `production` environment. Its token goes to Fly in step 4. The package is installed in step 5.
-- **Step 2 is done:** the repo is public at https://github.com/richardbarter/booking-app. It has the `main` ruleset, the security features and the `production` environment, which still needs its `FLY_API_TOKEN` in step 4.
-- **Step 3 is done:** the Neon project `bookalive` is in AWS Europe (London), with Postgres 18, a `bookalive` database and autoscaling from 0.25 to 0.5 CU. The app isn't connected to it yet. Its connection string goes straight from Neon's console to Fly in step 4, and the first deploy (step 7) proves the connection works.
+- **Step 1.3 is done:** the Nightwatch application Bookalive is in the EU region (Frankfurt), with a `production` environment. The package is installed in step 5.
+- **Step 2 is done:** the repo is public at https://github.com/richardbarter/booking-app. It has the `main` ruleset, the security features and the `production` environment.
+- **Step 3 is done:** the Neon project `bookalive` is in AWS Europe (London), with Postgres 18, a `bookalive` database and autoscaling from 0.25 to 0.5 CU. The first deploy (step 7) proves the app can connect to it.
+- **Step 4 is done:** the Fly app `bookalive` is in the existing `personal` organization. Its secrets `APP_KEY`, `DB_URL` and `NIGHTWATCH_TOKEN` are staged and take effect on the first deploy. The `production` environment's `FLY_API_TOKEN` is a deploy token named `github-actions`, limited to this app, which **expires on 2027-10-28**. CI deploys fail after that until it's replaced with the command in step 4.3.
 - **Step 5.4 is partly done:** `laravel/nightwatch` 1.30 is installed and turned off locally (`NIGHTWATCH_ENABLED=false` in `.env.example`). The Supervisor setup for its agent is still to do. Boost added its `configure-nightwatch` skill. PHPUnit 13.4.5 and `symfony/mime` 8.1.10 fix two advisories published on 2026-10-27 and 2026-10-28, so `composer audit` is clean again.
 - **Expected failures until the 02 pull request merges:**
   - The starter kit's old `tests` workflow fails on `main`.
@@ -30,7 +31,7 @@ Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
 
 ## Next up
 
-1. Finish building sub-plan 02, starting at step 4 (the Fly app and its secrets). Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
+1. Finish building sub-plan 02, starting at step 5 (the app changes; 5.4 is partly done). Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
 2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
 
 Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
@@ -44,7 +45,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
-| 02 | CI and deployment | In progress | | Steps 1, 2 and 3 done |
+| 02 | CI and deployment | In progress | | Steps 1 to 4 done |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
