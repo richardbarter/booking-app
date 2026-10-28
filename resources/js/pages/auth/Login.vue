@@ -102,7 +102,10 @@ defineProps<{
             </Button>
         </div>
 
-        <div class="text-center text-sm text-muted-foreground">
+        <div
+            v-if="$page.props.canRegister"
+            class="text-center text-sm text-muted-foreground"
+        >
             Don't have an account?
             <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
         </div>
