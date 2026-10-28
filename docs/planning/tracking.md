@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Current status
 
@@ -10,7 +10,11 @@ Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-ap
 
 Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
 - **Step 1.1 is done:** flyctl 0.4.123 is installed in Ubuntu and logged in, and Bookalive goes in the existing `personal` organization (step 4).
+- **Step 1.2 is done:** Neon is set up, through an existing account signed in with GitHub.
+- **Step 1.3 is done:** the Nightwatch application Bookalive is in the EU region (Frankfurt), with a `production` environment. Its token goes to Fly in step 4. The package is installed in step 5.
 - **Step 2 is done:** the repo is public at https://github.com/richardbarter/booking-app. It has the `main` ruleset, the security features and the `production` environment, which still needs its `FLY_API_TOKEN` in step 4.
+- **Step 3 is done:** the Neon project `bookalive` is in AWS Europe (London), with Postgres 18, a `bookalive` database and autoscaling from 0.25 to 0.5 CU. The app isn't connected to it yet. Its connection string goes straight from Neon's console to Fly in step 4, and the first deploy (step 7) proves the connection works.
+- **Step 5.4 is partly done:** `laravel/nightwatch` 1.30 is installed and turned off locally (`NIGHTWATCH_ENABLED=false` in `.env.example`). The Supervisor setup for its agent is still to do. Boost added its `configure-nightwatch` skill. PHPUnit 13.4.5 and `symfony/mime` 8.1.10 fix two advisories published on 2026-10-27 and 2026-10-28, so `composer audit` is clean again.
 - **Expected failures until the 02 pull request merges:**
   - The starter kit's old `tests` workflow fails on `main`.
   - No pull request can merge, because the ruleset requires the `checks` and `audit` jobs, which arrive with the 02 pull request.
@@ -26,7 +30,7 @@ Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
 
 ## Next up
 
-1. Finish building sub-plan 02, starting at steps 1.2 and 1.3 (Neon and Nightwatch sign-ups), then step 3. Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
+1. Finish building sub-plan 02, starting at step 4 (the Fly app and its secrets). Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
 2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
 
 Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
@@ -40,7 +44,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
-| 02 | CI and deployment | In progress | | Steps 1.1 and 2 done |
+| 02 | CI and deployment | In progress | | Steps 1, 2 and 3 done |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
@@ -107,6 +111,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-27 | Write sub-plans a few at a time, shortly before building them, rather than all at once. The overview's sub-plan table already sketches every one | Later plans depend on what earlier ones settle (the tables from 03, the engine's interfaces from 04, the queue setup from 02), so detailed plans written too early would need rewriting |
 | 2026-10-27 | The product is called Bookalive, with only the B capitalised. The Fly app is `bookalive` (`bookalive.fly.dev`), and the repo stays `booking-app` | Short, and it reads as one word. "Alive" suits availability that's always worked out from the current diary. Two UK booking systems have similar names (BookingLive, BookItLive); that's accepted. The name is cheap to change until links are shared, but a Fly app can't be renamed, so changing it later means a new app and a new URL |
 | 2026-10-27 | Commits use GitHub's no-reply address, set in the global git config. The existing commits were rewritten to use it before the first push | Commit emails become public with the repo and can't be removed once pushed. Commits still link to the GitHub account. The rewrite changed only the email: the files, dates, messages and merges are the same |
+| 2026-10-28 | Set Neon up in its console only. Don't follow the agent prompt Neon shows after creating a project (install the `neon` CLI, `neon init`, `neon deploy`) | That prompt is for JavaScript apps that use Neon in local development. `neon deploy` would write the production connection string into the local `.env`, and `neon init` adds Neon's own config file (`neon.ts`) to the repo. Here Neon is production only: local development and tests use the Docker PostgreSQL, and Laravel's `pgsql` connection reads `DB_URL`, which goes straight from the console to Fly as a secret |
 
 ## Notes for the next session
 

@@ -75,7 +75,7 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
 
 1. **Fly.io:** sign up at fly.io and add a card. In Ubuntu, install `flyctl` with the command from Fly's install docs (`curl -L https://fly.io/install.sh | sh`), add it to your `PATH` as the installer says, then run `fly auth login`.
 2. **Neon:** sign up at neon.com. Signing in with GitHub is fine.
-3. **Nightwatch:** sign up at nightwatch.laravel.com and create an application named Bookalive in the **EU** region, with a `production` environment. Keep its token for step 4.
+3. **Nightwatch:** sign up at nightwatch.laravel.com and create an application named Bookalive in the **EU** region, with a `production` environment. Its token stays in Nightwatch (the application's settings, under **Environments**) until step 4, and only ever goes to Fly, never into a local `.env`. Skip the setup steps Nightwatch shows after that: this plan installs the package (step 5.4), sets the token (step 4) and runs the agent under Supervisor (step 5.4). Request sampling stays at the default 100% (see Notes).
 4. **Licence:** none for now, so all rights are reserved (see Notes). Before the first push, Claude sets `license` in `composer.json` to `"proprietary"` and adds a line to the README saying the code is public to read but all rights are reserved.
 
 ### 2. GitHub repo
@@ -104,10 +104,16 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
 ### 4. Fly app and secrets (you, with Claude)
 
 1. Run `fly platform regions` to confirm `lhr` is still offered, then create the app without launching it, in your existing personal organization: `fly apps create bookalive --org personal`. That organization keeps the old plan's free allowances, and a new organization wouldn't get them. Don't use `fly launch`, which writes its own Dockerfile and settings for Laravel.
-2. Set the secrets with `fly secrets import --stage`, which reads them from standard input, so they don't end up in your shell history:
+2. Set the secrets with `fly secrets import --stage`, which reads them from standard input, so they don't end up in your shell history. `read -rs` asks for each value without showing it, and the `DB_URL` line swaps the query string Neon gives for the one from step 3:
    ```bash
    echo "APP_KEY=$(php artisan key:generate --show)" | fly secrets import --stage -a bookalive
-   fly secrets import --stage -a bookalive   # paste DB_URL=... and NIGHTWATCH_TOKEN=..., then Ctrl-D
+   read -rsp 'Neon connection string: ' url && echo \
+       && printf 'DB_URL=%s?sslmode=verify-full&sslrootcert=system\n' "${url%%\?*}" \
+       | fly secrets import --stage -a bookalive; unset url
+   read -rsp 'Nightwatch token: ' token && echo \
+       && printf 'NIGHTWATCH_TOKEN=%s\n' "$token" \
+       | fly secrets import --stage -a bookalive; unset token
+   fly secrets list -a bookalive   # names and digests only, never the values
    ```
 3. Create a deploy token that only works for this app and expires in a year, and send it straight to the GitHub environment:
    ```bash
@@ -161,7 +167,7 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
      size = "shared-cpu-1x"
      memory = "512mb"
    ```
-   The entrypoint already caches config at startup and runs `release_command` through `exec "$@"`, so it needs no changes.
+   The entrypoint already caches config at startup and runs `release_command` through `exec "$@"`, so it needs no changes. `NIGHTWATCH_REQUEST_SAMPLE_RATE` is left out on purpose, so Nightwatch records every request (see Notes).
 3. **Dockerfile.** Add `ARG VITE_APP_NAME` to the `assets` stage before `npm run build`. Vite reads `VITE_*` variables from the environment, and the image has no `.env`, so without it page titles would say "Laravel".
 4. **Nightwatch** (a new dependency, approved with this plan). Run `composer require laravel/nightwatch`. Add `NIGHTWATCH_ENABLED=false` to `.env.example`, because there's no agent locally; `phpunit.xml` already turns it off for tests. Run the agent under Supervisor in production only: add an `[include]` for `/etc/supervisor/conf.d/*.conf` to `supervisord.conf`, copy a `nightwatch.conf` (running `php artisan nightwatch:agent`) into that folder in the `php` stage, and delete it again in the `dev` stage.
 5. **Proxies and hosts** in `bootstrap/app.php`:
@@ -266,6 +272,7 @@ Open the pull request from `feature/02-ci-deployment`. Once `checks` and `audit`
 - **Content Security Policy in 11.** A CSP needs a nonce on Vite's scripts and care with reka-ui's inline styles, and the embed (18) needs `frame-ancestors` per route. 11 is the first page where customers enter their details, so the CSP arrives with it, and 18 adjusts it for `/embed/*`.
 - **The deploy token expires after a year.** CI deploys start failing when it does. Record the expiry date in `tracking.md`, and create a new token with the command in step 4.
 - **Watch Neon's usage in the first few weeks.** The console shows CU-hours used this month. If they're climbing faster than expected, something is waking the database.
+- **Watch Nightwatch's usage too.** Nightwatch suggests recording 10% of requests, but Bookalive starts at 100%, the default. A demo's traffic is far below the Free plan's 300,000 events a month, and full traces make early problems easier to find. Errors are recorded either way: when Nightwatch reports an exception from a request it skipped, it uses the exception rate, which stays at 100%. If bots push usage up, add `NIGHTWATCH_REQUEST_SAMPLE_RATE = "0.1"` to `[env]` in `fly.toml`. It's a setting, not a secret.
 - **Nightwatch covers the server side only.** It records errors, requests, queries, queued jobs, scheduled tasks and emails, which matters once the scheduler (08) and queue (12) arrive. Errors in the browser aren't covered. Sentry's Vue package can be added later for those, most likely with the widget (18), which runs on other people's sites.
 - **Nightwatch pauses free projects after 30 days without events.** That only matters if the site goes quiet for a month.
 - **The app uses Neon's owner role,** which can also run migrations. A separate role with fewer rights isn't worth the extra setup yet.
