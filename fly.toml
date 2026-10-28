@@ -1,0 +1,53 @@
+# Fly.io settings for production. Secrets (APP_KEY, DB_URL and NIGHTWATCH_TOKEN)
+# are set with `fly secrets import`, never here.
+
+app = "bookalive"
+primary_region = "lhr"
+
+[build]
+# The Dockerfile's last stage is `dev`, which must never be deployed.
+build-target = "php"
+
+[build.args]
+VITE_APP_NAME = "Bookalive"
+
+[deploy]
+# Runs on a temporary Machine before each release. A failure stops the deploy.
+release_command = "php artisan migrate --force"
+
+[env]
+APP_NAME = "Bookalive"
+APP_ENV = "production"
+APP_DEBUG = "false"
+APP_URL = "https://bookalive.fly.dev"
+DB_CONNECTION = "pgsql"
+LOG_CHANNEL = "stderr"
+LOG_LEVEL = "info"
+MAIL_MAILER = "log"
+QUEUE_CONNECTION = "sync"
+SESSION_SECURE_COOKIE = "true"
+# Sign-up stays off until owner sign-up arrives in sub-plan 09.
+REGISTRATION_ENABLED = "false"
+
+[http_service]
+internal_port = 8080
+force_https = true
+auto_stop_machines = "suspend"
+auto_start_machines = true
+min_machines_running = 0
+
+# /up never touches the database, so these checks don't keep Neon awake.
+[[http_service.checks]]
+method = "GET"
+path = "/up"
+interval = "30s"
+timeout = "5s"
+grace_period = "10s"
+
+# Checks reach the Machine directly, and trustHosts() rejects other hosts.
+[http_service.checks.headers]
+Host = "bookalive.fly.dev"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "512mb"

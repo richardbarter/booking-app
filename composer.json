@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/vue-starter-kit",
+    "name": "richardbarter/bookalive",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Online booking for appointment-based businesses that keeps the diary free of unbookable gaps",
     "keywords": [
         "laravel",
         "framework"

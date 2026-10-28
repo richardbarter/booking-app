@@ -1,4 +1,4 @@
-# Booking App
+# Bookalive
 
 An online booking system for small appointment-based businesses, such as physio clinics, sports massage therapists, salons and dog groomers. Customers book from a public page or a widget on the business's own website, with no account needed. It decides which times to offer by scoring each slot by how much unbookable time it would leave behind, so diaries stay tightly packed without turning customers away.
 
