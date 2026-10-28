@@ -397,7 +397,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 |---|---|---|
 | 09 | Accounts and sign-up | Owner sign-up creates a business; owner and practitioner roles; current business taken from the logged-in user |
 | 10 | Admin setup | Screens for practitioners, services, working hours, time off and business settings, including the strictness slider with live preview |
-| 11 | Public booking page | Customer booking component; stateless booking API; hosted page at `/book/{business}`; logging of availability searches |
+| 11 | Public booking page | Customer booking component; stateless booking API; hosted page at `/book/{business}`; logging of availability searches; Content Security Policy with `spatie/laravel-csp` |
 | 12 | Emails and reminders | Confirmation, cancellation and reminder emails through queues and the scheduler; manage-booking page with cancel and reschedule links; production mail provider |
 | 13 | Admin calendar | Day and week views per practitioner, built from the playground timeline; create, move and cancel bookings; no-shows |
 | 14 | Efficiency score | Nightly diary statistics (5.6); efficiency score; missed bookings; dashboard trend chart with strictness changes marked; recalculation command |
