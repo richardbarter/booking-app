@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## Current status
 
@@ -8,23 +8,15 @@ Sub-plan 01 is done. The Laravel 13 Vue starter kit runs in Docker (PostgreSQL 1
 
 Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-app` in Ubuntu, the dev containers run as the developer's user and share `vendor` and `node_modules` with Ubuntu, and the Windows-only workarounds are gone. PHPUnit's 42 tests take about 2.5s, in the container or in Ubuntu, against 7.3s on Windows.
 
-Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
-- **Step 1.1 is done:** flyctl is installed in Ubuntu and logged in. It updates itself, and went from 0.4.123 to 0.5.0 on 2026-10-28.
-- **Step 1.2 is done:** Neon is set up, through an existing account signed in with GitHub.
-- **Step 1.3 is done:** the Nightwatch application Bookalive is in the EU region (Frankfurt), with a `production` environment. The package is installed in step 5.
-- **Step 2 is done:** the repo is public at https://github.com/richardbarter/booking-app. It has the `main` ruleset, the security features and the `production` environment.
-- **Step 3 is done:** the Neon project `bookalive` is in AWS Europe (London), with Postgres 18, a `bookalive` database and autoscaling from 0.25 to 0.5 CU. The first deploy (step 7) proves the app can connect to it.
-- **Step 4 is done:** the Fly app `bookalive` is in the existing `personal` organization. Its secrets `APP_KEY`, `DB_URL` and `NIGHTWATCH_TOKEN` are staged and take effect on the first deploy. The `production` environment's `FLY_API_TOKEN` is a deploy token named `github-actions`, limited to this app, which **expires on 2027-10-28**. CI deploys fail after that until it's replaced with the command in step 4.3.
-- **Step 5 is done:** the Bookalive name, `fly.toml`, the Dockerfile's `VITE_APP_NAME`, Nightwatch (1.30, off locally, its agent under Supervisor in production only), trusted proxies and hosts, security headers (`bepsvpt/secure-headers` 9.1), sign-up off in production, and Larastan at level 9 with no errors. PHPUnit has 53 tests. The production image was built and run locally: `/up` returns 200 with Fly's `Host` header and 400 with any other, the headers and HSTS are sent, there are no register routes, PHP is 8.5.12 and the Nightwatch agent starts. PHPUnit 13.4.5 and `symfony/mime` 8.1.10 fixed two advisories published on 2026-10-27 and 2026-10-28.
-- **Step 6 is done:** CI passes on the draft pull request https://github.com/richardbarter/booking-app/pull/1, and GitHub validated the Dependabot config on it. `ci.yml` replaces the starter kit's `tests` workflow, with the `checks`, `audit` and `deploy` jobs and every action pinned to a commit (actionlint finds no problems). Dependabot covers Composer, npm, the Dockerfile, Docker Compose and GitHub Actions. It ignores TypeScript 7, `@laravel/passkeys` from 0.3 (until the PHP package moves) and PostgreSQL majors in Docker Compose (which follow Neon). CodeQL's default setup scans `actions` and `javascript-typescript`.
-- **Step 7 is in progress.** Bookalive is live at https://bookalive.fly.dev since 2026-10-28: one Machine in `lhr`, a shared IPv4 and an IPv6 address. The release command ran the migrations against Neon.
-  - **Production checks passed:** the title, HTTP to HTTPS, `/up`, the security headers, no `:8080`, `X-Forwarded-Host` ignored, `/register` 404 with no sign-up links, PHP 8.5.12, and the Nightwatch agent authenticating and sending. The forged-IP check passed: 11 requests from one session, each with a made-up `Fly-Client-IP` and `X-Forwarded-For`, got a 429 on the 11th, and Laravel stored the real client IP for each session. So Fly replaces a client's `Fly-Client-IP`. After about 3.5 minutes without visitors, Fly suspended the Machine, and its health checks stopped.
-  - **Fixed after the first deploy:** `/login` returned 502 because its response headers (about 4.6KB: preload links, cookies, the Permissions-Policy) overflowed nginx's 4KB FastCGI buffer, so `nginx.conf` now uses the buffer sizes from Laravel's deployment docs. Nightwatch was recording every `/up` health check, so a `DiagnosingHealth` listener now calls `Nightwatch::dontSample()`. The entrypoint now runs `php artisan optimize`, which adds the event cache. `config/secure-headers.php` holds only the four settings that differ from the package's defaults. PHPUnit has 54 tests.
-  - **Still to check:** Neon's Monitoring page shows the compute idle overnight (the Neon console's Tables and SQL Editor wake it, so they don't count); the test exception "Nightwatch test from the first deploy" is in Nightwatch; and the first visit after a quiet spell wakes the suspended Machine and Neon (time it). After a deploy the Machine is stopped rather than suspended, and that first visit took 5.4s (a full boot); warm requests take about 0.1s. Since the last deploy (`f818fd0`), health checks no longer cause Nightwatch sends.
-- **Expected failures until the 02 pull request merges:**
-  - The starter kit's old `tests` workflow still fails on `main`. The 02 branch deletes it.
-  - No pull request can merge, because the ruleset requires the `checks` and `audit` jobs, which arrive with the 02 pull request.
-  - Dependabot only reads its config from `main`, so its config errors (if any) show under **Insights → Dependency graph → Dependabot** after the merge.
+Sub-plan 02 is built, in pull request https://github.com/richardbarter/booking-app/pull/1. Bookalive has been live at https://bookalive.fly.dev since 2026-10-28, and every production check in the sub-plan passed:
+- **Hosting:** one Fly Machine (`shared-cpu-1x`, 512MB) in `lhr`, with a shared IPv4 and an IPv6 address. It suspends after about 3.5 minutes without visitors, and Fly's health checks stop while it's suspended. The Neon project `bookalive` is in AWS Europe (London), with Postgres 18 and autoscaling from 0.25 to 0.5 CU. Fly's release command runs the migrations before each release.
+- **Waking up:** Neon's compute stayed idle overnight on 2026-10-28, with the Machine suspended. The first visit after that woke both in 1.35s (measured through a VPN that added about 0.05s to each round trip). Warm requests take about 0.1s, and `/up` about 0.035s. After a deploy the Machine is stopped rather than suspended, so the first visit is a full boot, which took 5.4s.
+- **CI:** `ci.yml` replaces the starter kit's `tests` workflow. It runs the `checks` and `audit` jobs on every pull request, every push to `main` and every Monday, and the `deploy` job on `main`. Every action is pinned to a commit. The `main` ruleset only accepts pull requests that pass `checks` and `audit`.
+- **Security:** Dependabot covers Composer, npm, the Dockerfile, Docker Compose and GitHub Actions. It ignores TypeScript 7, `@laravel/passkeys` from 0.3 (until the PHP package moves) and PostgreSQL majors in Docker Compose (which follow Neon). Secret scanning with push protection, private vulnerability reporting and CodeQL (`actions` and `javascript-typescript`) are on. Security headers come from `bepsvpt/secure-headers` 9.1. The client IP comes from `Fly-Client-IP`, and forged IPs still get rate limited. Sign-up is off.
+- **Monitoring:** Nightwatch 1.30 (EU region) receives production's errors and requests, but not Fly's health checks. Its agent runs under Supervisor in production only.
+- **Code:** Larastan at level 9 with no errors. PHPUnit has 54 tests.
+- **The deploy token expires on 2027-10-28.** The `production` environment's `FLY_API_TOKEN` is a deploy token named `github-actions`, limited to this app. CI deploys fail after it expires, until it's replaced with the command in sub-plan 02, step 4.3.
+- **Still to check after the merge** (step 8): the `deploy` job deploys `main` to Fly; Dependabot reports no config errors under **Insights → Dependency graph → Dependabot** (it only reads its config from `main`); and the repo's website is set to https://bookalive.fly.dev.
 
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
@@ -36,7 +28,7 @@ Sub-plan 02 is in progress, on `feature/02-ci-deployment`:
 
 ## Next up
 
-1. Finish building sub-plan 02: the rest of step 7's checks (see Current status), then step 8 (mark pull request #1 ready, merge it, check the `deploy` job, check Dependabot reports no config errors, set the repo's website), then step 9 (README, overview and this file). Every later sub-plan goes through a pull request and is only done once its tests pass in CI, so 02 comes before any feature work.
+1. Finish sub-plan 02's step 8 once pull request #1 merges: check the three things under **Still to check after the merge**. Record the results here in a `docs/` pull request, which marks 02 as done. Merging it deploys again, which tests the automatic deploy a second time.
 2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
 
 Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
@@ -50,7 +42,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
-| 02 | CI and deployment | In progress | #1 (draft) | Steps 1 to 6 done, 7 in progress. Live at https://bookalive.fly.dev |
+| 02 | CI and deployment | In progress | #1 | Built. Step 8's checks follow the merge. Live at https://bookalive.fly.dev |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
@@ -121,23 +113,14 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-28 | Trust only the address that connects (`trustProxies(at: 'REMOTE_ADDR')`), and take the client IP from Fly's `Fly-Client-IP` header through a `UseFlyClientIp` middleware. Production checks that forged IPs still get rate limited | Laravel 13's `at: '*'` trusts every address in `X-Forwarded-For`, so `ip()` returned an address the client wrote itself, and the IP-based rate limiters could be dodged. Fly's `X-Forwarded-For` ends with the app's own IP, so no position in it is reliably the client, and Fly recommends `Fly-Client-IP`. Its docs don't say whether a client can forge that header, hence the production check |
 | 2026-10-28 | Sign-up is switched off with its own setting, `REGISTRATION_ENABLED` (on by default, `"false"` in `fly.toml`), not by `APP_ENV`. A shared `canRegister` prop hides the links | The image's assets stage has no `APP_ENV`, so Laravel treats it as production. Wayfinder wouldn't generate the register routes, and the pages that import them would break the build. 09 removes the setting when owner sign-up arrives |
 | 2026-10-28 | Security headers come from `bepsvpt/secure-headers`, replacing the hand-written `AddSecurityHeaders` middleware. The Content Security Policy in 11 uses `spatie/laravel-csp`. Both are approved as dependencies | A widely used pair, with every header set and documented in one config file. `config/secure-headers.php` holds only what differs from the package's defaults (HSTS on, CSP off, `strict-origin-when-cross-origin` because `no-referrer` breaks `redirect()->back()` after Inertia visits, and `Cross-Origin-Opener-Policy: same-origin`). The package merges its defaults for the rest, so they keep up with package updates |
+| 2026-10-28 | No licence for now, so all rights are reserved. `composer.json` says `"proprietary"`, and the README says the code is public to read but not licensed for reuse | Keeps the option of turning Bookalive into a real product. An open licence such as MIT can be added later, but code published under one can't be taken back |
+| 2026-10-28 | Nothing in production queries the database on a timer. Fly's health checks call `/up`, which never touches the database; sessions and cache use the database only when someone visits; the queue moves to Redis (Upstash) in 12; the scheduler (08) runs tasks hourly or less often | Neon's Free plan gives 100 CU-hours a month, and a 0.25 CU compute that never sleeps uses about 180, so it has to sleep more than half the time. Neon sleeps after 5 minutes without queries. Confirmed overnight on 2026-10-28 |
+| 2026-10-28 | The app connects to Neon directly, not through its pooler, over TLS with the certificate checked (`sslmode=verify-full&sslrootcert=system`) | PHP-FPM opens at most 5 connections on one Machine, well under Neon's limit. The pooler runs PgBouncer in transaction mode, which has caveats for session settings and prepared statements, and migrations should use a direct connection anyway. Revisit when the queue worker and Reverb add connections |
+| 2026-10-28 | One Fly Machine, which suspends when idle (`auto_stop_machines = "suspend"`, `min_machines_running = 0`) and resumes on the next request | A demo has long quiet spells. Resuming is quick (1.35s for the first visit, including waking Neon, against 5.4s for a full boot), and a suspended Machine costs only its storage |
+| 2026-10-28 | Production monitoring is Laravel Nightwatch (Free plan, EU region), recording 100% of requests but not Fly's health checks | Laravel's own service: it records requests, queries, jobs, scheduled tasks and emails as well as errors, which matters once the scheduler (08) and queue (12) arrive. The Free plan's 300,000 events a month is far more than a demo uses. Browser errors aren't covered; Sentry's Vue package can be added with the widget (18) |
+| 2026-10-28 | CI deploys with a Fly deploy token limited to the `bookalive` app, stored in the GitHub `production` environment (deployments from `main` only). It expires on 2027-10-28 | A deploy token can't touch other apps or the organisation, and an expiry limits the damage if it ever leaks. Replace it before then with the command in sub-plan 02, step 4.3 |
 | 2026-10-29 | Each main step's heading in a sub-plan starts with "Step" and its number (`### Step 3: Neon`). The numbered items inside a step don't, and are referred to as step 3.2. The overview's sub-plan template says so | Searching the docs for "step 3:" finds the heading straight away. Searching for "3." doesn't work, because it matches every list item and version number |
 
 ## Notes for the next session
 
 - This repo will be public, so keep the planning docs about the product. Leave out personal or job-search notes.
-- For sub-plan 02:
-  - The starter kit already ships `.github/workflows/tests.yml` and `.github/dependabot.yml`. Rework them rather than starting again:
-    - The workflow would fail as it stands: it has no PostgreSQL service and uses PHP 8.3 and Node 22. Give it a PostgreSQL 18 service, PHP 8.5 and Node 26.
-    - It runs `composer ci:check`, which covers Pint, Larastan, PHPUnit, `npm run check` and `npm run types:check`. Add `npm run test` (Vitest), which `ci:check` leaves out.
-    - It already uses least-privilege `permissions` and actions pinned to commit SHAs. Keep both.
-    - `dependabot.yml` only covers GitHub Actions. Add Composer, npm and the Docker base images.
-  - Protect `main`: merge only through pull requests, and require CI to pass first.
-  - Add `composer audit` and `npm audit` to CI. Turn on GitHub's secret scanning and push protection, which are free for public repos.
-  - Raise Larastan from level 7 to 9 (see sub-plan 02, step 5). Level 9 reports 13 errors, including a real bug: the login and passkey rate limiters return a 500 when the input is an array. Level 10 only adds errors from Inertia's `Route::inertia()` helper, so stop at 9.
-  - Decide on production error monitoring, for example Laravel Nightwatch or Sentry.
-  - In GitHub's email settings, turn on "Keep my email addresses private", so commits made on github.com (such as pull request merges) also use the no-reply address, and "Block command line pushes that expose my email".
-  - Use the name Bookalive: `APP_NAME` in `.env.example` and on Fly, the README, and the heading in `.ai/guidelines/project.md` (then run `boost:update`). `VITE_APP_NAME` is compiled into the frontend, and the Dockerfile doesn't pass it yet, so the production build would fall back to "Laravel". Pass it as a build argument.
-  - Laravel builds URLs, including password reset links, from the request's Host header. Configure trusted proxies for Fly and consider `trustHosts()`, checking that Fly's health checks still pass.
-  - Supervisor keeps the container running even if nginx or PHP-FPM gives up, so Fly's HTTP health check on `/up` is what catches a broken machine.
-  - The production image is about 970MB, mostly the official `php:8.5-fpm` base image.

@@ -235,17 +235,18 @@ Later, the same import could bring a business's future bookings across when it s
 
 | Area | Choice |
 |---|---|
-| Backend | Laravel 13 (latest stable), PHP 8.4+ |
+| Backend | Laravel 13 (latest stable), PHP 8.5 |
 | Frontend | Inertia, Vue 3 (`<script setup>`), TypeScript |
 | Starting point | Official Laravel Vue starter kit (includes auth, Tailwind and shadcn-vue) |
 | UI | Tailwind CSS 4, shadcn-vue, lucide icons |
 | Database | PostgreSQL, same major version locally, in CI and on Neon |
 | Real time | Laravel Reverb + Laravel Echo |
-| Queues and scheduling | Laravel queues and scheduler (driver decided in sub-plan 02) |
+| Queues and scheduling | Laravel queues and scheduler. The queue uses Redis (Upstash) from sub-plan 12, and runs jobs straight away (`sync`) until then |
 | Email | Mailpit locally; production provider decided in sub-plan 12 |
 | Embed widget | TypeScript, built as its own Vite entry, no framework |
 | Testing | PHPUnit, Vitest, Playwright; Infection for mutation testing (scheduling engine only); axe for accessibility checks in Playwright |
-| Code style | Laravel Pint; ESLint and Prettier if the starter kit includes them |
+| Code style and static analysis | Laravel Pint, Larastan at level 9; Oxlint, Oxfmt and `vue-tsc` (through Vite+) |
+| Monitoring | Laravel Nightwatch (EU region): server-side errors, requests, queries, jobs, scheduled tasks and emails |
 | AI tooling | Laravel Boost (MCP), shadcn-vue MCP |
 | CI/CD | GitHub Actions, deploying to Fly.io |
 | Hosting | Fly.io (`lhr`), Neon, Cloudflare R2 |
@@ -274,13 +275,22 @@ The Docker and Fly setup uses a proven pattern:
 
 ### CI (GitHub Actions)
 
-- On every push and pull request: Pint, PHPUnit on PostgreSQL, type-check and build, Vitest. Playwright joins once end-to-end tests exist.
-- On `main`, after CI passes: deploy to Fly.io automatically.
+- On every pull request, every push to `main` and once a week:
+  - the `checks` job: the build, Pint, Larastan, PHPUnit on PostgreSQL 18, Oxlint and Oxfmt, `vue-tsc` and Vitest. Playwright joins once end-to-end tests exist.
+  - the `audit` job: `composer audit` and `npm audit`.
+- `main` only accepts pull requests, and only once `checks` and `audit` pass.
+- On `main`, after both pass: the `deploy` job deploys to Fly.io automatically.
+- Dependabot keeps the Composer and npm packages, the Docker images and the actions up to date. CodeQL scans the TypeScript and the workflows.
 
 ### Production
 
-- Fly.io app in London (`lhr`), Neon PostgreSQL in its region closest to London, Cloudflare R2 for logos and other uploads.
-- **Always-on processes:** the web app can sleep when idle, but the scheduler, queue worker and Reverb need to keep running. The approach is decided in sub-plan 02 and revisited as each process arrives (08, 12 and 17). A database queue that checks for work every few seconds would stop Neon from ever sleeping, which could use up its free compute allowance.
+- Fly.io app in London (`lhr`), Neon PostgreSQL in AWS London, Laravel Nightwatch for monitoring, Cloudflare R2 for logos and other uploads.
+- **Nothing queries the database on a timer.** Neon's free plan only covers the database being awake about half the time, and Neon puts it to sleep after 5 minutes without queries, so only real visitors should wake it. Sub-plan 02 has the numbers.
+- **Always-on processes**, and how each follows that rule:
+  - **Web:** one Machine that suspends after a few minutes without visitors and resumes on the next request. The first visit after a quiet spell wakes the Machine and Neon, and takes about a second longer. Fly's health checks call `/up`, which never touches the database.
+  - **Scheduler (08):** its own small Machine running `php artisan schedule:work`, always on. Tasks run hourly or less often where possible, so the database wakes once an hour at most.
+  - **Queue worker (12):** Redis on Upstash, not the database queue, whose worker checks for jobs every few seconds and would keep Neon awake. The worker runs alongside the scheduler.
+  - **Reverb (17):** decided then. Open WebSocket connections keep a Machine awake, but they don't touch the database.
 
 ## 9. Data model (first sketch)
 
@@ -434,7 +444,6 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | Question | Needed by |
 |---|---|
 | When to add the custom domain: before links are shared at the playground milestone, or in 22 as planned (`bookalive.io` was unregistered on 2026-10-27) | 08 / 22 |
-| Queue driver, and how the scheduler, worker and Reverb run on Fly without keeping Neon awake all the time | 02 / 12 |
 | Default strictness and relaxation window | 07 |
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
 | Production email provider (e.g. Resend, Postmark, Amazon SES) | 12 |
