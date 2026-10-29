@@ -347,7 +347,7 @@ The final schema for each table is set in the sub-plan that creates it.
 - Vue uses `<script setup>` with a consistent ordering, plus composables. Pinia only when props, events and Inertia props aren't enough.
 - Laravel Boost is used to look up version-specific docs.
 
-**Sub-plan template.** Every file in `sub-plans/` uses these headings. Setup-type sub-plans may use ordered **Steps** in place of Backend and Frontend.
+**Sub-plan template.** Every file in `sub-plans/` uses these headings. Setup-type sub-plans may use ordered **Steps** in place of Backend and Frontend. Each step's heading starts with the word "Step" and its number, as in `### Step 3: Neon`, so searching for "step 3:" finds it. The numbered items inside a step don't need the word, and are referred to as step 3.2.
 
 ```
 # NN — Name

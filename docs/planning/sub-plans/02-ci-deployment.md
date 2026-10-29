@@ -71,14 +71,14 @@ How each later background process follows the rule:
 
 Steps marked **(you)** need your accounts or a browser. Claude Code does the rest, and can run the `gh`, `fly` and `git` commands once you're logged in.
 
-### 1. Accounts and tools (you)
+### Step 1: Accounts and tools (you)
 
 1. **Fly.io:** sign up at fly.io and add a card. In Ubuntu, install `flyctl` with the command from Fly's install docs (`curl -L https://fly.io/install.sh | sh`), add it to your `PATH` as the installer says, then run `fly auth login`.
 2. **Neon:** sign up at neon.com. Signing in with GitHub is fine.
 3. **Nightwatch:** sign up at nightwatch.laravel.com and create an application named Bookalive in the **EU** region, with a `production` environment. Its token stays in Nightwatch (the application's settings, under **Environments**) until step 4, and only ever goes to Fly, never into a local `.env`. Skip the setup steps Nightwatch shows after that: this plan installs the package (step 5.4), sets the token (step 4) and runs the agent under Supervisor (step 5.4). Request sampling stays at the default 100% (see Notes).
 4. **Licence:** none for now, so all rights are reserved (see Notes). Before the first push, Claude sets `license` in `composer.json` to `"proprietary"` and adds a line to the README saying the code is public to read but all rights are reserved.
 
-### 2. GitHub repo
+### Step 2: GitHub repo
 
 1. **Review what goes public.** Check `git ls-files` for anything that shouldn't be public. The Claude Code and Cursor skills under `.claude/` and `.cursor/` are fine to publish, and `.claude/settings.local.json` is ignored. The only `.env` file ever committed is `.env.example`.
 2. **Create and push.** Merge this plan and the licence change into `main` first, then:
@@ -95,13 +95,13 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
 5. **Security** (all free for public repos): turn on Dependabot alerts and security updates, secret scanning with push protection, private vulnerability reporting, and CodeQL's default setup (it covers the TypeScript and the workflows, not PHP).
 6. **`production` environment:** allow deployments from `main` only. Its `FLY_API_TOKEN` secret is added in step 4.
 
-### 3. Neon (you)
+### Step 3: Neon (you)
 
 1. Create a project named `bookalive` in **AWS Europe (London)** with **Postgres 18**, and name its database `bookalive`.
 2. Set autoscaling to 0.25–0.5 CU.
 3. Copy the connection string with **connection pooling turned off** (the host has no `-pooler`). Replace its query string with `?sslmode=verify-full&sslrootcert=system`, which checks Neon's certificate against the image's system CA list. `sslrootcert=system` needs libpq 16 or later, and Debian trixie's is 17. Laravel doesn't pass on the `channel_binding` option that Neon adds.
 
-### 4. Fly app and secrets (you, with Claude)
+### Step 4: Fly app and secrets (you, with Claude)
 
 1. Run `fly platform regions` to confirm `lhr` is still offered, then create the app without launching it, in your existing personal organization: `fly apps create bookalive --org personal`. That organization keeps the old plan's free allowances, and a new organization wouldn't get them. Don't use `fly launch`, which writes its own Dockerfile and settings for Laravel.
 2. Set the secrets with `fly secrets import --stage`, which reads them from standard input, so they don't end up in your shell history. `read -rs` asks for each value without showing it, and the `DB_URL` line swaps the query string Neon gives for the one from step 3:
@@ -121,7 +121,7 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
        | gh secret set FLY_API_TOKEN --env production --repo richardbarter/booking-app
    ```
 
-### 5. App changes (on `feature/02-ci-deployment`)
+### Step 5: App changes (on `feature/02-ci-deployment`)
 
 1. **Name.** Set `APP_NAME="Bookalive"` in `.env.example`. Change the heading in `.ai/guidelines/project.md`, then run `php artisan boost:update`, which rewrites `CLAUDE.md` and `AGENTS.md`. Update the README title. Replace the starter kit's `name` and `description` in `composer.json`. Optionally change `APP_NAME` in your own `.env` too; it logs you out locally once.
 2. **`fly.toml`**, written by hand. This sketch shows the intended settings; check the keys against Fly's configuration reference:
@@ -191,7 +191,7 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
    Level 10 isn't used: its only extra errors come from Inertia's `Route::inertia()` helper, which doesn't declare a return type.
 9. **`composer ci:check`:** add `npm run test` (Vitest), so CI and a local `composer ci:check` run the same checks.
 
-### 6. CI and Dependabot
+### Step 6: CI and Dependabot
 
 **Replace `.github/workflows/tests.yml` with `ci.yml`.** Keep what it already does well: least-privilege `permissions: contents: read`, every action pinned to a commit SHA with its version in a comment, and `persist-credentials: false` on checkout.
 
@@ -212,7 +212,7 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
 
 **Dependabot.** Add the `composer`, `npm`, `docker` (the Dockerfile) and `docker-compose` ecosystems next to `github-actions`. Check them weekly, group minor and patch updates per ecosystem, and keep the existing 5-day cooldown, so a newly published release has time to be pulled if it turns out to be bad. It ignores the updates the decisions log holds back: TypeScript 7, `@laravel/passkeys` beyond the PHP package's version, and PostgreSQL majors in Docker Compose, which follow Neon. GitHub reports config errors under **Insights → Dependency graph → Dependabot**.
 
-### 7. First deploy (from the branch)
+### Step 7: First deploy (from the branch)
 
 Deploy once by hand before opening the pull request, so a broken deploy never lands on `main`:
 
@@ -222,11 +222,11 @@ fly deploy --ha=false
 
 `--ha=false` creates a single Machine; Fly would otherwise create two. Run `fly ips list` to check the app has a shared IPv4 address (not a dedicated one) and an IPv6 address. Then go through the production checks under **Tests**.
 
-### 8. Pull request and automatic deploy
+### Step 8: Pull request and automatic deploy
 
 Open the pull request from `feature/02-ci-deployment`. Once `checks` and `audit` pass, merge it, and check that the `deploy` job deploys it. Then set the repo's website to `https://bookalive.fly.dev`.
 
-### 9. Docs
+### Step 9: Docs
 
 - **README:** live URL, CI badge, and a short "Deployment" section (merges to `main` deploy automatically; secrets live in Fly and the GitHub environment).
 - **Overview:**

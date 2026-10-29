@@ -38,7 +38,7 @@ The only file git doesn't track that needs copying by hand is `.env`. Everything
 
 **Stop the Windows copy's containers.** In PowerShell, in `D:\projects\booking-app`, run `docker compose down`. Both copies use the same Compose project name (`booking-app`), so they share containers and volumes. Never run both.
 
-### 1. Ubuntu in WSL (PowerShell on Windows)
+### Step 1: Ubuntu in WSL (PowerShell on Windows)
 
 1. Run `wsl --update` to get the latest WSL.
 2. Run `wsl --list --online` to see the available distros, then install the newest Ubuntu LTS, using its name exactly as the list shows it. For Ubuntu 26.04: `wsl --install -d Ubuntu-26.04`.
@@ -48,7 +48,7 @@ The only file git doesn't track that needs copying by hand is `.env`. Everything
 
 From now on, open Ubuntu from Windows Terminal (which adds an Ubuntu profile) or the Start menu.
 
-### 2. Tools inside Ubuntu
+### Step 2: Tools inside Ubuntu
 
 Bring Ubuntu up to date, then check Docker works. If `docker` isn't found, check step 1.5.
 
@@ -85,7 +85,7 @@ node -v
 
 **Check which PHP and Node run.** `which php` and `which node` should both print paths under `/usr/bin`. WSL adds the Windows PATH to Ubuntu's, so a Windows install could otherwise be picked up.
 
-### 3. Git, GitHub and Claude Code (Ubuntu)
+### Step 3: Git, GitHub and Claude Code (Ubuntu)
 
 **Git identity.** Use the same name and email as the existing commits. In the Windows copy, `git log -1 --format='%an <%ae>'` shows them. Leave `core.autocrlf` unset, because `.gitattributes` already sets the line endings.
 
@@ -134,7 +134,7 @@ cp /mnt/c/Users/<windows-user>/.claude/settings.json ~/.claude/
 cp -r /mnt/c/Users/<windows-user>/.claude/skills/<skill-name> ~/.claude/skills/
 ```
 
-### 4. Copy the project and open it in Cursor
+### Step 4: Copy the project and open it in Cursor
 
 **Clone the Windows copy**, then copy `.env`:
 
@@ -159,7 +159,7 @@ cp /mnt/d/projects/booking-app/.env .env
 
 Don't open the project through its `\\wsl.localhost\...` path from Windows: it's slow, and editor tools get the paths wrong. Windows Explorer can still browse files at that path, which is handy for copying files in.
 
-### 5. Claude Code finishes the move
+### Step 5: Claude Code finishes the move
 
 In Ubuntu, run `cd ~/projects/booking-app && claude`, then ask it to carry out step 5 of this sub-plan on a `feature/01b-wsl-setup` branch.
 
