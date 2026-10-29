@@ -46,6 +46,8 @@ The user knows the businesses, and you know the code. Questions with recommendat
 
 **Don't add a pattern without a reason.** Every interface, layer or abstraction has a cost: more code to read, test and change. Add one when this plan needs it, or when a sub-plan in the overview clearly will and adding it now is cheap. Otherwise, mention the future need in Notes instead. Over-engineering is as much a best-practice failure as a missing check.
 
+**Record the alternatives for big decisions.** When a decision is big and hard to change later, such as how something is stored, how the engine is structured or which package to use, and the right choice isn't obvious, list the options briefly in the plan. Give each one's main trade-off, and say why the chosen one wins. That lets the user decide with the trade-offs in view, and stops a later session from "simplifying" back to an option that was already rejected. If one option is clearly right, a sentence on why is enough. Most plans need this for one or two decisions at most.
+
 **Let the database enforce what it can:** foreign keys, unique and check constraints, and exclusion constraints. Rules that only exist in PHP can be bypassed by a bug.
 
 **Keep to the project's rules:**
@@ -91,6 +93,7 @@ Say what must be tested, and at which level: unit tests for the engine, feature 
 
 - **Use the template** in the overview (section 11). Plans with steps give each main step a heading like `### Step 3: Neon`, so it's easy to search for. The numbered items inside a step stay plain, and are referred to as step 3.2.
 - **Be specific where the builder would otherwise have to guess:** table columns, types and constraints; class names and where they go, following the code layout in `CLAUDE.md`; routes; and the signatures of anything other plans depend on, such as the engine's interfaces. Leave the rest of the implementation to the builder. A plan isn't the code.
+- **Add a diagram where a picture says it faster,** such as how tables relate or how the steps of a process connect. Write it in Mermaid, in a `` ```mermaid `` code block, and GitHub draws it whenever the file or pull request is viewed. Keep each diagram small, and use the plan's own names in it. `erDiagram` for tables and `flowchart` for processes cover most needs. GitHub shows an error box instead of a diagram it can't read, so keep the syntax simple. A diagram of something simple is just clutter.
 - **Explain the reason** for each decision that isn't obvious, in a sentence. Builders and reviewers both need it, and it stops a decision being undone later by someone who didn't know why it was made.
 - **Write for the user,** who reviews every plan: British English, plain words and short sentences, with jargon explained the first time it appears. Code keeps the framework's spelling (`authorize`, `color`).
 - **Keep the docs consistent.** If the plan changes something in the overview or another sub-plan, change that document on the same branch, and add a row to the decisions log.

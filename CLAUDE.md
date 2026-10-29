@@ -67,8 +67,9 @@ Organise code by type, Laravel's and the starter kit's default, with subfolders 
 ## Workflow
 
 - `main` only accepts pull requests that pass CI (the `checks` and `audit` jobs), so never push to it directly. Every change goes on a branch with its own pull request: `feature/NN-short-name` for a sub-plan, `docs/short-name` for docs-only changes. Pull requests are merged with a merge commit.
+- Write or revise sub-plans with the `draft-sub-plan` skill. It lives in `.ai/skills/`, and `php artisan boost:update` links it into `.claude/skills/` and `.cursor/skills/`.
 - Update `tracking.md` as part of each sub-plan's pull request.
-- Once sub-plan 02 is done, merging to `main` deploys to production automatically.
+- Merging to `main` deploys to production automatically.
 - Check how the framework or a package behaves (in `vendor/`, its docs, or by reproducing it locally) before relying on it in a plan or a fix. Silencing a type error isn't the same as fixing the bug.
 - Secrets never go in the repo, in chat, or in a command that lands in shell history. Production secrets live in Fly (`fly secrets import`) and the GitHub `production` environment (`gh secret set`), piped in from standard input.
 - The repo is public, so docs stay about the product: no personal, account or billing details.
