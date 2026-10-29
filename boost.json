@@ -16,6 +16,7 @@
         "configure-nightwatch",
         "wayfinder-development",
         "inertia-vue-development",
-        "tailwindcss-development"
+        "tailwindcss-development",
+        "draft-sub-plan"
     ]
 }

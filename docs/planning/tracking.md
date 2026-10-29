@@ -28,10 +28,9 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 ## Next up
 
-1. Review Dependabot's first pull requests: #2 (two npm updates, grouped) and #3 (jsdom 29 to 30, a major version).
-2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
-
-Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
+1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch, one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 starts with the working-hours questions: patterns, edited weeks, templates and snapshots, as discussed on 2026-10-29.
+2. Before building 03, write a `build-sub-plan` skill in `.ai/skills/`, the counterpart of `draft-sub-plan` for building a merged plan. It replaces the personal `build-feature` skill for this repo, which belongs to another project.
+3. Build 03 to 07 in order, then plan 08.
 
 ## Sub-plan status
 
@@ -121,6 +120,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-28 | CI deploys with a Fly deploy token limited to the `bookalive` app, stored in the GitHub `production` environment (deployments from `main` only). It expires on 2027-10-28 | A deploy token can't touch other apps or the organisation, and an expiry limits the damage if it ever leaks. Replace it before then with the command in sub-plan 02, step 4.3 |
 | 2026-10-29 | Production mail uses the `array` mailer until 12, which sends nothing, rather than the `log` mailer | The log mailer writes each email at `debug` level, which `LOG_LEVEL = "info"` drops anyway. Raising the level to troubleshoot would put password reset and verification links, which let anyone holding them take over an account, in Fly's logs. Nightwatch still records each email's class, subject and recipient count, whichever mailer sends it |
 | 2026-10-29 | Each main step's heading in a sub-plan starts with "Step" and its number (`### Step 3: Neon`). The numbered items inside a step don't, and are referred to as step 3.2. The overview's sub-plan template says so | Searching the docs for "step 3:" finds the heading straight away. Searching for "3." doesn't work, because it matches every list item and version number |
+| 2026-10-29 | Sub-plans are drafted with a project skill, `draft-sub-plan`, kept in `.ai/skills/` and linked into `.claude/skills/` and `.cursor/skills/` by `boost:update`. The project guidelines name it, so it's used for every plan. It covers context, questions with recommendations, design patterns (and not adding them without a reason), alternatives for big decisions that aren't clear-cut, checking behaviour first, best practice and security, tests, Mermaid diagrams and a review pass | Puts the planning checklist in the repo, where Claude Code and Cursor both read it, rather than in one session's memory. Boost picks up custom skills from `.ai/skills/` and only removes skills it installed itself, so `boost:update` keeps it |
 
 ## Notes for the next session
 
