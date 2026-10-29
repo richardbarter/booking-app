@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  # Weekly, so the audits catch new advisories even when the code hasn't changed.
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+# One run per branch. A new push cancels the older run on a pull request, but
+# never on main, where a run may be deploying.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:18-trixie
+        env:
+          POSTGRES_DB: testing
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        # Published on 5434, as in Docker Compose, so .env.example's database
+        # settings work unchanged.
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d testing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          # The extensions the Dockerfile installs.
+          extensions: pdo_pgsql, opcache, pcntl, bcmath, intl, gd, exif, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+
+      - name: Install Composer packages
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Create the .env file
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Install npm packages
+        run: npm ci
+
+      # The feature tests render pages, which need Vite's manifest.
+      - name: Build the frontend
+        run: npm run build
+
+      - name: Run the checks
+        run: composer ci:check
+        env:
+          # Vitest loads vite.config.ts in dev-server mode, which the Laravel
+          # Vite plugin refuses when CI is set. Nothing serves HMR here.
+          LARAVEL_BYPASS_ENV_CHECK: '1'
+
+  # Reads only the lock files, so nothing needs installing.
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+
+      - name: Audit Composer packages
+        run: composer audit --locked
+
+      # Runs even if the Composer audit fails, so both results show.
+      - name: Audit npm packages
+        if: ${{ !cancelled() }}
+        run: npm audit --audit-level=high
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [checks, audit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://bookalive.fly.dev
+    # A deploy that's under way is never cancelled; the next one waits.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      # Builds on Fly's remote builder from fly.toml, then runs the migrations
+      # as the release command before switching over.
+      - name: Deploy to Fly
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

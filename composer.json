@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/vue-starter-kit",
+    "name": "richardbarter/bookalive",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Online booking for appointment-based businesses that keeps the diary free of unbookable gaps",
     "keywords": [
         "laravel",
         "framework"
@@ -10,10 +10,12 @@
     "license": "proprietary",
     "require": {
         "php": "^8.4",
+        "bepsvpt/secure-headers": "^9.1",
         "inertiajs/inertia-laravel": "^3.0",
         "laravel/chisel": "^0.1.0",
         "laravel/fortify": "^1.37.2",
         "laravel/framework": "^13.17",
+        "laravel/nightwatch": "^1.30",
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14"
     },
@@ -64,6 +66,7 @@
             "Composer\\Config::disableProcessTimeout",
             "npm run check",
             "npm run types:check",
+            "npm run test -- --run",
             "@test"
         ],
         "types:check": [

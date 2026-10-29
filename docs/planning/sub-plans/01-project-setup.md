@@ -49,7 +49,7 @@ A second database, `testing`, is created by a PostgreSQL init script. The `btree
 
 This is a setup sub-plan, so ordered steps take the place of the usual Backend and Frontend sections.
 
-### 1. Install into a temporary folder
+### Step 1: Install into a temporary folder
 
 `D:\projects\booking-app` already contains `docs/`, so the installer can't target it. **Never use the installer's `--force` flag: it deletes the target folder, `docs/` included.**
 
@@ -71,7 +71,7 @@ mv booking-app-install/* booking-app/
 rmdir booking-app-install
 ```
 
-### 2. Git
+### Step 2: Git
 
 1. In `D:\projects\booking-app`, run `git init -b main`.
 2. Check `.gitignore` covers `.env`, `vendor`, `node_modules`, `public/build`, `public/hot` and generated Wayfinder files.
@@ -79,7 +79,7 @@ rmdir booking-app-install
 4. Make a first commit: the untouched starter kit plus `docs/`.
 5. Do the rest of this sub-plan on `feature/01-project-setup`, then merge it into `main` locally. There's no remote until sub-plan 02.
 
-### 3. Docker
+### Step 3: Docker
 
 **Images:** use the default Debian-based official images, not Alpine, anywhere Node runs. The starter kit pins native binaries for `linux-x64-gnu` (glibc), and Alpine uses musl. Use PHP 8.4 to match the host PHP that Boost and the editor tools use.
 
@@ -147,14 +147,14 @@ The ports are chosen so they don't clash with other local projects.
 
 Docker Compose overrides the host and port values for containers.
 
-### 4. Database and tests
+### Step 4: Database and tests
 
 - In `phpunit.xml`, replace the SQLite settings with `DB_CONNECTION=pgsql` and `DB_DATABASE=testing`, both with `force="true"`. Without `force`, the container's `DB_DATABASE=booking` environment variable would win, and `RefreshDatabase` would wipe the development database.
 - Don't set the host or port in `phpunit.xml`. They come from the environment, so tests work both in the container and on the host.
 - Add `tests/Feature/DatabaseConnectionTest.php`. It checks that the driver is `pgsql` and the database is `testing`, which guards against the mistake above.
 - Check `btree_gist` is available: `SELECT name FROM pg_available_extensions WHERE name = 'btree_gist';`
 
-### 5. Frontend tooling
+### Step 5: Frontend tooling
 
 - Use Vite+'s built-in test runner (`vp test`, which runs Vitest):
   - add a `test` block to `vite.config.ts` with a DOM environment (jsdom or happy-dom)
@@ -164,7 +164,7 @@ Docker Compose overrides the host and port values for containers.
 - If `vp test` turns out not to suit, install Vitest directly instead, and note why in `tracking.md`.
 - Check that `npm run check` and `npm run types:check` pass.
 
-### 6. Laravel Boost and other AI tools
+### Step 6: Laravel Boost and other AI tools
 
 1. Run `composer require laravel/boost --dev`.
 2. Run `php artisan boost:install` in a terminal. It's interactive, so the user runs it with `! php artisan boost:install` from Claude Code. Choose **Claude Code**, and turn on **guidelines, skills and MCP**.
@@ -177,13 +177,13 @@ Docker Compose overrides the host and port values for containers.
 5. Commit `CLAUDE.md`, `boost.json`, `.mcp.json` and Boost's skill files. None of them contain secrets.
 6. Boost's **project rules** (`.ai/rules`, recorded with its `record-rule` tool) will hold rules that can't be worked out from the code. The first ones come in sub-plan 03: tenant scoping, and scheduling code receiving the business explicitly.
 
-### 7. Project basics
+### Step 7: Project basics
 
 - Set `APP_NAME` to "Booking App". It's a placeholder until the name is chosen in sub-plan 02.
 - Leave the app time zone as UTC. Each business's own time zone is handled in code (03 and 04).
 - `composer dev` (`php artisan dev`) is left in place, but Docker is the main way to run the app.
 
-### 8. `CLAUDE.md`
+### Step 8: `CLAUDE.md`
 
 Write the project's own sections above Boost's `<laravel-boost-guidelines>` block, which Boost manages itself:
 
@@ -212,7 +212,7 @@ Write the project's own sections above Boost's `<laravel-boost-guidelines>` bloc
   - Every tenant-owned table has a `business_id`.
 - **Workflow:** one sub-plan per branch and pull request, then update `tracking.md`. The repo is public, so docs stay about the product.
 
-### 9. README
+### Step 9: README
 
 Keep it short for now:
 - one paragraph on what the app is

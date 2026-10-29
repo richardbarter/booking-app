@@ -143,7 +143,7 @@ return [
     */
 
     'passkeys' => [
-        'relying_party_id' => parse_url(config('app.url'), PHP_URL_HOST),
+        'relying_party_id' => parse_url(config()->string('app.url'), PHP_URL_HOST),
         'allowed_origins' => [config('app.url')],
         'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config('app.key')),
         'timeout' => 60000,
@@ -158,10 +158,15 @@ return [
     | by removing them from this array. You're free to only remove some of
     | these features, or you can even remove all of these if you need to.
     |
+    | Registration is turned off in production until owner sign-up arrives
+    | in sub-plan 09. It has its own setting rather than following APP_ENV
+    | because the frontend build runs without an APP_ENV, and Wayfinder
+    | needs the registration routes there to generate their functions.
+    |
     */
 
     'features' => [
-        Features::registration(),
+        ...(env('REGISTRATION_ENABLED', true) ? [Features::registration()] : []),
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

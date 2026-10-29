@@ -45,6 +45,9 @@ RUN npm ci
 
 COPY . .
 COPY --from=composer-deps /var/www/html/vendor vendor
+
+# Vite compiles VITE_* variables into the bundle, and the image has no .env.
+ARG VITE_APP_NAME
 RUN composer dump-autoload --no-dev --no-scripts \
     && npm run build
 
@@ -63,6 +66,7 @@ RUN curl -fsSL https://nginx.org/keys/nginx_signing.key -o /etc/apt/keyrings/ngi
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/zzz-app.conf
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
+COPY docker/nightwatch.conf /etc/supervisor/conf.d/nightwatch.conf
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 COPY . .
@@ -87,6 +91,9 @@ ENTRYPOINT ["entrypoint.sh"]
 FROM php AS dev
 
 USER root
+
+# Nightwatch runs in production only, so there's no agent to send events to.
+RUN rm /etc/supervisor/conf.d/nightwatch.conf
 
 # www-data takes the host user's IDs (as in Laravel Sail), so the containers
 # can write to the mounted code and the files they create belong to you.

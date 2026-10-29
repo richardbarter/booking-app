@@ -6,10 +6,10 @@ APP_ENV="${APP_ENV:-production}"
 php artisan package:discover --ansi
 
 # Cache at runtime rather than build time, so Fly secrets are available.
+# optimize caches config, events, routes and views, as Laravel's deployment
+# docs recommend, plus anything a package registers.
 if [ "$APP_ENV" != "local" ]; then
-    php artisan config:cache
-    php artisan route:cache
-    php artisan view:cache
+    php artisan optimize
 fi
 
 # A command was passed (e.g. Fly's release_command, or the vite service):

@@ -1,5 +1,84 @@
 version: 2
+
+# Every ecosystem is checked weekly, with minor and patch updates grouped into
+# one pull request each. The cooldown leaves a new release 5 days to be pulled
+# if it turns out to be bad. It applies to version updates only: security
+# updates arrive straight away.
 updates:
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      composer:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      npm:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # TypeScript 7 no longer ships the JavaScript API that vue-tsc needs.
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
+      # The passkeys client stays matched to the PHP laravel/passkeys package
+      # (0.2). Raise this when the PHP package moves on.
+      - dependency-name: "@laravel/passkeys"
+        versions:
+          - ">=0.3.0"
+
+  # The Dockerfile's base images.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      docker:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # docker-compose.yml's images.
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      docker-compose:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Local PostgreSQL matches Neon's version, so a major upgrade is done on
+      # purpose, together with Neon and CI.
+      - dependency-name: "postgres"
+        update-types:
+          - "version-update:semver-major"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -10,3 +89,6 @@ updates:
       github-actions:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"

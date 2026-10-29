@@ -65,6 +65,29 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_login_with_an_array_email_returns_a_validation_error()
+    {
+        $response = $this->post(route('login.store'), [
+            'email' => ['x'],
+            'password' => 'password',
+        ]);
+
+        $response->assertSessionHasErrors(['email' => 'The email field must be a string.']);
+        $this->assertGuest();
+    }
+
+    public function test_passkey_login_with_an_array_credential_id_returns_a_validation_error()
+    {
+        $this->skipUnlessFortifyHas(Features::passkeys());
+
+        $response = $this->postJson(route('passkey.login'), [
+            'credential' => ['id' => ['x']],
+        ]);
+
+        $response->assertJsonValidationErrors(['credential.id' => 'The credential.id field must be a string.']);
+        $this->assertGuest();
+    }
+
     public function test_users_can_logout()
     {
         $user = User::factory()->create();

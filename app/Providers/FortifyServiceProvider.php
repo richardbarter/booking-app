@@ -85,16 +85,25 @@ class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });
 
+        // These limiters run before validation, so the input may be an array
+        // (e.g. email[]=x). Such requests are limited by IP or session alone,
+        // and validation then rejects them.
         RateLimiter::for('login', function (Request $request) {
-            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
+            $username = $request->input(Fortify::username());
+            $username = is_string($username) ? $username : '';
+
+            $throttleKey = Str::transliterate(Str::lower($username).'|'.$request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
         });
 
         RateLimiter::for('passkeys', function (Request $request) {
-            return Limit::perMinute(10)->by(
-                ($request->input('credential.id') ?: $request->session()->getId()).'|'.$request->ip(),
-            );
+            $credentialId = $request->input('credential.id');
+            $credentialId = is_string($credentialId) && $credentialId !== ''
+                ? $credentialId
+                : $request->session()->getId();
+
+            return Limit::perMinute(10)->by($credentialId.'|'.$request->ip());
         });
     }
 }
