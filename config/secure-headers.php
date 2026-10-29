@@ -9,6 +9,12 @@
 | package merges its own config (vendor/bepsvpt/secure-headers/config) for
 | every key not set here, so the rest keeps up with package updates.
 |
+| The merge is one level deep: a block set here, such as hsts, replaces the
+| package's whole block. To change one setting in a block, copy the whole
+| block from the package's config and change it here. A permissions-policy
+| block with only one feature would drop the other 35, and one without
+| 'enable' => true would turn the header off.
+|
 */
 
 return [

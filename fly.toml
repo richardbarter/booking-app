@@ -23,7 +23,9 @@ APP_URL = "https://bookalive.fly.dev"
 DB_CONNECTION = "pgsql"
 LOG_CHANNEL = "stderr"
 LOG_LEVEL = "info"
-MAIL_MAILER = "log"
+# Sends nothing until sub-plan 12 adds a mail provider. Not "log", which would
+# write password reset and verification links to the logs at debug level.
+MAIL_MAILER = "array"
 QUEUE_CONNECTION = "sync"
 SESSION_SECURE_COOKIE = "true"
 # Sign-up stays off until owner sign-up arrives in sub-plan 09.

@@ -44,7 +44,7 @@ No changes.
 | Migrations | Fly's `release_command` runs `php artisan migrate --force` on a temporary Machine before each release. A failed migration stops the deploy |
 | Sessions and cache | The `database` drivers, as now. Only visitors' requests touch them |
 | Queue | `sync` until 12. Nothing is queued yet, and there's no worker to run it |
-| Mail | `log` until 12 |
+| Mail | `array` until 12, so nothing is sent. Not `log`, which writes each email at `debug` level: it's dropped at `LOG_LEVEL = "info"`, and raising the level would put password reset and verification links in Fly's logs. Nightwatch still records each email's class, subject and recipient count |
 | Logs | `stderr`, read with `fly logs` |
 | Monitoring | Laravel Nightwatch, Free plan, EU region |
 | Deploys | GitHub Actions, after CI passes on `main`. Fly builds the image on its remote builder, from the `php` stage of the Dockerfile |
@@ -145,7 +145,7 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
      DB_CONNECTION = "pgsql"
      LOG_CHANNEL = "stderr"
      LOG_LEVEL = "info"
-     MAIL_MAILER = "log"
+     MAIL_MAILER = "array"
      QUEUE_CONNECTION = "sync"
      SESSION_SECURE_COOKIE = "true"
 
@@ -181,7 +181,7 @@ Steps marked **(you)** need your accounts or a browser. Claude Code does the res
    - its CSP turned off: the Content Security Policy comes from `spatie/laravel-csp` in 11
 
    Everything else is the package's default: `nosniff`, `X-Frame-Options: sameorigin` (18 relaxes framing for `/embed/*`), and a `Permissions-Policy` that limits about 30 browser features to our own origin.
-7. **Sign-up off in production until 09.** In `config/fortify.php`, include `Features::registration()` only while `REGISTRATION_ENABLED` is true (the default), and set it to `"false"` in `fly.toml`. It can't follow `APP_ENV`: the image's assets stage runs without one, so Laravel treats the build as production, and Wayfinder wouldn't generate the register routes that `Welcome.vue`, `Login.vue` and `Register.vue` import, which breaks the build. A shared `canRegister` Inertia prop hides the Register and Sign up links when registration is off. Until 09 there's nothing behind an account, and with mail going to the log, nobody could verify their email or reset their password. This keeps strangers' personal data out of the live database. 09 turns registration back on, as the owner sign-up.
+7. **Sign-up off in production until 09.** In `config/fortify.php`, include `Features::registration()` only while `REGISTRATION_ENABLED` is true (the default), and set it to `"false"` in `fly.toml`. It can't follow `APP_ENV`: the image's assets stage runs without one, so Laravel treats the build as production, and Wayfinder wouldn't generate the register routes that `Welcome.vue`, `Login.vue` and `Register.vue` import, which breaks the build. A shared `canRegister` Inertia prop hides the Register and Sign up links when registration is off. Until 09 there's nothing behind an account, and with no mail provider, nobody could verify their email or reset their password. This keeps strangers' personal data out of the live database. 09 turns registration back on, as the owner sign-up.
 8. **Larastan level 9.** Raise `level` in `phpstan.neon` to 9 and fix its 13 errors properly, with no ignore rules or baseline:
    - 9 come from `$request->user()` possibly being null in the settings controllers and request. Laravel's `#[CurrentUser]` attribute fixes them.
    - 1 is a passkey's `created_at`, which the passkeys package types as nullable (its table uses `timestamps()`). The security page now handles a missing date, in PHP, the `Passkey` type and `PasskeyItem.vue`.

@@ -15,8 +15,10 @@ class UseFlyClientIp
      * from. X-Forwarded-For also holds anything the client sent, with the app's
      * own IP on the right, so its entries can't be told apart reliably. Putting
      * Fly-Client-IP in its place gives the trusted proxy settings one address
-     * to use. Requests without the header are left alone. Whether Fly replaces
-     * a Fly-Client-IP sent by the client is checked in production (sub-plan 02).
+     * to use. Requests without the header are left alone. Fly replaces any
+     * Fly-Client-IP the client sends: in production (sub-plan 02), requests that
+     * each forged a different one still hit the rate limit, and the session
+     * stored the real address.
      *
      * @param  Closure(Request): (Response)  $next
      */
