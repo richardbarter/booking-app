@@ -8,7 +8,7 @@ Sub-plan 01 is done. The Laravel 13 Vue starter kit runs in Docker (PostgreSQL 1
 
 Sub-plan 01b moved development into WSL 2. The code is at `~/projects/booking-app` in Ubuntu, the dev containers run as the developer's user and share `vendor` and `node_modules` with Ubuntu, and the Windows-only workarounds are gone. PHPUnit's 42 tests take about 2.5s, in the container or in Ubuntu, against 7.3s on Windows.
 
-Sub-plan 02 is built, in pull request https://github.com/richardbarter/booking-app/pull/1. Bookalive has been live at https://bookalive.fly.dev since 2026-10-28, and every production check in the sub-plan passed:
+Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/pull/1 merged on 2026-10-29, and merges to `main` now deploy automatically. Bookalive has been live at https://bookalive.fly.dev since 2026-10-28, and every production check in the sub-plan passed:
 - **Hosting:** one Fly Machine (`shared-cpu-1x`, 512MB) in `lhr`, with a shared IPv4 and an IPv6 address. It suspends after about 3.5 minutes without visitors, and Fly's health checks stop while it's suspended. The Neon project `bookalive` is in AWS Europe (London), with Postgres 18 and autoscaling from 0.25 to 0.5 CU. Fly's release command runs the migrations before each release.
 - **Waking up:** Neon's compute stayed idle overnight on 2026-10-28, with the Machine suspended. The first visit after that woke both in 1.35s (measured through a VPN that added about 0.05s to each round trip). Warm requests take about 0.1s, and `/up` about 0.035s. After a deploy the Machine is stopped rather than suspended, so the first visit is a full boot, which took 5.4s.
 - **CI:** `ci.yml` replaces the starter kit's `tests` workflow. It runs the `checks` and `audit` jobs on every pull request, every push to `main` and every Monday, and the `deploy` job on `main`. Every action is pinned to a commit. The `main` ruleset only accepts pull requests that pass `checks` and `audit`.
@@ -16,7 +16,7 @@ Sub-plan 02 is built, in pull request https://github.com/richardbarter/booking-a
 - **Monitoring:** Nightwatch 1.30 (EU region) receives production's errors and requests, but not Fly's health checks. Its agent runs under Supervisor in production only.
 - **Code:** Larastan at level 9 with no errors. PHPUnit has 54 tests.
 - **The deploy token expires on 2027-10-28.** The `production` environment's `FLY_API_TOKEN` is a deploy token named `github-actions`, limited to this app. CI deploys fail after it expires, until it's replaced with the command in sub-plan 02, step 4.3.
-- **Still to check after the merge** (step 8): the `deploy` job deploys `main` to Fly; Dependabot reports no config errors under **Insights → Dependency graph → Dependabot** (it only reads its config from `main`); and the repo's website is set to https://bookalive.fly.dev.
+- **Automatic deploys work** (step 8): merging pull request #1 ran `checks`, `audit` and `deploy` on `main`. Fly's release v4 ran the migrations and started the merge commit, with `MAIL_MAILER = "array"`. Dependabot's first runs on `main` succeeded for all five ecosystems, and it opened its first pull requests. The repo's website is https://bookalive.fly.dev.
 
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
@@ -28,7 +28,7 @@ Sub-plan 02 is built, in pull request https://github.com/richardbarter/booking-a
 
 ## Next up
 
-1. Finish sub-plan 02's step 8 once pull request #1 merges: check the three things under **Still to check after the merge**. Record the results here in a `docs/` pull request, which marks 02 as done. Merging it deploys again, which tests the automatic deploy a second time.
+1. Review Dependabot's first pull requests: #2 (two npm updates, grouped) and #3 (jsdom 29 to 30, a major version).
 2. Write sub-plans 03 to 07 as one set: the data model, then the engine. The engine plans share interfaces and the randomised rule checks, so they're best designed together. Build them in order, then plan 08.
 
 Use Laravel Boost's docs search while planning, so the plans use the installed versions' APIs.
@@ -42,7 +42,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 1: Foundations** | | | |
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
-| 02 | CI and deployment | In progress | #1 | Built. Step 8's checks follow the merge. Live at https://bookalive.fly.dev |
+| 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
 | 03 | Core data model | Not started | | |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
