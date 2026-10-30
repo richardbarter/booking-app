@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 ## Current status
 
@@ -28,7 +28,7 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 ## Next up
 
-1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch, one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 starts with the working-hours questions: patterns, edited weeks, templates and snapshots, as discussed on 2026-10-29.
+1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch (`docs/sub-plans-03-07`), one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 is drafted, for v1's single-user scope; 04 is next.
 2. Before building 03, write a `build-sub-plan` skill in `.ai/skills/`, the counterpart of `draft-sub-plan` for building a merged plan. It replaces the personal `build-feature` skill for this repo, which belongs to another project.
 3. Build 03 to 07 in order, then plan 08.
 
@@ -42,7 +42,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
-| 03 | Core data model | Not started | | |
+| 03 | Core data model | Planned | | Drafted 2026-10-30, awaiting review with 04 to 07 |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
 | 05 | Making bookings | Not started | | |
@@ -121,6 +121,15 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-29 | Production mail uses the `array` mailer until 12, which sends nothing, rather than the `log` mailer | The log mailer writes each email at `debug` level, which `LOG_LEVEL = "info"` drops anyway. Raising the level to troubleshoot would put password reset and verification links, which let anyone holding them take over an account, in Fly's logs. Nightwatch still records each email's class, subject and recipient count, whichever mailer sends it |
 | 2026-10-29 | Each main step's heading in a sub-plan starts with "Step" and its number (`### Step 3: Neon`). The numbered items inside a step don't, and are referred to as step 3.2. The overview's sub-plan template says so | Searching the docs for "step 3:" finds the heading straight away. Searching for "3." doesn't work, because it matches every list item and version number |
 | 2026-10-29 | Sub-plans are drafted with a project skill, `draft-sub-plan`, kept in `.ai/skills/` and linked into `.claude/skills/` and `.cursor/skills/` by `boost:update`. The project guidelines name it, so it's used for every plan. It covers context, questions with recommendations, design patterns (and not adding them without a reason), alternatives for big decisions that aren't clear-cut, checking behaviour first, best practice and security, tests, Mermaid diagrams and a review pass | Puts the planning checklist in the repo, where Claude Code and Cursor both read it, rather than in one session's memory. Boost picks up custom skills from `.ai/skills/` and only removes skills it installed itself, so `boost:update` keeps it |
+| 2026-10-30 | Version 1 is for one person who works for themselves: one login and one practitioner per business, with full control. Staff (more practitioners and logins, who offers which services, per-practitioner prices, lengths, buffers and booking windows, roles and permissions, "anyone available") come after v1. Nothing belongs to a login; everything belongs to the business or its practitioner, and the database allows one practitioner per business until then | The user's decision, to narrow the first version. Keeping a separate practitioner means staff can be added later by dropping one unique index and adding tables beside the existing ones, with no data moved and the engine unchanged |
+| 2026-10-30 | Tenant-owned models use a `BelongsToBusiness` trait whose global scope filters by the current business (a `CurrentBusiness` service, one per request or job), and fails closed: with no current business set, the query throws. Cross-business code opts out with `withoutGlobalScope(BusinessScope::class)`. Child tables reference parents through composite foreign keys that include `business_id` | A forgotten entry point is an error rather than a leak, and the database refuses rows that mix two businesses even if the code has a bug. Tenancy packages such as `stancl/tenancy` cover far more than this needs, which is a trait, a scope and a small service |
+| 2026-10-30 | Working hours are working patterns (a cycle of 1 to 4 weeks from a start date to an optional end date, only one in force per date, enforced by an exclusion constraint) plus edited days (one date's hours entered by hand). A pattern's cycle counts from its own Monday (`cycle_starts_on`), so an old pattern can resume with its rhythm after a temporary one. Each pattern's and edited day's hours are `jsonb`, checked by value objects in `app/Scheduling/Hours` | The user's answers to 03's questions. Edits are per day, so pattern changes still reach the untouched days of an edited week. One pattern per date keeps the stored rows equal to the timeline the owner sees. JSON keeps a pattern one value to copy, and the value objects check every range |
+| 2026-10-30 | Week templates and hours snapshots wait until after v1. Bookings that end up outside new hours are flagged, never moved or cancelled | The user's answers to 03's questions. How useful templates and snapshots are depends on how hours and the dynamic slots work in practice, and a snapshot may need to include strictness, which isn't designed yet |
+| 2026-10-30 | Services have buffers before and after (default 0), kept inside working hours and adding up back to back. Lengths the customer chooses are separate services in v1 | The user's answers to 03's questions. Per-practitioner lengths, buffers and prices come with staff |
+| 2026-10-30 | The booking window is set for the business (default 2 hours' notice, up to 90 days ahead). The slot interval is set for the business: 10, 15, 20, 30 or 60 minutes, default 15 | The user's answers to 03's questions. Every 5 minutes isn't offered, because times like 09:05 look odd to customers. Per-practitioner windows come with staff |
+| 2026-10-30 | Instants (time off now, bookings from 05) are `timestamptz`, written through an `AsUtcDateTime` cast, and the PostgreSQL connection's time zone is set to UTC | Checked locally: Eloquent saves a `Carbon` in its own time zone without converting it, so 10:00 London time in July was stored as 10:00 UTC, and a query given a London time matched the wrong row |
+| 2026-10-30 | The sample business is built by an action, `CreateSampleBusiness`, with fixed data and no Faker: an independent physio and sports massage therapist with a fortnightly pattern and six services from 30 to 90 minutes. `DatabaseSeeder` calls it, and the playground (08) will call it for each sandbox | Faker is a development dependency, and the playground runs in production. One definition serves local development, the tests and the playground |
+| 2026-10-30 | The business's URL slug moves from 03 to whichever of 10 or 11 first needs it | Nothing before the booking link uses it, and sandboxes would otherwise need one generated for nothing |
 
 ## Notes for the next session
 

@@ -4,14 +4,16 @@
 
 ## 1. Summary
 
-An online booking system for small appointment-based businesses: physio and therapy clinics, sports massage therapists, salons, dog groomers and independent practitioners. Each business gets a public booking page and a "Book now" widget it can embed in its own website. Customers pick a service, see the available times and book without creating an account. The business manages its practitioners, services, working hours and bookings from an admin area.
+An online booking system for small appointment-based businesses: physio and therapy clinics, sports massage therapists, salons, dog groomers and independent practitioners. Each business gets a public booking page and a "Book now" widget it can embed in its own website. Customers pick a service, see the available times and book without creating an account. The owner manages their services, working hours, time off and bookings from an admin area.
+
+**Version 1 is for one person who works for themselves**: one login and one diary per business, with full control over everything. Businesses with staff come after v1, and the data model is designed for them from the start (sub-plan 03).
 
 What makes it different is **how it decides which times to offer**. Services have different lengths (for example 30, 60 and 90 minutes), and every booking changes what else can fit around it. The app:
 
 - works out available times on the fly from working hours, time off and existing bookings, so once a slot is taken, every time that would overlap it disappears
 - scores each possible slot by how much usable time it would waste, such as a 15-minute hole nobody can book
 - lets each business choose, with a **strictness slider**, how hard to push for a tightly packed diary versus giving customers the most choice
-- has an interactive **scheduling playground**: anyone can book appointments into a sample clinic and drag the slider to see how the offered times change, with no sign-up
+- has an interactive **scheduling playground**: anyone can book appointments into a sample business and drag the slider to see how the offered times change, with no sign-up
 - tracks a **diary efficiency score** over time, showing how much time and how many bookings were lost to awkward gaps, separately from time that was free because the business was quiet
 - (later) offers a free **diary health check**: a business uploads an export from its current system and gets an efficiency score for its past diary
 - (later) learns from the business's own booking history, so busy times are packed tightly and quiet times stay flexible
@@ -21,30 +23,30 @@ What makes it different is **how it decides which times to offer**. Services hav
 
 - A working product that a small business could actually use, deployed with a public demo.
 - An interactive playground that shows the core idea in under a minute, with no sign-up.
-- A full product demo: one-click demo logins, realistic sample data, and an example business website with the widget embedded.
+- A full product demo: a one-click demo login, realistic sample data, and an example business website with the widget embedded.
 - Scheduling that stays correct under pressure: no double bookings, correct across clock changes, thoroughly tested.
 - Clean, conventional Laravel and Vue code, with CI and automatic deploys.
 
 ## 3. Users and main flows
 
 **Visitor** (playground, no account)
-- Books appointments into their own copy of a sample clinic, drags the strictness slider, and watches the offered times and the day's efficiency change.
+- Books appointments into their own copy of a sample business, drags the strictness slider, and watches the offered times and the day's efficiency change.
 
-**Business owner**
+**Business owner** (in v1, a practitioner who works alone)
 - Signs up, which creates their business.
-- Sets up services, practitioners, working hours, time off and booking rules.
-- Sees and manages every booking in a calendar.
+- Sets up services, working hours, time off and booking rules.
+- Sees and manages every booking in a calendar, and marks no-shows.
 - Copies their booking link or widget code into their own website.
 
-**Practitioner** (login optional)
-- Sees their own calendar, adds time off and marks no-shows.
+**Staff** (after v1)
+- More practitioners, with or without a login of their own, and what the owner lets each of them change.
 
 **Prospective business** (no account, later)
 - Uploads an export of its existing appointments and gets a free diary health check.
 
 **Customer** (no account)
 1. Opens the business's booking link or widget.
-2. Chooses a service, then a practitioner or "anyone available".
+2. Chooses a service (and, once businesses have staff, a practitioner or "anyone available").
 3. Picks a date and one of the offered times.
 4. Enters their name, email and phone number, and confirms.
 5. Receives a confirmation email with links to cancel or reschedule, then a reminder before the appointment.
@@ -56,17 +58,20 @@ Use these names consistently in code, UI and docs.
 | Term | Meaning |
 |---|---|
 | Business | A tenant: one clinic, salon or independent practitioner. All other data belongs to a business. |
-| Sandbox | A temporary copy of the sample clinic, made for one playground visitor and deleted after 24 hours. It's an ordinary business underneath. |
-| Practitioner | A person who delivers appointments. May or may not have a login. |
-| Service | Something a customer can book. Has a duration, optional buffer time after it, and a price. Offered by one or more practitioners. |
-| Working hours | A practitioner's repeating weekly hours, e.g. Monday 09:00–13:00 and 14:00–17:00. Stored as local times. |
+| Sandbox | A temporary copy of the sample business, made for one playground visitor and deleted after 24 hours. It's an ordinary business underneath. |
+| Current business | The business a request or job is working for. Every query on tenant-owned data is filtered by it, and with none set the query fails. |
+| Practitioner | The person whose diary is booked. Hours, time off and bookings belong to the practitioner. In v1 each business has exactly one, the owner; staff come after v1. |
+| Service | Something a customer can book. Has a length, optional buffer time before and after it, and a price. In v1 the practitioner offers every active service. With staff, each service is offered by chosen practitioners, who can have their own length, buffers and price for it. |
+| Working hours | What a practitioner works on a date: the edited day's hours if there is one, otherwise the working pattern's. Stored as local times, e.g. 09:00–13:00 and 14:00–17:00. |
+| Working pattern | A practitioner's repeating hours: a cycle of 1 to 4 weeks, from a start date until an optional end date. Only one is in force on any date. |
+| Edited day | A date whose hours were entered by hand, replacing the pattern's for that date. It may have no hours. "Reset to pattern" removes it. |
 | Time off | A one-off period when a practitioner isn't available. |
-| Booking | A customer's appointment with one practitioner for one service. Blocks the practitioner from its start until its end plus the service's buffer. |
+| Booking | A customer's appointment with one practitioner for one service. Blocks the practitioner from its start minus the buffer before, until its end plus the buffer after. |
 | Customer | Someone who has booked with a business. No login; identified within a business by email. |
 | Free gap | A continuous stretch of time when a practitioner is working and not blocked. |
 | Slot | A possible start time for a service, practitioner and date. Slots are calculated, never stored. |
-| Slot interval | The step between possible start times. Default 15 minutes, aligned to the clock (:00, :15, :30, :45). |
-| Booking window | How soon (minimum notice) and how far ahead (maximum advance) customers can book. |
+| Slot interval | The step between possible start times, set for the whole business: 10, 15, 20, 30 or 60 minutes. Default 15, aligned to the clock (:00, :15, :30, :45). |
+| Booking window | How soon (minimum notice) and how far ahead (maximum advance) customers can book. Set for the business. Default 2 hours and 90 days. With staff, each practitioner can have their own. |
 | Waste score | How much usable time a slot would waste if it were booked. |
 | Strictness | A business setting from 0 to 100. 0 offers every slot that fits; 100 offers only the least wasteful ones. |
 | Relaxation window | How close to an appointment time strictness stops applying, so late bookings aren't turned away. |
@@ -81,14 +86,14 @@ All times are shown to customers in the business's time zone, since appointments
 
 ### 5.1 Calculating available slots
 
-For a service, a date range and a practitioner (or every practitioner who offers the service):
+For a service, a date range and a practitioner (in v1, the business's only one):
 
-1. Turn the practitioner's working hours into real time ranges for each date, using the business's time zone, so 09:00 stays 09:00 when the clocks change.
-2. Subtract time off and existing bookings (including buffer time) to get the free gaps.
-3. In each free gap, list every start time on the slot interval where the whole service, plus its buffer, fits.
+1. Work out the practitioner's working hours for each date (the edited day if there is one, otherwise the working pattern), and turn them into real time ranges using the business's time zone, so 09:00 stays 09:00 when the clocks change.
+2. Subtract time off and existing bookings (including their buffers) to get the free gaps.
+3. In each free gap, list every start time on the slot interval where the whole service, plus its buffers before and after, fits.
 4. Drop start times outside the booking window.
 5. Apply the waste score and strictness rules (5.3 and 5.4).
-6. For "anyone available", combine practitioners: a time is shown if at least one of them can take it.
+6. With staff (after v1), for "anyone available", combine practitioners: a time is shown if at least one of them can take it.
 
 Example: a practitioner works 09:00–12:00 and has a 30-minute booking at 10:00. The free gaps are 09:00–10:00 and 10:30–12:00. For a 60-minute service the possible starts are 09:00, 10:30, 10:45 and 11:00. 09:15 isn't offered because it would run into the 10:00 booking.
 
@@ -103,7 +108,7 @@ Two customers can try to take the same time at the same moment. Two layers stop 
 
 The customer who loses the race sees "Sorry, that time was just taken" along with an updated list of times.
 
-For "anyone available", the booking goes to the practitioner it fits best: at first the one with the smallest free gap that fits, and from sub-plan 06 the one with the lowest waste score. This keeps longer free gaps open for longer services.
+With staff (after v1), an "anyone available" booking goes to the practitioner it fits best: the one with the lowest waste score. This keeps longer free gaps open for longer services.
 
 ### 5.3 Waste score
 
@@ -128,10 +133,10 @@ While the owner drags the slider, the admin screen shows a live preview, e.g. "C
 
 ### 5.5 Scheduling playground
 
-A public page, with no sign-up, that shows the core idea in action. Each visitor gets their own sandbox: a temporary copy of a sample clinic (for example two practitioners and 30, 60 and 90-minute services). Sandboxes are deleted after 24 hours, and visitors never see or affect each other's bookings.
+A public page, with no sign-up, that shows the core idea in action. Each visitor gets their own sandbox: a temporary copy of the sample business from sub-plan 03 (an independent physio and sports massage therapist, with services from 30 to 90 minutes). Sandboxes are deleted after 24 hours, and visitors never see or affect each other's bookings.
 
 On the page:
-- a day timeline for each practitioner, showing bookings and free gaps, with stranded time highlighted
+- a day timeline showing bookings and free gaps, with stranded time highlighted
 - a booking panel: choose a service, see the offered times, and click one to book it
 - the strictness slider, with the offered times updating as it moves
 - a "show hidden times" toggle that greys out the times strictness is hiding and says why, e.g. "would leave 15 minutes nobody can book"
@@ -169,7 +174,7 @@ It answers the question "of the time bookings took up, how much was earning?" A 
 - the score by week and month as a trend line, marked wherever the strictness setting changed, so the owner can see whether a change helped
 - time lost to gaps, in hours and as an estimated value in pounds, based on the average price per minute of the business's services
 - missed bookings, with the services and days they happened on
-- a breakdown by practitioner and by day of the week
+- a breakdown by day of the week (and by practitioner, once there are staff)
 - stranded time already in the next seven days, which the owner could still fix by moving a booking
 
 An Artisan command can recalculate the figures for past days. It's also used to build up history for the demo business.
@@ -216,6 +221,7 @@ Later, the same import could bring a business's future bookings across when it s
 | Build order: foundations, then the scheduling engine, then the playground, then accounts, admin screens and emails | The engine is the riskiest and most distinctive part, so it's proven first. The data model settles before admin screens are built on it, and there's a shareable demo early. |
 | The playground runs on the real foundations. Each visitor's sandbox is an ordinary business that uses the real engine, rules and constraint | Nothing in the demo is throwaway, so the early build order doesn't create rework later. |
 | Scheduling code receives the business it works on, rather than reading it from the logged-in user | The same code serves the playground (sandbox from the session), the public booking page (business from the URL) and the admin area (business from the user). |
+| Version 1 is for one person who works for themselves: one login and one practitioner per business. Nothing belongs to a login; everything belongs to the business or its practitioner | A smaller first version. Staff, roles and per-practitioner settings can be added later without moving data (sub-plan 03) |
 | Multi-tenant from the start: one database, every tenant-owned table has a `business_id`, and queries are scoped to the current business automatically | Adding tenancy later would mean touching every query. Isolation between businesses gets its own tests. |
 | PostgreSQL everywhere, including tests | Exclusion constraints and time ranges are PostgreSQL features. Tests on SQLite would miss double-booking bugs. |
 | Times stored in UTC; working hours stored as local times plus the business's time zone | Stays correct across clock changes. |
@@ -299,27 +305,30 @@ The final schema for each table is set in the sub-plan that creates it.
 | Table | Key columns |
 |---|---|
 | `businesses` | name, slug, time zone, slot interval, minimum notice, maximum advance, strictness, relaxation window, logo, brand colour, sandbox expiry (playground sandboxes only) |
-| `users` | business, role (owner or practitioner), name, email |
-| `practitioners` | business, user (nullable), name, colour, active |
-| `services` | business, name, duration, buffer after, price (in pence), active |
-| `practitioner_service` | which practitioners offer which services |
-| `working_hours` | practitioner, weekday, start time, end time (several rows per day allowed) |
+| `users` | business, name, email. One per business in v1; a role once there are staff |
+| `practitioners` | business, name. One per business in v1; with staff, also user (nullable), colour, own booking window and active |
+| `services` | business, name, length, buffer before, buffer after, price (in pence), active |
+| `practitioner_service` (after v1) | which practitioners offer which services, with each practitioner's own length, buffers and price |
+| `working_patterns` | practitioner, starts on, ends on (nullable), cycle starts on, 1 to 4 weeks of hours. No two overlap for one practitioner |
+| `edited_days` | practitioner, date, hours (possibly none) |
 | `time_off` | practitioner, starts at, ends at, reason |
 | `customers` | business, name, email, phone |
-| `bookings` | business, practitioner, service, customer, starts at, ends at, blocked until, status (confirmed, cancelled, completed, no-show), source (playground, booking page, widget, admin), manage token (hashed) |
+| `bookings` | business, practitioner, service, customer, starts at, ends at, blocked from, blocked until, status (confirmed, cancelled, completed, no-show), source (playground, booking page, widget, admin), manage token (hashed) |
 | `availability_searches` | what was searched, how many slots were offered, and whether it led to a booking |
 | `diary_stats` | business, practitioner, date, and that day's working, booked, free, stranded and fragmented minutes, plus the strictness in force |
 | `diary_imports` (later) | file type, column mapping, date range, results summary |
 | `imported_appointments` (later) | import, practitioner, service or duration, start, end, status, price; no customer details |
 | `simulation_runs` (later) | settings and results of each simulator run |
 
-`bookings` has the exclusion constraint described in 5.2. It covers `practitioner_id` and the time range from `starts_at` to `blocked_until`, for bookings that aren't cancelled.
+`bookings` has the exclusion constraint described in 5.2. It covers `practitioner_id` and the time range from `blocked_from` to `blocked_until`, for bookings that aren't cancelled.
+
+Child tables reference their parents through composite foreign keys that include `business_id`, so the database refuses rows that mix two businesses (sub-plan 03).
 
 ## 10. Testing strategy
 
-- **Availability engine and waste score:** unit tests that take a timetable and check the expected slots. They cover clock-change days, buffers, gap edges, multiple practitioners, the booking window, strictness levels and the relaxation window.
+- **Availability engine and waste score:** unit tests that take a timetable and check the expected slots. They cover clock-change days, buffers, gap edges, the booking window, strictness levels and the relaxation window.
 - **Randomised rule checks for the engine:** hundreds of random diaries, generated from a fixed seed so any failure can be reproduced, checked against rules that must always hold. They're written in plain PHPUnit, with no extra package. They start in 04, and new rules are added in 05 to 07:
-  - every offered slot, plus its buffer, fits inside working hours, without overlapping time off or any booking's blocked time
+  - every offered slot, plus its buffers, fits inside working hours, without overlapping time off or any booking's blocked time
   - every offered slot is inside the booking window
   - raising strictness only ever hides slots, never adds any, so strictness 100 offers a subset of strictness 0
   - at any strictness, every free gap with room for the service still offers at least one time
@@ -343,8 +352,8 @@ The final schema for each table is set in the sub-plan that creates it.
 
 **For each sub-plan:**
 1. Read this overview and `tracking.md`.
-2. Create a branch named `feature/NN-short-name`.
-3. Plan in Claude Code's plan mode, then implement.
+2. Draft the sub-plan with the `draft-sub-plan` skill on a `docs/` branch, and merge it once reviewed.
+3. Build it on a branch named `feature/NN-short-name`, with the `build-sub-plan` skill. That skill is written just before building 03, once there are plans to build from.
 4. Write the tests, and get them passing.
 5. Open a pull request, then merge it.
 6. Update `tracking.md`.
@@ -383,15 +392,15 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | 01 | Project setup | Laravel + official Vue starter kit; Docker dev environment (PostgreSQL, app, Vite, Mailpit); tests running on PostgreSQL; Laravel Boost; `CLAUDE.md` |
 | 01b | WSL development environment | Development moved into WSL 2 on Windows, so the code lives on a Linux filesystem; Windows-only workarounds removed |
 | 02 | CI and deployment | GitHub repo; Actions for lint, tests and build; Fly.io (London) + Neon + automatic deploys; a live URL from day one |
-| 03 | Core data model | Businesses with automatic tenant scoping; practitioners; services and who offers what; working hours; time off; business settings; factories and a sample clinic seeder; isolation tests. No admin screens yet |
+| 03 | Core data model | Businesses with automatic tenant scoping; the business's practitioner (one in v1); services; working patterns and edited days; time off; booking settings; factories and a sample business; isolation tests. No admin screens yet |
 
 ### Phase 2: Scheduling engine
 
 | # | Sub-plan | Delivers |
 |---|---|---|
 | 04 | Availability engine | Slot calculation (5.1), including time zones and the booking window; thorough unit tests; randomised rule checks; mutation testing with Infection |
-| 05 | Making bookings | Booking action; customers; locking + exclusion constraint; best-fit practitioner for "anyone available" |
-| 06 | Waste score | Waste score (5.3) in the engine and practitioner assignment; a day's stranded and fragmented time |
+| 05 | Making bookings | Booking action; customers; locking + exclusion constraint |
+| 06 | Waste score | Waste score (5.3) in the engine; a day's stranded and fragmented time |
 | 07 | Strictness and relaxation | Strictness filter and relaxation window in the engine (5.4); settings stored on the business |
 
 ### Phase 3: Playground
@@ -405,13 +414,13 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | # | Sub-plan | Delivers |
 |---|---|---|
-| 09 | Accounts and sign-up | Owner sign-up creates a business; owner and practitioner roles; current business taken from the logged-in user |
-| 10 | Admin setup | Screens for practitioners, services, working hours, time off and business settings, including the strictness slider with live preview |
+| 09 | Accounts and sign-up | Owner sign-up creates the business, its practitioner and the one login; current business taken from the logged-in user |
+| 10 | Admin setup | Screens for services, working hours, time off and business settings, including the strictness slider with live preview. Working hours: new hours from a date, editing days and resetting them; bookings outside new hours are flagged |
 | 11 | Public booking page | Customer booking component; stateless booking API; hosted page at `/book/{business}`; logging of availability searches; Content Security Policy with `spatie/laravel-csp` |
 | 12 | Emails and reminders | Confirmation, cancellation and reminder emails through queues and the scheduler; manage-booking page with cancel and reschedule links; production mail provider |
-| 13 | Admin calendar | Day and week views per practitioner, built from the playground timeline; create, move and cancel bookings; no-shows |
+| 13 | Admin calendar | Day and week views, built from the playground timeline; create, move and cancel bookings; no-shows |
 | 14 | Efficiency score | Nightly diary statistics (5.6); efficiency score; missed bookings; dashboard trend chart with strictness changes marked; recalculation command |
-| 15 | Demo mode and README | Full product demo: sample clinic with months of history; one-click demo logins; nightly reset; README with screenshots |
+| 15 | Demo mode and README | Full product demo: sample business with months of history; a one-click demo login; nightly reset; README with screenshots |
 | ★ | **MVP milestone** | **Ready for real businesses** |
 
 ### Phase 5: Extras
@@ -428,6 +437,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 ## 13. Out of scope (for now)
 
+- Staff: more than one practitioner or login per business, who offers which services, per-practitioner prices, lengths, buffers and booking windows, roles and permissions, and "anyone available". Designed for in sub-plan 03, added after v1
 - Payments and deposits
 - SMS reminders
 - Google and Outlook calendar sync
@@ -438,14 +448,17 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 - Clinical notes or records of any kind
 - Recurring bookings
 - Native mobile apps
+- Rooms and equipment: a booking only blocks a practitioner's time
+- Working hours that run past midnight
 
 ## 14. Open questions
 
 | Question | Needed by |
 |---|---|
 | When to add the custom domain: before links are shared at the playground milestone, or in 22 as planned (`bookalive.io` was unregistered on 2026-10-27) | 08 / 22 |
-| Default strictness and relaxation window | 07 |
+| Default strictness and relaxation window, and whether to set them provisionally in 07 and tune them once the playground shows the dynamic slots working | 07 / 08 |
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
 | Production email provider (e.g. Resend, Postmark, Amazon SES) | 12 |
+| Week templates and hours snapshots: saved weeks of hours to apply, and saved copies of a practitioner's hours to restore after experimenting. Decide once a first version of the hours and the dynamic slots can be tried. A template would copy its hours when applied; a snapshot would cover one practitioner. Should a snapshot include strictness? | After v1 |
 | Which libraries to use for reading CSV, Excel and .ics files in the browser | 16 |
 | Where the example business website lives (GitHub Pages or a second Fly app) | 18 |
