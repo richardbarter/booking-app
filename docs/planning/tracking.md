@@ -20,13 +20,13 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 Sub-plans 03 to 07 (the core data model and the scheduling engine) were reviewed and merged in pull request #7 on 2026-11-02. They're built in order with the `build-sub-plan` skill, one pull request each.
 
-Sub-plan 03 is built, in pull request #BUILD_PR:
+Sub-plan 03 is built, in pull request #10:
 - **Tables:** businesses with their booking settings, one practitioner per business (through a unique index on `practitioners.business_id`, which goes when staff arrive), services, working patterns, edited days and time off. Check, unique and exclusion constraints keep the data valid, and composite foreign keys on `(business_id, practitioner_id)` stop a row mixing two businesses. Every `business_id` cascades on delete.
 - **Tenancy:** tenant-owned models use `BelongsToBusiness`, whose scope filters by `CurrentBusiness` and throws `MissingCurrentBusiness` when none is set. `business_id` and `practitioner_id` aren't mass-assignable. A guard test checks every table with a `business_id`, including later sub-plans' tables.
 - **Hours:** plain PHP value objects in `app/Scheduling/Hours`, ending in `WorkingHours::on()`, which 04 builds on. They need no Laravel, and their tests extend PHPUnit's `TestCase`.
 - **Times:** the PostgreSQL connection runs in UTC, instants go through `AsUtcDateTime`, and production masks query values in database error messages (`DB_MASK_BINDINGS`).
 - **Sample business:** `CreateSampleBusiness` makes Alex Morgan Physio & Sports Massage, and `DatabaseSeeder` calls it.
-- **Code:** PHPUnit has 262 tests, which take about 4.8s on the host. Larastan at level 9 has no errors.
+- **Code:** PHPUnit has 268 tests, which take about 4.7s on the host and 6.3s in CI. Larastan at level 9 has no errors.
 
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
@@ -53,7 +53,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
-| 03 | Core data model | Done | Plan #7, build #BUILD_PR | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 262 PHPUnit tests in about 4.8s. The production checks wait for the merge |
+| 03 | Core data model | Done | Plan #7, build #10 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 268 PHPUnit tests in about 4.7s. The production checks wait for the merge |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07 |
 | 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |

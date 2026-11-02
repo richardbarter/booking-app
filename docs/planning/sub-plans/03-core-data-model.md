@@ -472,7 +472,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
 ## Done when
 
 - [x] `php artisan migrate:fresh --seed` creates the schema and the sample business locally, and `php artisan migrate:rollback --step=7` takes it back to the existing tables without errors. After `migrate:fresh` every migration is in one batch, so a plain `migrate:rollback` would remove the existing tables too
-- [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
+- [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
 - [x] The guard test covers every tenant-owned table and model
 - [ ] The deploy after merging runs the new migrations on Neon, including enabling `btree_gist` (Fly's release command succeeds)
 - [ ] Production masks query values in error messages: `fly ssh console -C "php artisan config:show database.connections.pgsql.mask_bindings_in_exception_messages"` shows true. The command names the one setting, because showing the whole connection would print the database URL and its password
