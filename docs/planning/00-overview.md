@@ -410,7 +410,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | # | Sub-plan | Delivers |
 |---|---|---|
 | 04 | Availability engine | Slot calculation (5.1), including time zones, clock changes and the booking window; an `availability:show` command to try it; thorough unit tests; randomised rule checks; mutation testing with Infection on every pull request |
-| 05 | Making bookings | Booking action; customers; locking + exclusion constraint |
+| 05 | Making bookings | Booking action; customers; locking + exclusion constraint; a `booking:create` command to try it locally |
 | 06 | Waste score | Waste score and extra waste (5.3) in the engine; room weights on services; a day's stranded and fragmented time |
 | 07 | Strictness and relaxation | Strictness filter and relaxation window in the engine (5.4), with strictness looked up for each time so it can vary by time of day later; settings stored on the business |
 
