@@ -42,12 +42,12 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
-| 03 | Core data model | Planned | | Drafted 2026-10-30 and revised 2026-11-02, awaiting review with 04 to 07 |
+| 03 | Core data model | Planned | #7 | Drafted 2026-10-30 and revised 2026-11-02, awaiting review with 04 to 07 |
 | | **Phase 2: Scheduling engine** | | | |
-| 04 | Availability engine | Planned | | Drafted 2026-11-02, awaiting review with 03 and 05 to 07 |
-| 05 | Making bookings | Planned | | Drafted 2026-11-02, awaiting review with 03, 04, 06 and 07 |
-| 06 | Waste score | Planned | | Drafted 2026-11-02, awaiting review with 03 to 05 and 07 |
-| 07 | Strictness and relaxation | Planned | | Drafted 2026-11-02, awaiting review with 03 to 06 |
+| 04 | Availability engine | Planned | #7 | Drafted 2026-11-02, awaiting review with 03 and 05 to 07 |
+| 05 | Making bookings | Planned | #7 | Drafted 2026-11-02, awaiting review with 03, 04, 06 and 07 |
+| 06 | Waste score | Planned | #7 | Drafted 2026-11-02, awaiting review with 03 to 05 and 07 |
+| 07 | Strictness and relaxation | Planned | #7 | Drafted 2026-11-02, awaiting review with 03 to 06 |
 | | **Phase 3: Playground** | | | |
 | 08 | Scheduling playground | Not started | | |
 | ★ | **Playground milestone** | | | |
