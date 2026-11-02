@@ -44,7 +44,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
-| 03 | Core data model | Planned | Plan #7 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07 |
+| 03 | Core data model | In progress | Plan #7 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Being built on `feature/03-core-data-model` |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07 |
 | 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |
