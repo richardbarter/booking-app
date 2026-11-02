@@ -15,7 +15,7 @@ Let each business choose how tightly its diary is packed. A **strictness** setti
 - The strictness step in the engine: which times are hidden, and the hidden times kept for explanations
 - The relaxation window
 - `CreateBooking`'s final check applying strictness
-- `availability:show` showing hidden times, with a way to try other strictness values
+- `availability:show` showing hidden times, with a way to try other strictness values, and the same option for 05's `booking:create`
 - Tests, and updates to the overview, 04, 05 and `tracking.md`
 
 **Out of scope**
@@ -116,7 +116,7 @@ In v1 it returns the business's strictness for every time. Strictness by time of
 
 ### The final check before saving
 
-`CreateBooking` (05) already looks for the requested start among the day's `slots`. Once strictness filters `slots`, a hidden time is refused with `SlotNotAvailable`, as the user chose, and `CreateBooking`'s code doesn't change. Inside the relaxation window nothing is hidden, so a customer booking close to the date never sees this.
+`CreateBooking` (05) already looks for the requested start among the day's `slots`. Once strictness filters `slots`, a hidden time is refused with `SlotNotAvailable`, as the user chose, and `CreateBooking`'s code doesn't change. Inside the relaxation window nothing is hidden, so a customer booking close to the date never sees this. 05's `booking:create` can book at another strictness (below), but it only runs locally, so wherever customers book, only offered times can be booked.
 
 ## Data model
 
@@ -149,6 +149,10 @@ It builds `BookingSettings` with the business's strictness and relaxation window
 - It lists the hidden times with their extra waste, beside the offered ones.
 - It says whether the date is within the relaxation window.
 - A new `--strictness=` option (0 to 100) shows the day at another strictness without changing the business, to try settings before the playground exists. The command sets the value on the business it has loaded, without saving it, and `AvailabilityService` reads it from there. An invalid value is refused with exit code 1, and a test checks the stored strictness is unchanged afterwards.
+
+### `booking:create` (05)
+
+It gains the same `--strictness=` option (0 to 100). The command sets the value on the business it has loaded, without saving it, and passes that business to `CreateBooking`, whose check reads it from there. So a time that's hidden at the business's own setting can be booked locally, to see how a wasteful booking fragments the diary. `CreateBooking` doesn't change, and an invalid value is refused with exit code 1.
 
 ## Frontend
 
@@ -204,12 +208,18 @@ These are the overview's last three rules (section 10), plus the checks that the
 - Hidden times are listed with their extra waste.
 - `--strictness=101` is refused.
 
+**Feature: `booking:create`**, at 04's fixed time:
+- At 50, booking the assessment at 09:15 on Monday 9 November, a hidden time, is refused with exit code 1, and `--strictness=0` books it.
+- The stored strictness is still 50 afterwards.
+- `--strictness=101` is refused.
+
 **Mutation testing:** the new code is in `app/Scheduling`, so Infection covers it, and the score stays at 90% or more.
 
 ## Done when
 
 - [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
 - [ ] `php artisan availability:show 1 <assessment's ID> --date=<a Monday at least 3 days ahead>` shows offered and hidden times locally, and `--strictness=0` shows them all
+- [ ] `php artisan booking:create 1 <assessment's ID> "<that Monday> <a hidden time>" --strictness=0` books a time that `availability:show` lists as hidden, locally
 - [ ] The deploy after merging runs the migration on Neon (Fly's release command succeeds)
 - [ ] `tracking.md` marks 07 as done, and with 03 to 06 done, the engine is complete for the playground (08)
 

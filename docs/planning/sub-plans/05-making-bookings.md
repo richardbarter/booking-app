@@ -2,7 +2,7 @@
 
 ## Goal
 
-Let a booking be made safely: a `CreateBooking` action that checks the time with the engine, saves the customer and the booking, and can never double-book a practitioner, even when two customers press "book" at the same moment. Bookings then become blocked time, so the engine stops offering anything that would overlap them. There are no pages yet; the playground (08), the public booking page (11) and the admin calendar (13) call this action.
+Let a booking be made safely: a `CreateBooking` action that checks the time with the engine, saves the customer and the booking, and can never double-book a practitioner, even when two customers press "book" at the same moment. Bookings then become blocked time, so the engine stops offering anything that would overlap them. There are no pages yet; the playground (08), the public booking page (11) and the admin calendar (13) call this action. Until then, a `booking:create` command books a time locally, so the engine can be tried around bookings of your own.
 
 ## Depends on
 
@@ -17,6 +17,7 @@ Let a booking be made safely: a `CreateBooking` action that checks the time with
 - `AvailabilityService` loads bookings as blocked time
 - Statuses and sources as enums, and the rule that a past confirmed booking counts as attended
 - Factories, a few sample bookings for local development, and tests
+- A `booking:create` command that books a time through `CreateBooking`, locally only, to try the engine before the playground
 - Updates to the overview, 03 and `tracking.md`
 
 **Out of scope**
@@ -38,6 +39,15 @@ The user's answers to this plan's questions (2026-11-02):
 | Booking again with a known email | A booking never changes an existing customer's details. Each booking also records the name and phone given with it, so the owner can compare them with the customer's and update the customer if needed (13) |
 | What customers must give | Name, email and phone, all required |
 | A "completed" status | Not stored. The statuses are confirmed, cancelled and no-show. A confirmed booking whose end has passed counts as attended, unless the owner marks it as a no-show. Nothing runs on a timer, so the database can sleep, and the status can never be out of step |
+
+Added after the plans were merged (2026-11-02), with the user's answers:
+
+| Question | Answer |
+|---|---|
+| A way to make bookings by hand before the playground | Yes: a `booking:create` command books a time through `CreateBooking`. Then `availability:show` shows what changed, and from 06 and 07 the waste scores and hidden times too. Otherwise the only bookings before 08 are the seeder's three |
+| Whether it runs in production | No. It writes bookings, and nothing can cancel one until 12 and 13, so it refuses to run in production. `availability:show` only reads, so it stays safe to run there |
+| How to undo its bookings | Start again with `php artisan migrate:fresh --seed`. Cancelling stays with 12 and 13, which design the real cancel action |
+| Booking a time that strictness hides | 07 gives it `availability:show`'s `--strictness=` option, which books as if the business were at that setting, without saving it |
 
 ## Design
 
@@ -99,7 +109,9 @@ A customer's name, email and phone are personal data:
 
 ### Ready for later sub-plans
 
-- **07:** strictness decides whether checking again refuses a time that still fits but that strictness would now hide.
+- **07:**
+  - strictness decides whether checking again refuses a time that still fits but that strictness would now hide
+  - `booking:create` gains `availability:show`'s `--strictness=` option
 - **08:** the playground calls `CreateBooking` with `BookingSource::Playground`, and its "Fill randomly" makes many bookings through it.
 - **11:** the public booking page catches `SlotNotAvailable` and `ServiceNotBookable` and shows the customer a clear message with updated times.
 - **12:**
@@ -257,6 +269,37 @@ $practitioner->bookings()->active()
 
 They join time off as the `Diary`'s blocked times. The engine doesn't change, and the randomised checks already cover blocked time of any kind. The query count stays the same for any range (now five).
 
+### `booking:create` (`app/Console/Commands/BookSlot.php`)
+
+```php
+#[Signature('booking:create
+    {business : The business ID}
+    {service : The service ID}
+    {start : The start, as "YYYY-MM-DD HH:MM" in the business\'s time zone}
+    {--name=Test Customer : The customer\'s name}
+    {--email=test@example.com : The customer\'s email}
+    {--phone=07700900000 : The customer\'s phone}')]
+#[Description('Book a time through CreateBooking, to try the engine locally')]
+class BookSlot extends Command
+```
+
+It's named `BookSlot` because `CreateBooking` is the action's name. It's the counterpart of 04's `availability:show`: book a time, then run `availability:show` for that date to see what changed. The command:
+- **Refuses to run in production,** with a clear message and exit code 1, before touching the database. It writes bookings, and nothing can cancel one until 12 and 13. To undo bookings made locally, start again with `php artisan migrate:fresh --seed`.
+- Finds the business, then works inside `CurrentBusiness::run($business, ...)`, as `availability:show` does.
+- Turns `start` into an instant with `LocalClock::startTimeOn()` (04), so it follows the engine's rule on the nights the clocks change: a repeated time means its first occurrence, where PHP's own parsing gives the second.
+- Checks the customer options, as every caller of the action must (see Notes): each is required and within its column's length, and the email is a valid address.
+- Calls `CreateBooking` with `BookingSource::Admin`, as the sample bookings do.
+- Prints the booking's ID, the service, and its local date, start and end, with no customer details.
+- Fails with a clear message and exit code 1, writing nothing, for:
+  - an unknown business
+  - a service that isn't the business's
+  - an inactive service (`ServiceNotBookable`)
+  - a start that isn't `YYYY-MM-DD HH:MM`, or a time the clocks skip
+  - invalid customer options
+  - a time that isn't offered (`SlotNotAvailable`), with a pointer to `availability:show`
+
+The default customer is made up: `example.com` is reserved for examples, and Ofcom keeps 07700 900000 to 900999 for drama. Bookings made with the defaults all belong to one customer, since customers are matched by email.
+
 ### Sample bookings for local development
 
 `DatabaseSeeder` makes three bookings in the sample business next week through `CreateBooking`, inside `CurrentBusiness::run()`. They use made-up customers at `example.com` (a domain reserved for examples) and `BookingSource::Admin`. So `availability:show` shows the engine working around real bookings. `CreateSampleBusiness` itself stays without bookings; whether a playground sandbox starts with some is 08's decision.
@@ -348,11 +391,25 @@ With the sample business at a fixed time (`travelTo()`, as in 04):
 - `php artisan db:seed` creates the three sample bookings.
 - The sample business's availability on that day leaves them out.
 
+**Feature: `booking:create`** (`tests/Feature/Console/Commands/BookSlotTest.php`), with the sample business at 04's fixed time:
+- `booking:create <business's ID> <assessment's ID> "2026-11-09 10:00"` books it through `CreateBooking`, with `BookingSource::Admin` and the default customer, and prints its ID and `10:00–11:00`.
+- Given `--name`, `--email` and `--phone`, it uses them.
+- Each failure gives its message and exit code 1, with nothing written:
+  - an unknown business
+  - another business's service
+  - an inactive service
+  - a badly formed start
+  - a time the clocks skip (`2027-03-28 01:30` in London)
+  - an invalid email
+  - a time already taken
+- With the app's environment set to production, it refuses before reading the database.
+
 ## Done when
 
 - [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection still at 90% or more
 - [ ] `php artisan migrate:fresh --seed` creates the sample bookings, and `php artisan migrate:rollback` removes both tables without errors
 - [ ] `php artisan availability:show 1 <service> --date=<the sample bookings' date>` leaves out the booked times locally
+- [ ] `php artisan booking:create 1 <follow-up's ID> "<date> <a time availability:show offers>"` books it locally, and `availability:show` for that date then leaves it out
 - [ ] The deploy after merging runs the new migrations on Neon (Fly's release command succeeds)
 - [ ] `tracking.md` marks 05 as done
 
