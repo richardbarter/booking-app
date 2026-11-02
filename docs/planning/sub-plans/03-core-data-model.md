@@ -52,6 +52,7 @@ The user's answers to this plan's questions (2026-10-29, 2026-10-30 and 2026-11-
 | Sample business | A made-up independent physio and sports massage therapist, with a fortnightly pattern and three services of 30, 60 and 90 minutes, with no buffers and the 90-minute one booked less often (changed from six services on 2026-11-02; the original set is kept in the notes for a second sample business) |
 | How the engine handles practitioners | It works on one practitioner, which the code that loads its data gets with `sole()`. Nothing in v1 combines practitioners. "Anyone available" comes with staff, as a layer that runs the engine for each practitioner and merges the results. Building the booking calculation may change how that layer looks, so it isn't designed now |
 | How a login is linked to its business | The simplest way: each user belongs to one business, through `users.business_id`, added in 09. Other arrangements wait until there are staff |
+| Which columns can be mass-assigned (asked while building, 2026-11-02) | Only the ones a person types. `business_id` and `practitioner_id` aren't in `#[Fillable]`: code sets them through relations (`$business->practitioners()->create()`, `associate()`) or `BelongsToBusiness`'s creating hook, so a request field can never move a row to another business. Practitioners and services have no composite foreign key to catch that |
 
 Already settled on 2026-10-29: hours are stored as rules (patterns and edited days) rather than written out for every date, buffers can go before and after an appointment, and rooms and equipment are out of scope for v1.
 
@@ -216,9 +217,9 @@ Unique `(business_id, id)`, for 05's bookings to reference. In v1 the practition
 | `weeks` | jsonb | 1 to 4 weeks of hours (format below) |
 | timestamps | | |
 
-Checks: `ends_on` is null or not before `starts_on`; `cycle_starts_on <= starts_on`; `extract(isodow from cycle_starts_on) = 1`; `jsonb_typeof(weeks) = 'array'` and `jsonb_array_length(weeks)` between 1 and 4. Exclusion constraint: `EXCLUDE USING gist (practitioner_id WITH =, daterange(starts_on, ends_on, '[]') WITH &&)`. Index `(business_id, practitioner_id)`.
+Checks: `ends_on` is null or not before `starts_on`; `cycle_starts_on <= starts_on`; `extract(isodow from cycle_starts_on) = 1`; `jsonb_typeof(weeks) = 'array'` and `jsonb_array_length(weeks)` between 1 and 4. The weeks check is written as a `CASE`, because PostgreSQL doesn't promise to test the type first, and `jsonb_array_length()` raises an error on an object rather than refusing it. Exclusion constraint: `EXCLUDE USING gist (practitioner_id WITH =, daterange(starts_on, ends_on, '[]') WITH &&)`. Index `(business_id, practitioner_id)`.
 
-Checked locally on PostgreSQL 18: the constraint refuses a pattern that overlaps another by one day, or that overlaps an open-ended one. It allows a pattern starting the day after another ends, and the same dates for a different practitioner. The Monday and week-count checks work, and deleting a business removes its practitioners and patterns. Laravel's schema builder has no method for exclusion constraints, so that line is a `DB::statement`.
+Checked locally on PostgreSQL 18: the constraint refuses a pattern that overlaps another by one day, or that overlaps an open-ended one. It allows a pattern starting the day after another ends, and the same dates for a different practitioner. The Monday and week-count checks work, and deleting a business removes its practitioners and patterns. Laravel's schema builder has no method for check or exclusion constraints, so those are `DB::statement`s. Each has a name, such as `services_duration_minutes_check`, which the tests match.
 
 **`edited_days`**
 
@@ -295,10 +296,12 @@ The rules, enforced by the value objects:
 ### Models
 
 `Business`, `Practitioner`, `Service`, `WorkingPattern`, `EditedDay` and `TimeOff`, in `app/Models`. They follow `User`:
-- `#[Fillable]` attributes
+- `#[Fillable]` attributes: the columns a person types. `business_id` and `practitioner_id` aren't fillable (see Decisions), so code sets them through relations or the trait
 - `@property` docblocks for every column
 - typed relations with generics, such as `@return HasMany<Practitioner, $this>`
 - a factory
+
+`Business` and `Service` mirror their database defaults in `$attributes` (the booking settings, the buffers and `is_active`), so a new model has them before it's saved or reloaded. The database tests check the two match.
 
 `TimeOff` sets its table with `#[Table('time_off')]`. Every model except `Business` uses `BelongsToBusiness`.
 
@@ -322,14 +325,14 @@ These are plain PHP value objects with no Eloquent and no database, so the engin
 
 | Class | Holds | Main methods |
 |---|---|---|
-| `LocalTimeRange` | start and end, in minutes after midnight | `fromStrings('09:00', '13:00')`, `toArray(): array{string, string}` |
+| `LocalTimeRange` | `startMinute` and `endMinute`, in minutes after midnight | `fromStrings('09:00', '13:00')`, `toArray(): array{string, string}` |
 | `DayHours` | a day's ranges, in order | `ranges(): list<LocalTimeRange>`, `isEmpty()`, `fromArray()`, `toArray()` |
-| `WeekHours` | `DayHours` for each ISO weekday | `forWeekday(int $isoWeekday): DayHours`, `fromArray()`, `toArray()` |
-| `PatternWeeks` | 1 to 4 `WeekHours` | `count()`, `week(int $index): WeekHours`, `fromArray()`, `toArray()` |
-| `RepeatingPattern` | `startsOn`, `endsOn` (nullable), `cycleStartsOn`, `PatternWeeks` | `covers(CarbonInterface $date): bool`, `hoursOn(CarbonInterface $date): DayHours` (throws for a date it doesn't cover) |
+| `WeekHours` | `DayHours` for each ISO weekday, given to the constructor as `monday` to `sunday` | `forWeekday(int $isoWeekday): DayHours`, `fromArray()`, `toArray()` |
+| `PatternWeeks` | 1 to 4 `WeekHours` | `count()`, `week(int $index): WeekHours` (zero-based, so week 1 is index 0), `fromArray()`, `toArray()` |
+| `RepeatingPattern` | `startsOn`, `endsOn` (nullable) and `cycleStartsOn`, held as `Y-m-d` strings, and `PatternWeeks` | `covers(CarbonInterface $date): bool`, `hoursOn(CarbonInterface $date): DayHours` (throws for a date it doesn't cover) |
 | `WorkingHours` | one practitioner's patterns and edited days (keyed by `Y-m-d`) | `on(CarbonInterface $date): DayHours` |
 
-`WorkingHours` refuses overlapping patterns, matching the database. Its signature is what 04 builds on:
+`WorkingHours` refuses overlapping patterns, matching the database. It also refuses an edited day keyed by anything but a real `Y-m-d` date, which `on()` would otherwise never find. Its signature is what 04 builds on:
 
 ```php
 /**
@@ -345,8 +348,10 @@ The week of the cycle is `intdiv(days from cycleStartsOn to the Monday of the da
 
 ### Casts (`app/Casts`)
 
-- `AsUtcDateTime`, a `CastsAttributes<CarbonImmutable, CarbonInterface>`. It converts to UTC before saving and returns `CarbonImmutable` in UTC.
-- `AsDayHours` and `AsPatternWeeks` encode and decode JSON with `JSON_THROW_ON_ERROR`, building the value objects so invalid hours fail in both directions.
+- `AsUtcDateTime`, a `CastsAttributes<CarbonImmutable, CarbonInterface>`. It converts to UTC before saving and returns `CarbonImmutable` in UTC. Setting a string throws a `TypeError`, since a string has no zone to convert from.
+- `AsDayHours` and `AsPatternWeeks` encode and decode JSON with `JSON_THROW_ON_ERROR`, building the value objects so invalid hours fail in both directions. They can be set with the value object or its stored form as an array.
+
+All three also implement `ComparesCastableAttributes`. Eloquent keeps the object a class cast returns and writes it back through `set()` on every save, and the text `set()` writes differs from what PostgreSQL returns (`+00:00` against `+00`, and jsonb's own spacing and key order). Comparing by meaning means reading an attribute never marks it changed, and only a real change is saved.
 
 ### Configuration
 
@@ -449,7 +454,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
   - a service length, buffer or price out of range
   - time off that ends before it starts
 - Deleting a business deletes all its data in every table, and leaves another business's data alone.
-- Casts:
+- Casts (`tests/Feature/Casts/`, mirroring `app/Casts`):
   - hours round-trip through the database
   - a row with invalid hours (written with `DB::table`) throws when read
   - 10:00 London time in July is stored as 09:00 UTC and read back in UTC
@@ -464,12 +469,12 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
 
 ## Done when
 
-- [ ] `php artisan migrate:fresh --seed` creates the schema and the sample business locally, and `php artisan migrate:rollback` takes it back to the existing tables without errors
+- [x] `php artisan migrate:fresh --seed` creates the schema and the sample business locally, and `php artisan migrate:rollback --step=7` takes it back to the existing tables without errors. After `migrate:fresh` every migration is in one batch, so a plain `migrate:rollback` would remove the existing tables too
 - [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
-- [ ] The guard test covers every tenant-owned table and model
+- [x] The guard test covers every tenant-owned table and model
 - [ ] The deploy after merging runs the new migrations on Neon, including enabling `btree_gist` (Fly's release command succeeds)
-- [ ] Production masks query values in error messages: `fly ssh console -C "php artisan config:show database.connections.pgsql"` shows `mask_bindings_in_exception_messages` as true
-- [ ] `tracking.md` marks 03 as done
+- [ ] Production masks query values in error messages: `fly ssh console -C "php artisan config:show database.connections.pgsql.mask_bindings_in_exception_messages"` shows true. The command names the one setting, because showing the whole connection would print the database URL and its password
+- [x] `tracking.md` marks 03 as done
 
 ## Notes
 
@@ -500,13 +505,17 @@ It has buffers after every appointment and one before (the rehab session's setup
   - bookings block from their start minus the buffer before until their end plus the buffer after (`blocked_from` to `blocked_until`), and the exclusion constraint covers that range
   - bookings reference the practitioner and the service with composite foreign keys using `noActionOnDelete()`, so a service with bookings is deactivated rather than deleted. Use NO ACTION, not RESTRICT. Checked locally: both refuse deleting the parent directly, and both let a business delete cascade. But PostgreSQL checks RESTRICT as soon as each row goes, while NO ACTION waits until the end of the delete, so only NO ACTION is sure to let a sandbox's business be deleted with its bookings (08), whatever order the cascade works in
   - store `starts_at` and `ends_at` with `AsUtcDateTime`
-- **07:** strictness may later vary by time of day, with fixed start times as an option (overview 5.4). The strictness filter asks what strictness applies at each time; in v1 the answer is always the business's. Those settings would go in a new column or table beside the hours, so the hours format here stays as it is.
+  - set `business_id` and the other foreign keys through relations, since they aren't fillable: `$business->customers()->createOrFirst()` for the customer, and `associate()` for the booking's parents
+- **06:** mirror `room_weight`'s default in `Service::$attributes`, and add it to the defaults `ServicesTableTest` compares.
+- **07:**
+  - strictness may later vary by time of day, with fixed start times as an option (overview 5.4). The strictness filter asks what strictness applies at each time; in v1 the answer is always the business's. Those settings would go in a new column or table beside the hours, so the hours format here stays as it is
+  - mirror the `strictness` and `relaxation_hours` defaults in `Business::$attributes`, and add them to the defaults `BusinessesTableTest` compares
 - **08:** middleware sets the current business from the visitor's sandbox. It has to run before `SubstituteBindings`, so it goes in the middleware priority list. Sandboxes come from `CreateSampleBusiness`, and deleting an expired sandbox's business deletes its data.
 - **09:**
   - sign-up creates the business, its practitioner and the one user, who has full control. No roles yet
   - the user belongs to one business through `users.business_id`
   - the practitioner is named after the user, so the owner never sees a separate practitioner step
-  - `User` isn't tenant-scoped, because logging in looks a user up before any business is known. 09 adds it to the guard test's exceptions, with that reason
+  - `User` isn't tenant-scoped, because logging in looks a user up before any business is known. 09 adds it to the guard test's exceptions (`TenantTablesTest::UNSCOPED_MODELS`), with that reason
 - **10:**
   - the actions that edit hours: set new hours from a date, edit a day, reset to the pattern. Whether temporary patterns (which hand back to the old one) come in 10 or later is decided then. If they come, they trim or split the old pattern and keep `cycle_starts_on` on the resumed part
   - flag bookings outside new hours
