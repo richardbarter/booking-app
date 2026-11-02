@@ -66,8 +66,8 @@ Use these names consistently in code, UI and docs.
 | Working pattern | A practitioner's repeating hours: a cycle of 1 to 4 weeks, from a start date until an optional end date. Only one is in force on any date. |
 | Edited day | A date whose hours were entered by hand, replacing the pattern's for that date. It may have no hours. "Reset to pattern" removes it. |
 | Time off | A one-off period when a practitioner isn't available. |
-| Booking | A customer's appointment with one practitioner for one service. Blocks the practitioner from its start minus the buffer before, until its end plus the buffer after. |
-| Customer | Someone who has booked with a business. No login; identified within a business by email. |
+| Booking | A customer's appointment with one practitioner for one service. Blocks the practitioner from its start minus the buffer before, until its end plus the buffer after. Confirmed, cancelled or no-show; a confirmed booking whose end has passed counts as attended. |
+| Customer | Someone who has booked with a business. No login; identified within a business by email. Their name and phone are as first given; each booking also records the name and phone given with it. |
 | Blocked time | Time within a practitioner's working hours that can't be booked: time off, and each booking from its start minus the buffer before until its end plus the buffer after. |
 | Diary | One practitioner's working hours and blocked time: what the engine works out free gaps and slots from. |
 | Free gap | A continuous stretch of time when a practitioner is working and not blocked. |
@@ -316,8 +316,8 @@ The final schema for each table is set in the sub-plan that creates it.
 | `working_patterns` | practitioner, starts on, ends on (nullable), cycle starts on, 1 to 4 weeks of hours. No two overlap for one practitioner |
 | `edited_days` | practitioner, date, hours (possibly none) |
 | `time_off` | practitioner, starts at, ends at, reason |
-| `customers` | business, name, email, phone |
-| `bookings` | business, practitioner, service, customer, starts at, ends at, blocked from, blocked until, status (confirmed, cancelled, completed, no-show), source (playground, booking page, widget, admin), manage token (hashed) |
+| `customers` | business, name, email (lower case, one customer per email per business), phone |
+| `bookings` | business, practitioner, service, customer, starts at, ends at, blocked from, blocked until, the customer's name and phone as given, price when booked, status (confirmed, cancelled, no-show; attended is worked out from the time), source (playground, booking page, widget, admin), manage token (hashed, from 12) |
 | `availability_searches` | what was searched, how many slots were offered, and whether it led to a booking |
 | `diary_stats` | business, practitioner, date, and that day's working, booked, free, stranded and fragmented minutes, plus the strictness in force |
 | `diary_imports` (later) | file type, column mapping, date range, results summary |
@@ -442,6 +442,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 ## 13. Out of scope (for now)
 
 - Staff: more than one practitioner or login per business, who offers which services, per-practitioner prices, lengths, buffers and booking windows, roles and permissions, and "anyone available". Designed for in sub-plan 03, added after v1
+- Customer accounts and sign-in: customers book as guests in v1 (see the open questions)
 - Payments and deposits
 - SMS reminders
 - Google and Outlook calendar sync
@@ -465,6 +466,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
 | Production email provider (e.g. Resend, Postmark, Amazon SES) | 12 |
 | Week templates and hours snapshots: saved weeks of hours to apply, and saved copies of a practitioner's hours to restore after experimenting. Decide once a first version of the hours and the dynamic slots can be tried. A template would copy its hours when applied; a snapshot would cover one practitioner. Should a snapshot include strictness? | After v1 |
+| Customer accounts: an optional account for returning customers, so they can see their bookings and book again quickly, perhaps signing up through Google. Google's sign-in page can't be shown inside the widget's iframe, so it would open in a popup window. A booking never changes an existing customer's details today (05); a customer who has proved their email could update their own | After v1 |
 | Once there are staff, rooms or larger businesses, does the engine need a dedicated solver (such as OR-Tools or Timefold) or a faster language? More practitioners only repeat the same small calculation, but rooms and equipment, or rearranging bookings to free time, are true optimisation problems. Decide from measured response times in Nightwatch. The engine takes plain inputs and returns plain results (04), so it could be rebuilt on its own, with the existing tests as its specification | After v1 |
 | Which libraries to use for reading CSV, Excel and .ics files in the browser | 16 |
 | Where the example business website lives (GitHub Pages or a second Fly app) | 18 |

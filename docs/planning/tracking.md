@@ -28,7 +28,7 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 ## Next up
 
-1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch (`docs/sub-plans-03-07`), one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 is drafted for v1's single-user scope, and was revised on 2026-11-02 after the user's first read. 04 is drafted (2026-11-02); 05 is next.
+1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch (`docs/sub-plans-03-07`), one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 is drafted for v1's single-user scope, and was revised on 2026-11-02 after the user's first read. 04 and 05 are drafted (2026-11-02); 06 is next.
 2. Before building 03, write a `build-sub-plan` skill in `.ai/skills/`, the counterpart of `draft-sub-plan` for building a merged plan. It replaces the personal `build-feature` skill for this repo, which belongs to another project.
 3. Build 03 to 07 in order, then plan 08.
 
@@ -45,7 +45,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 03 | Core data model | Planned | | Drafted 2026-10-30 and revised 2026-11-02, awaiting review with 04 to 07 |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Planned | | Drafted 2026-11-02, awaiting review with 03 and 05 to 07 |
-| 05 | Making bookings | Not started | | |
+| 05 | Making bookings | Planned | | Drafted 2026-11-02, awaiting review with 03, 04, 06 and 07 |
 | 06 | Waste score | Not started | | |
 | 07 | Strictness and relaxation | Not started | | |
 | | **Phase 3: Playground** | | | |
@@ -138,6 +138,12 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-02 | The maximum advance counts whole dates in the business's time zone: with 90, customers can book on dates up to 90 days after today | The user's decision. A day is either fully open or not shown, and a new one opens at midnight |
 | 2026-11-02 | Infection 0.35.8 mutation-tests `app/Scheduling` on every pull request, through `composer ci:check`, and fails below a score (`minMsi`) of 90%. PCOV is the coverage driver: in the `dev` image, in CI, and from Ubuntu's `php8.5-pcov` package on the host. The engine's tests get their own `Scheduling` suite, and extend `PHPUnit\Framework\TestCase` | The user's decision on CI. Checked in a throwaway container: Infection 0.35.8 runs with PHPUnit 13.4 and PCOV 1.0.12 on PHP 8.5, fails the run below the minimum, and can be limited to one suite. A folder can't be in two PHPUnit 13 suites without a warning, so `Unit` leaves it out. Booting Laravel for each engine test would slow every Infection run. The 90% can be raised once real scores are known |
 | 2026-11-02 | An `availability:show` Artisan command prints a day's working hours, free gaps and offered times for a business and service | The user's decision: a way to try the engine before the playground (08), and to debug it later. It prints no customer details or time off reasons |
+| 2026-11-02 | Customers book as guests in v1, with no account, giving their name, email and phone (all required). Customer accounts, perhaps with a quick sign-up through Google, are an after-v1 question; remembering details on the device isn't wanted | The user's decision. Most booking tools a business runs for itself work this way, fewer customers give up, logins don't work reliably inside the widget's iframe, and there are no passwords to secure. The emailed links (12) let customers manage a booking |
+| 2026-11-02 | Customers are matched within a business by email, stored trimmed and in lower case. A booking never changes an existing customer's details; each booking records the name and phone given with it, for the owner to compare. Matching is silent | The user's decision. Otherwise anyone who knows a customer's email could change the details the owner sees. Telling the person booking that an email is known would reveal that someone is a client |
+| 2026-11-02 | Booking statuses are confirmed, cancelled and no-show. "Completed" isn't stored: a confirmed booking whose end has passed counts as attended (`Booking::attended()`) | The user's decision. Nothing has to run on a timer to update bookings, so Neon can sleep, and the status can never be out of step. The owner never has to mark appointments as completed |
+| 2026-11-02 | `CreateBooking` locks the practitioner's row, checks the time again with `AvailabilityService`, and saves the booking with the slot's times and the service's price. An exclusion constraint on `tstzrange(blocked_from, blocked_until, '[)')` refuses overlapping blocked time for one practitioner unless cancelled, and its error (`23P01`) becomes the same `SlotNotAvailable` | Checked in a throwaway PostgreSQL 18 database: overlaps refused, touching allowed, cancelled ignored, un-cancelling into an overlap refused, no-shows still block, and the constraint's index serves range queries. Storing the times and price means later service changes never move or reprice a booking |
+| 2026-11-02 | Production masks query values in database error messages (`mask_bindings_in_exception_messages`, set by `DB_MASK_BINDINGS` in `fly.toml`), added to 03 | Checked locally: a failed query's message includes the values, so a customer's name or a time off reason could reach Nightwatch and Fly's logs. Nightwatch's own query records use placeholders |
+| 2026-11-02 | The manage token waits for 12, and the cancel, move and no-show actions for their first screens (12 and 13) | Nothing before 12 can send a manage link, and 05's statuses already settle what cancelling and no-shows mean for the diary |
 
 ## Notes for the next session
 

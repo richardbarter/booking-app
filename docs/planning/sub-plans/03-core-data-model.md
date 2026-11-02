@@ -350,7 +350,9 @@ The week of the cycle is `intdiv(days from cycleStartsOn to the Monday of the da
 
 ### Configuration
 
-`config/database.php`: add `'timezone' => 'UTC'` to the `pgsql` connection. Laravel runs `set time zone 'UTC'` when it connects.
+`config/database.php`, on the `pgsql` connection:
+- add `'timezone' => 'UTC'`. Laravel runs `set time zone 'UTC'` when it connects
+- add `'mask_bindings_in_exception_messages' => env('DB_MASK_BINDINGS', false)`, and set `DB_MASK_BINDINGS = "true"` in `fly.toml`'s `[env]`. This table holds the first personal data: the practitioner's name, and time off reasons that could be medical. Checked locally (for 05): a failed query's `QueryException` message includes the values, which would then reach Nightwatch and Fly's logs. With this setting on, it shows only `?` placeholders. It stays off locally and in tests, where the values help debugging
 
 ### Sample business
 
@@ -468,6 +470,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
 - [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
 - [ ] The guard test covers every tenant-owned table and model
 - [ ] The deploy after merging runs the new migrations on Neon, including enabling `btree_gist` (Fly's release command succeeds)
+- [ ] Production masks query values in error messages: `fly ssh console -C "php artisan config:show database.connections.pgsql"` shows `mask_bindings_in_exception_messages` as true
 - [ ] `tracking.md` marks 03 as done
 
 ## Notes
