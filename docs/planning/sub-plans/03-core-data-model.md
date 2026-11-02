@@ -34,7 +34,7 @@ Create the tables and models the scheduling engine is built on: businesses with 
 
 ## Decisions
 
-The user's answers to this plan's questions (2026-10-29 and 2026-10-30):
+The user's answers to this plan's questions (2026-10-29, 2026-10-30 and 2026-11-02):
 
 | Question | Answer |
 |---|---|
@@ -50,6 +50,8 @@ The user's answers to this plan's questions (2026-10-29 and 2026-10-30):
 | Booking window | Set for the business: 2 hours' notice and up to 90 days ahead by default. Per-practitioner windows come with staff |
 | Start times | Every 15 minutes by default, with 10, 15, 20, 30 or 60 as the choices. Every 5 minutes isn't offered, because times like 09:05 look odd to customers |
 | Sample business | A made-up independent physio and sports massage therapist, with a fortnightly pattern and six services from 30 to 90 minutes |
+| How the engine handles practitioners | It works on one practitioner, which the code that loads its data gets with `sole()`. Nothing in v1 combines practitioners. "Anyone available" comes with staff, as a layer that runs the engine for each practitioner and merges the results. Building the booking calculation may change how that layer looks, so it isn't designed now |
+| How a login is linked to its business | The simplest way: each user belongs to one business, through `users.business_id`, added in 09. Other arrangements wait until there are staff |
 
 Already settled on 2026-10-29: hours are stored as rules (patterns and edited days) rather than written out for every date, buffers can go before and after an appointment, and rooms and equipment are out of scope for v1.
 
@@ -66,8 +68,8 @@ Already settled on 2026-10-29: hours are stored as rules (patterns and edited da
 | More practitioners | Drop the unique index on `practitioners.business_id`. Hours, time off and bookings already belong to a practitioner |
 | Which practitioners offer which services, with their own price, length and buffers | A `practitioner_service` table with nullable overrides, filled by linking every existing service to the existing practitioner. It needs a custom pivot model that uses `BelongsToBusiness`. Laravel's `withPivotValue('business_id', ...)` can't fill the column, because eager loading calls the relation on an empty model and `withPivotValue` refuses a null value (checked in Laravel 13's source) |
 | Practitioners' own booking windows | Nullable columns on `practitioners`, falling back to the business's |
-| More logins, roles and permissions | A role on users (existing users become owners) and a nullable `practitioners.user_id` |
-| Customers choosing a practitioner, "anyone available", and the best-fitting practitioner | The engine (04) already works one practitioner at a time and is given the business's practitioners, so it's a list of one in v1 |
+| More logins, roles and permissions | A role on users, beside the `business_id` that 09 adds (existing users become owners), and a nullable `practitioners.user_id` |
+| Customers choosing a practitioner, "anyone available", and the best-fitting practitioner | A layer above the engine that runs it for each practitioner and merges the results. The engine (04) works on one practitioner, so it doesn't change |
 
 v1 code that needs "the" practitioner asks for it in one way, `$business->practitioners()->sole()`, so the places to change later are easy to find. `sole()` throws if there isn't exactly one.
 
@@ -384,7 +386,11 @@ Buffers are multiples of 15 minutes, so unbookable gaps come from the times cust
 
 ### Factories
 
-One factory for each model, with plain defaults: a business in `Europe/London`, its practitioner, a 60-minute service, and a weekly Monday-to-Friday 09:00–17:00 pattern starting this week. Each child factory takes `business_id` from its parent, so tests can't create mismatched rows by accident. It reads the parent without the scope, since tests often create data for several businesses. Useful states include `fortnightly()` and `endingOn($date)` for patterns, and `dayOff()` for edited days. The builder adds others as tests need them.
+One factory for each model, with plain defaults: a business in `Europe/London`, a practitioner, a 60-minute service, and a weekly Monday-to-Friday 09:00–17:00 pattern starting this week.
+
+`PractitionerFactory` creates its own business, and `BusinessFactory` creates no practitioner. So a test can't give a business a second practitioner by accident, and one that needs both creates the practitioner and uses its business. The pattern, edited day and time off factories create a practitioner, and so a business, unless they're given one.
+
+Each child factory takes `business_id` from its parent, so tests can't create mismatched rows by accident. It reads the parent without the scope, since tests often create data for several businesses. Useful states include `fortnightly()` and `endingOn($date)` for patterns, and `dayOff()` for edited days. The builder adds others as tests need them.
 
 ## Frontend
 
@@ -472,7 +478,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. Feat
 - **04:**
   - load the practitioner's patterns, edited days and time off for a date range, and build `WorkingHours`
   - turn local hours into UTC times on each date, in the business's time zone, deciding what happens to hours inside the hour skipped when the clocks go forward
-  - take the business's practitioners (one in v1) and work one practitioner at a time, so staff can be added later without reshaping the engine
+  - work on one practitioner, given to the engine by the code that loads its data, which gets it with `sole()`. Build nothing that combines practitioners: "anyone available" comes with staff, as a layer that runs the engine for each one
   - in v1 the practitioner offers every active service, at the service's length, buffers and price. Keep that rule in the code that loads the engine's data, so `practitioner_service` can replace it later
   - query with UTC times
   - Infection's mutation testing of `app/Scheduling` covers `app/Scheduling/Hours` as well
@@ -481,10 +487,15 @@ Read the `testing-best-practices` skill first. Unit tests need no database. Feat
   - bookings reference the practitioner and the service with composite foreign keys using `noActionOnDelete()`, so a service with bookings is deactivated rather than deleted. Use NO ACTION, not RESTRICT. Checked locally: both refuse deleting the parent directly, and both let a business delete cascade. But PostgreSQL checks RESTRICT as soon as each row goes, while NO ACTION waits until the end of the delete, so only NO ACTION is sure to let a sandbox's business be deleted with its bookings (08), whatever order the cascade works in
   - store `starts_at` and `ends_at` with `AsUtcDateTime`
 - **08:** middleware sets the current business from the visitor's sandbox. It has to run before `SubstituteBindings`, so it goes in the middleware priority list. Sandboxes come from `CreateSampleBusiness`, and deleting an expired sandbox's business deletes its data.
-- **09:** sign-up creates the business, its practitioner and the one user, who has full control. No roles yet.
+- **09:**
+  - sign-up creates the business, its practitioner and the one user, who has full control. No roles yet
+  - the user belongs to one business through `users.business_id`
+  - the practitioner is named after the user, so the owner never sees a separate practitioner step
+  - `User` isn't tenant-scoped, because logging in looks a user up before any business is known. 09 adds it to the guard test's exceptions, with that reason
 - **10:**
   - the actions that edit hours: set new hours from a date, edit a day, reset to the pattern. Whether temporary patterns (which hand back to the old one) come in 10 or later is decided then. If they come, they trim or split the old pattern and keep `cycle_starts_on` on the resumed part
   - flag bookings outside new hours
+  - v1's pages and URLs don't mention the practitioner. The owner sees "your hours" at an address like `/admin/hours`, not `/admin/practitioners/{practitioner}/hours`, and the controllers get the practitioner with `sole()`. Pages for each practitioner come with staff
   - validate the time zone and the booking window
   - scope `exists` and `unique` rules by business
 - **10 or 11:** the business's URL slug.

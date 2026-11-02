@@ -93,7 +93,7 @@ For a service, a date range and a practitioner (in v1, the business's only one):
 3. In each free gap, list every start time on the slot interval where the whole service, plus its buffers before and after, fits.
 4. Drop start times outside the booking window.
 5. Apply the waste score and strictness rules (5.3 and 5.4).
-6. With staff (after v1), for "anyone available", combine practitioners: a time is shown if at least one of them can take it.
+6. With staff (after v1), "anyone available" runs steps 1 to 5 for each practitioner and combines the results: a time is shown if at least one of them can take it. The engine itself always works on one practitioner.
 
 Example: a practitioner works 09:00–12:00 and has a 30-minute booking at 10:00. The free gaps are 09:00–10:00 and 10:30–12:00. For a 60-minute service the possible starts are 09:00, 10:30, 10:45 and 11:00. 09:15 isn't offered because it would run into the 10:00 booking.
 

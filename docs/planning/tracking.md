@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-10-30
+Last updated: 2026-11-02
 
 ## Current status
 
@@ -28,7 +28,7 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 ## Next up
 
-1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch (`docs/sub-plans-03-07`), one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 is drafted, for v1's single-user scope; 04 is next.
+1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch (`docs/sub-plans-03-07`), one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 is drafted for v1's single-user scope, and was revised on 2026-11-02 after the user's first read; 04 is next.
 2. Before building 03, write a `build-sub-plan` skill in `.ai/skills/`, the counterpart of `draft-sub-plan` for building a merged plan. It replaces the personal `build-feature` skill for this repo, which belongs to another project.
 3. Build 03 to 07 in order, then plan 08.
 
@@ -42,7 +42,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
-| 03 | Core data model | Planned | | Drafted 2026-10-30, awaiting review with 04 to 07 |
+| 03 | Core data model | Planned | | Drafted 2026-10-30 and revised 2026-11-02, awaiting review with 04 to 07 |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Not started | | |
 | 05 | Making bookings | Not started | | |
@@ -130,6 +130,8 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-10-30 | Instants (time off now, bookings from 05) are `timestamptz`, written through an `AsUtcDateTime` cast, and the PostgreSQL connection's time zone is set to UTC | Checked locally: Eloquent saves a `Carbon` in its own time zone without converting it, so 10:00 London time in July was stored as 10:00 UTC, and a query given a London time matched the wrong row |
 | 2026-10-30 | The sample business is built by an action, `CreateSampleBusiness`, with fixed data and no Faker: an independent physio and sports massage therapist with a fortnightly pattern and six services from 30 to 90 minutes. `DatabaseSeeder` calls it, and the playground (08) will call it for each sandbox | Faker is a development dependency, and the playground runs in production. One definition serves local development, the tests and the playground |
 | 2026-10-30 | The business's URL slug moves from 03 to whichever of 10 or 11 first needs it | Nothing before the booking link uses it, and sandboxes would otherwise need one generated for nothing |
+| 2026-11-02 | The engine works on one practitioner, which v1 code gets with `$business->practitioners()->sole()`. "Anyone available" comes with staff, as a layer that runs the engine for each practitioner and merges the results | The user's decision, to keep v1 simple. A list of one would lead 04 to build and test merging that v1 never uses, and building the booking calculation may change what that layer needs anyway. The engine still doesn't change when staff arrive |
+| 2026-11-02 | Each user belongs to one business, through `users.business_id` (09) | The user's decision: the simplest link for v1. Other arrangements wait until there are staff |
 
 ## Notes for the next session
 
