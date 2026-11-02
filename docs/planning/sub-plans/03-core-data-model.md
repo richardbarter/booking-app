@@ -486,6 +486,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. Feat
   - bookings block from their start minus the buffer before until their end plus the buffer after (`blocked_from` to `blocked_until`), and the exclusion constraint covers that range
   - bookings reference the practitioner and the service with composite foreign keys using `noActionOnDelete()`, so a service with bookings is deactivated rather than deleted. Use NO ACTION, not RESTRICT. Checked locally: both refuse deleting the parent directly, and both let a business delete cascade. But PostgreSQL checks RESTRICT as soon as each row goes, while NO ACTION waits until the end of the delete, so only NO ACTION is sure to let a sandbox's business be deleted with its bookings (08), whatever order the cascade works in
   - store `starts_at` and `ends_at` with `AsUtcDateTime`
+- **07:** strictness may later vary by time of day, with fixed start times as an option (overview 5.4). The strictness filter asks what strictness applies at each time; in v1 the answer is always the business's. Those settings would go in a new column or table beside the hours, so the hours format here stays as it is.
 - **08:** middleware sets the current business from the visitor's sandbox. It has to run before `SubstituteBindings`, so it goes in the middleware priority list. Sandboxes come from `CreateSampleBusiness`, and deleting an expired sandbox's business deletes its data.
 - **09:**
   - sign-up creates the business, its practitioner and the one user, who has full control. No roles yet

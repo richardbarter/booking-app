@@ -131,6 +131,8 @@ While the owner drags the slider, the admin screen shows a live preview, e.g. "C
 
 **Relaxation window:** the nearer an appointment time gets, the less likely it is that someone else will book the time being protected. So strictness stops applying within a set number of hours of the slot (default 48, adjustable). If nobody has booked 09:00 by the day before, 09:15 opens up.
 
+**Strictness by time of day (later).** Some parts of the week are busier than others, so an owner will be able to set strictness for parts of it: loose from 09:00 to 11:00 on a quiet Monday morning, say, and strict from 11:00 to 17:00. An owner who wants certainty will also be able to fix a period's start times, such as 09:00, 10:15 and 11:30. Fixed times are offered whatever their waste score. They suit businesses whose services are all the same length. With mixed lengths they bring back the gaps the changing times avoid: if 09:00 and 10:00 are fixed times, a 30-minute booking at 09:00 leaves 30 minutes nobody can book. So the strictness filter (07) asks what strictness applies at each time, rather than reading one number, and the settings and their screens come once the single slider has been tried (see the open questions). It's the hand-set version of what learning from history (5.7) does automatically.
+
 ### 5.5 Scheduling playground
 
 A public page, with no sign-up, that shows the core idea in action. Each visitor gets their own sandbox: a temporary copy of the sample business from sub-plan 03 (an independent physio and sports massage therapist, with services from 30 to 90 minutes). Sandboxes are deleted after 24 hours, and visitors never see or affect each other's bookings.
@@ -401,7 +403,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | 04 | Availability engine | Slot calculation (5.1), including time zones and the booking window; thorough unit tests; randomised rule checks; mutation testing with Infection |
 | 05 | Making bookings | Booking action; customers; locking + exclusion constraint |
 | 06 | Waste score | Waste score (5.3) in the engine; a day's stranded and fragmented time |
-| 07 | Strictness and relaxation | Strictness filter and relaxation window in the engine (5.4); settings stored on the business |
+| 07 | Strictness and relaxation | Strictness filter and relaxation window in the engine (5.4), with strictness looked up for each time so it can vary by time of day later; settings stored on the business |
 
 ### Phase 3: Playground
 
@@ -457,6 +459,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 |---|---|
 | When to add the custom domain: before links are shared at the playground milestone, or in 22 as planned (`bookalive.io` was unregistered on 2026-10-27) | 08 / 22 |
 | Default strictness and relaxation window, and whether to set them provisionally in 07 and tune them once the playground shows the dynamic slots working | 07 / 08 |
+| Strictness by time of day and fixed start times (5.4). Where the settings are stored: with the working pattern, so they follow its cycle, or in a weekly schedule of their own, so they survive a change of hours (fixed times may suit the pattern, and busy and quiet times a schedule of their own). Which period a slot belongs to when it crosses a boundary (its start time is simplest). Whether the relaxation window opens up other times in a fixed period, or the fixed times are final. How the randomised checks treat fixed periods, which can leave a free gap with no time offered. Whether they come in 10 or after v1 | 07 / 10 |
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
 | Production email provider (e.g. Resend, Postmark, Amazon SES) | 12 |
 | Week templates and hours snapshots: saved weeks of hours to apply, and saved copies of a practitioner's hours to restore after experimenting. Decide once a first version of the hours and the dynamic slots can be tried. A template would copy its hours when applied; a snapshot would cover one practitioner. Should a snapshot include strictness? | After v1 |
