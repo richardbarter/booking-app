@@ -398,7 +398,7 @@ None.
 
 ## Tests
 
-Read the `testing-best-practices` skill first. Unit tests need no database. Feature tests run on PostgreSQL, as always.
+Read the `testing-best-practices` skill first. Unit tests need no database. The hours tests extend `PHPUnit\Framework\TestCase`, not the app's `Tests\TestCase`: they need no Laravel, and 04's mutation testing runs them over and over. Feature tests run on PostgreSQL, as always.
 
 **Unit: hours value objects** (`tests/Unit/Scheduling/Hours/`)
 - `LocalTimeRange` accepts `00:00`–`24:00` in 5-minute steps, and rejects:
@@ -475,7 +475,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. Feat
 **Personal data.** The practitioner's name is personal data. A time off reason could be sensitive, such as a medical appointment, so it's optional, for the business only, and never sent to customers or a public API (11). Exception messages from the value objects mention times, never names.
 
 **For later sub-plans**
-- **04:**
+- **04** (now drafted; `04-availability-engine.md` settles each of these):
   - load the practitioner's patterns, edited days and time off for a date range, and build `WorkingHours`
   - turn local hours into UTC times on each date, in the business's time zone, deciding what happens to hours inside the hour skipped when the clocks go forward
   - work on one practitioner, given to the engine by the code that loads its data, which gets it with `sole()`. Build nothing that combines practitioners: "anyone available" comes with staff, as a layer that runs the engine for each one

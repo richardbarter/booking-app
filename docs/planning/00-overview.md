@@ -68,10 +68,12 @@ Use these names consistently in code, UI and docs.
 | Time off | A one-off period when a practitioner isn't available. |
 | Booking | A customer's appointment with one practitioner for one service. Blocks the practitioner from its start minus the buffer before, until its end plus the buffer after. |
 | Customer | Someone who has booked with a business. No login; identified within a business by email. |
+| Blocked time | Time within a practitioner's working hours that can't be booked: time off, and each booking from its start minus the buffer before until its end plus the buffer after. |
+| Diary | One practitioner's working hours and blocked time: what the engine works out free gaps and slots from. |
 | Free gap | A continuous stretch of time when a practitioner is working and not blocked. |
 | Slot | A possible start time for a service, practitioner and date. Slots are calculated, never stored. |
 | Slot interval | The step between possible start times, set for the whole business: 10, 15, 20, 30 or 60 minutes. Default 15, aligned to the clock (:00, :15, :30, :45). |
-| Booking window | How soon (minimum notice) and how far ahead (maximum advance) customers can book. Set for the business. Default 2 hours and 90 days. With staff, each practitioner can have their own. |
+| Booking window | How soon (minimum notice) and how far ahead (maximum advance) customers can book. Set for the business. Default 2 hours and 90 days. The maximum counts whole dates in the business's time zone: with 90, customers can book on dates up to 90 days after today. With staff, each practitioner can have their own. |
 | Waste score | How much usable time a slot would waste if it were booked. |
 | Strictness | A business setting from 0 to 100. 0 offers every slot that fits; 100 offers only the least wasteful ones. |
 | Relaxation window | How close to an appointment time strictness stops applying, so late bookings aren't turned away. |
@@ -88,7 +90,7 @@ All times are shown to customers in the business's time zone, since appointments
 
 For a service, a date range and a practitioner (in v1, the business's only one):
 
-1. Work out the practitioner's working hours for each date (the edited day if there is one, otherwise the working pattern), and turn them into real time ranges using the business's time zone, so 09:00 stays 09:00 when the clocks change.
+1. Work out the practitioner's working hours for each date (the edited day if there is one, otherwise the working pattern), and turn them into real time ranges using the business's time zone, so 09:00 stays 09:00 when the clocks change. On the night they change, a time the clocks skip means the moment they change, and a time they repeat means its first occurrence (sub-plan 04).
 2. Subtract time off and existing bookings (including their buffers) to get the free gaps.
 3. In each free gap, list every start time on the slot interval where the whole service, plus its buffers before and after, fits.
 4. Drop start times outside the booking window.
@@ -284,7 +286,7 @@ The Docker and Fly setup uses a proven pattern:
 ### CI (GitHub Actions)
 
 - On every pull request, every push to `main` and once a week:
-  - the `checks` job: the build, Pint, Larastan, PHPUnit on PostgreSQL 18, Oxlint and Oxfmt, `vue-tsc` and Vitest. Playwright joins once end-to-end tests exist.
+  - the `checks` job: the build, Pint, Larastan, PHPUnit on PostgreSQL 18, Oxlint and Oxfmt, `vue-tsc`, Vitest, and Infection on the scheduling engine (from 04). Playwright joins once end-to-end tests exist.
   - the `audit` job: `composer audit` and `npm audit`.
 - `main` only accepts pull requests, and only once `checks` and `audit` pass.
 - On `main`, after both pass: the `deploy` job deploys to Fly.io automatically.
@@ -335,7 +337,7 @@ Child tables reference their parents through composite foreign keys that include
   - raising strictness only ever hides slots, never adds any, so strictness 100 offers a subset of strictness 0
   - at any strictness, every free gap with room for the service still offers at least one time
   - within the relaxation window, strictness has no effect
-- **Mutation testing (Infection), on the scheduling engine only:** Infection makes small changes to the engine's code and checks that a test fails each time, which shows the tests would actually catch a bug. It's set up in 04. It needs a coverage driver (PCOV) in the dev image, and its PHPUnit 13 support needs confirming then. It's too slow for the whole app; 04 also decides whether it runs in CI and what minimum score it needs.
+- **Mutation testing (Infection), on the scheduling engine only:** Infection makes small changes to the engine's code and checks that a test fails each time, which shows the tests would actually catch a bug. It's set up in 04, with the PCOV coverage driver, and works with PHPUnit 13 (checked for 04). It's too slow for the whole app, so it runs only the engine's tests, which need no database. It runs on every pull request, through `composer ci:check`, and fails below a score of 90%.
 - **Diary statistics:** a known diary produces known booked, stranded and fragmented minutes, and a known search log produces the right number of missed bookings.
 - **Imports:** sample CSV, Excel and .ics files; column detection; day-first and month-first dates; missing columns; cancelled appointments; calendar files that mix time zones.
 - **Feature tests:** every endpoint and policy, plus tenant isolation. One business must never see another's data, and one playground sandbox must never see another's.
@@ -400,7 +402,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | # | Sub-plan | Delivers |
 |---|---|---|
-| 04 | Availability engine | Slot calculation (5.1), including time zones and the booking window; thorough unit tests; randomised rule checks; mutation testing with Infection |
+| 04 | Availability engine | Slot calculation (5.1), including time zones, clock changes and the booking window; an `availability:show` command to try it; thorough unit tests; randomised rule checks; mutation testing with Infection on every pull request |
 | 05 | Making bookings | Booking action; customers; locking + exclusion constraint |
 | 06 | Waste score | Waste score (5.3) in the engine; a day's stranded and fragmented time |
 | 07 | Strictness and relaxation | Strictness filter and relaxation window in the engine (5.4), with strictness looked up for each time so it can vary by time of day later; settings stored on the business |
@@ -463,5 +465,6 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
 | Production email provider (e.g. Resend, Postmark, Amazon SES) | 12 |
 | Week templates and hours snapshots: saved weeks of hours to apply, and saved copies of a practitioner's hours to restore after experimenting. Decide once a first version of the hours and the dynamic slots can be tried. A template would copy its hours when applied; a snapshot would cover one practitioner. Should a snapshot include strictness? | After v1 |
+| Once there are staff, rooms or larger businesses, does the engine need a dedicated solver (such as OR-Tools or Timefold) or a faster language? More practitioners only repeat the same small calculation, but rooms and equipment, or rearranging bookings to free time, are true optimisation problems. Decide from measured response times in Nightwatch. The engine takes plain inputs and returns plain results (04), so it could be rebuilt on its own, with the existing tests as its specification | After v1 |
 | Which libraries to use for reading CSV, Excel and .ics files in the browser | 16 |
 | Where the example business website lives (GitHub Pages or a second Fly app) | 18 |
