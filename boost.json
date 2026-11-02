@@ -17,6 +17,7 @@
         "wayfinder-development",
         "inertia-vue-development",
         "tailwindcss-development",
+        "build-sub-plan",
         "draft-sub-plan"
     ]
 }

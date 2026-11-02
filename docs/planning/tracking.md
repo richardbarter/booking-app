@@ -18,6 +18,8 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 - **The deploy token expires on 2027-10-28.** The `production` environment's `FLY_API_TOKEN` is a deploy token named `github-actions`, limited to this app. CI deploys fail after it expires, until it's replaced with the command in sub-plan 02, step 4.3.
 - **Automatic deploys work** (step 8): merging pull request #1 ran `checks`, `audit` and `deploy` on `main`. Fly's release v4 ran the migrations and started the merge commit, with `MAIL_MAILER = "array"`. Dependabot's first runs on `main` succeeded for all five ecosystems, and it opened its first pull requests. The repo's website is https://bookalive.fly.dev.
 
+Sub-plans 03 to 07 (the core data model and the scheduling engine) were reviewed and merged in pull request #7 on 2026-11-02. They're built in order with the `build-sub-plan` skill, one pull request each.
+
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
 - Docker 29.9.2 and Compose v5.6.1, through Docker Desktop's WSL integration
@@ -28,9 +30,9 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 ## Next up
 
-1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch (`docs/sub-plans-03-07`), one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 is drafted for v1's single-user scope, and was revised on 2026-11-02 after the user's first read. 04 to 07 are drafted (2026-11-02), so all five are ready for review. Next, open one pull request for 03 to 07, for the user to review and merge.
-2. Before building 03, write a `build-sub-plan` skill in `.ai/skills/`, the counterpart of `draft-sub-plan` for building a merged plan. It replaces the personal `build-feature` skill for this repo, which belongs to another project.
-3. Build 03 to 07 in order, then plan 08.
+1. Build 03 with the `build-sub-plan` skill, on `feature/03-core-data-model`.
+2. Build 04 to 07 in order, one pull request each. Each starts once the one before is merged and its deploy has been checked.
+3. Then draft 08 with the `draft-sub-plan` skill.
 
 ## Sub-plan status
 
@@ -42,12 +44,12 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
-| 03 | Core data model | Planned | #7 | Drafted 2026-10-30 and revised 2026-11-02, awaiting review with 04 to 07 |
+| 03 | Core data model | Planned | Plan #7 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07 |
 | | **Phase 2: Scheduling engine** | | | |
-| 04 | Availability engine | Planned | #7 | Drafted 2026-11-02, awaiting review with 03 and 05 to 07 |
-| 05 | Making bookings | Planned | #7 | Drafted 2026-11-02, awaiting review with 03, 04, 06 and 07 |
-| 06 | Waste score | Planned | #7 | Drafted 2026-11-02, awaiting review with 03 to 05 and 07 |
-| 07 | Strictness and relaxation | Planned | #7 | Drafted 2026-11-02, awaiting review with 03 to 06 |
+| 04 | Availability engine | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07 |
+| 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07 |
+| 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07 |
+| 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06 |
 | | **Phase 3: Playground** | | | |
 | 08 | Scheduling playground | Not started | | |
 | ★ | **Playground milestone** | | | |
@@ -152,6 +154,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-02 | The final check before saving a booking applies strictness: only offered times can be booked | The user's decision. Otherwise a hidden time could be booked by calling the public API directly. `CreateBooking` already looks among the offered `slots`, so its code doesn't change |
 | 2026-11-02 | New businesses start at strictness 50 with a 48-hour relaxation window. 04's, 05's and 06's sample-business tests set strictness to 0, since they test fitting, not strictness | The user's decision on the defaults, to be tuned in 08. Without the test change, 04's expected 24 assessment times would become 22 once 07 adds the default |
 | 2026-11-02 | The sample business has three services with no buffers: a 30-minute physio follow-up, a 60-minute physio assessment and a 90-minute sports massage, the massage with a room weight of 5 (booked less often). The original six services with 15-minute clean-ups are kept in 03's notes for a second sample business later. The strictness scale becomes 120 minutes (it was 80) | The user's decision: simpler to follow in the playground, and the room weight is used from day one. Buffers are still covered by the engine tests' own diaries. With three services and no buffers, an 80-minute scale hid more than half of some rows at 50; 120 keeps 50 a middle setting (22 of 24 assessment times on an empty Monday) |
+| 2026-11-02 | Merged sub-plans are built with a project skill, `build-sub-plan`, beside `draft-sub-plan` in `.ai/skills/`. It replaces the personal `build-feature` skill for this repo. A build stops for the user only when it's blocked: the plan is wrong or unclear, a dependency isn't approved, or a decision isn't in the plan. Otherwise it checks and commits after each part and carries on. Each plan starts once the one before is merged and its deploy has been checked. The build's pull request ticks the "Done when" items with evidence and marks the plan done, and checks that can only run after the merge are recorded on the next branch. The review pass uses the `code-review` skill at the `high` level, plus the skill's own checklist | The user's answers. The plan has already been reviewed, so the pull request is where the build is reviewed, and stopping after every part would add rounds without much value. Waiting for each merge keeps the history simple and builds on reviewed code. Marking a plan done in its own pull request saves an extra pull request and deploy for each plan. `code-review` comes with Claude Code, and the checklist covers Cursor, which reads the same skill |
 
 ## Notes for the next session
 

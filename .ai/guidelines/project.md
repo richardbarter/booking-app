@@ -64,7 +64,7 @@ Organise code by type, Laravel's and the starter kit's default, with subfolders 
 ## Workflow
 
 - `main` only accepts pull requests that pass CI (the `checks` and `audit` jobs), so never push to it directly. Every change goes on a branch with its own pull request: `feature/NN-short-name` for a sub-plan, `docs/short-name` for docs-only changes. Pull requests are merged with a merge commit.
-- Write or revise sub-plans with the `draft-sub-plan` skill. It lives in `.ai/skills/`, and `php artisan boost:update` links it into `.claude/skills/` and `.cursor/skills/`.
+- Write or revise sub-plans with the `draft-sub-plan` skill, and build a merged sub-plan with the `build-sub-plan` skill. Both live in `.ai/skills/`, and `php artisan boost:update` links them into `.claude/skills/` and `.cursor/skills/`.
 - Update `tracking.md` as part of each sub-plan's pull request.
 - Merging to `main` deploys to production automatically.
 - Check how the framework or a package behaves (in `vendor/`, its docs, or by reproducing it locally) before relying on it in a plan or a fix. Silencing a type error isn't the same as fixing the bug.
