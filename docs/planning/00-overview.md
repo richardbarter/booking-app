@@ -74,11 +74,13 @@ Use these names consistently in code, UI and docs.
 | Slot | A possible start time for a service, practitioner and date. Slots are calculated, never stored. |
 | Slot interval | The step between possible start times, set for the whole business: 10, 15, 20, 30 or 60 minutes. Default 15, aligned to the clock (:00, :15, :30, :45). |
 | Booking window | How soon (minimum notice) and how far ahead (maximum advance) customers can book. Set for the business. Default 2 hours and 90 days. The maximum counts whole dates in the business's time zone: with 90, customers can book on dates up to 90 days after today. With staff, each practitioner can have their own. |
-| Waste score | How much usable time a slot would waste if it were booked. |
+| Waste score | How much room a slot would cost the bookings still to come if it were booked, in minutes: the stranded time it leaves, the room it takes from each kind of appointment (by room weight), and a small cost for splitting a free gap. Worked out from the diary alone; strictness decides how much to tolerate. |
+| Extra waste | How much more a slot's waste score is than the best slot offered in the same free gap. The best has 0. |
+| Room weight | How much the waste score protects room for a service, from 0 (not at all) to 10 (fully, the default). Set by the owner for services booked more or less often. |
 | Strictness | A business setting from 0 to 100. 0 offers every slot that fits; 100 offers only the least wasteful ones. |
 | Relaxation window | How close to an appointment time strictness stops applying, so late bookings aren't turned away. |
 | Stranded time | Free time in a gap too short for any service the practitioner offers. Nobody could ever book it. |
-| Fragmented time | Free time in a gap that fits shorter services but not the longest one. |
+| Fragmented time | Free time in a gap that fits shorter services but not the longest one the owner keeps room for (room weight above 0). |
 | Missed booking | A search that ended without a booking, on a day when there was enough free time in total for the service but not in one piece. |
 | Efficiency score | A 0–100 score showing how much of the time taken up by bookings was actually booked rather than stranded. |
 
@@ -114,12 +116,13 @@ With staff (after v1), an "anyone available" booking goes to the practitioner it
 
 ### 5.3 Waste score
 
-Every possible slot gets a waste score that combines:
+Every possible slot gets a waste score, in minutes, before anyone books it. It says how much room booking that time would cost the bookings still to come, and it's never stored. (Looking back at how a day actually went is the efficiency score, 5.6.) It adds up:
 
 - **Stranded time:** any part of the free gap left before or after the booking that's too short for every service the practitioner offers. A 30-minute booking at 09:15, in a gap starting at 09:00, strands 15 minutes.
-- **Lost capacity:** how much the booking reduces room for longer services. Splitting a 90-minute gap into two 30-minute pieces scores worse than taking 30 minutes from one end of it.
+- **Lost room:** for each kind of appointment, how many fewer the gap can still take, valued at their length and weighted by each service's **room weight**, so a rarely booked long service doesn't restrict everyone else. Splitting a 90-minute gap into two 30-minute pieces scores worse than taking 30 minutes from one end of it.
+- **Splitting a gap:** a small cost (5 minutes) when the booking leaves free time on both sides, because two pieces can't hold the same mixes of appointments as one. At the tightest setting, bookings are packed together from the edges of each gap.
 
-The exact formula is defined in sub-plan 06, then tuned using the simulator.
+A time's **extra waste** is how much more it scores than the best time offered in the same gap. Part of every score can't be avoided, so strictness (5.4) compares extra waste. The formula is in sub-plan 06, a first version to be tuned with the playground and the simulator.
 
 ### 5.4 Strictness slider
 
@@ -163,7 +166,7 @@ Every night, for each practitioner and the day just ended, the app records:
 | Booked time | Time spent in appointments |
 | Free time | Working time that wasn't booked |
 | Stranded time | Free time in gaps too short for any service the practitioner offers |
-| Fragmented time | Free time in gaps too short for the longest service |
+| Fragmented time | Free time in gaps too short for the longest service the owner keeps room for |
 | Missed bookings | Searches that ended without a booking, on a day with enough free time in total for the service but not in one piece |
 
 These use the same gap calculations as the waste score (5.3), and the playground (5.5) shows the same figures live for its single day. Missed bookings come from the search log, which starts in sub-plan 11. The strictness setting in force that day is stored alongside each record.
@@ -190,6 +193,8 @@ The app works out how often each part of the week ends up booked and how far ahe
 > waste = minutes wasted × chance those minutes would otherwise have been booked
 
 Busy times get packed tightly, while quiet times stay flexible. It's the same idea as Littlewood's rule from airline revenue management: only turn away a certain booking if the chance of a better use of that time is high enough (see [background](../background.md), section 4). New businesses have no history, so they run on the slider alone. The efficiency score uses the same weighting.
+
+It can also suggest each service's room weight (5.3) from the share of searches for it, including searches that found no time. Raw bookings would mislead: long services get squeezed out of a busy diary, so they're booked less often than customers ask for them.
 
 ### 5.8 Simulator (later)
 
@@ -311,7 +316,7 @@ The final schema for each table is set in the sub-plan that creates it.
 | `businesses` | name, slug, time zone, slot interval, minimum notice, maximum advance, strictness, relaxation window, logo, brand colour, sandbox expiry (playground sandboxes only) |
 | `users` | business, name, email. One per business in v1; a role once there are staff |
 | `practitioners` | business, name. One per business in v1; with staff, also user (nullable), colour, own booking window and active |
-| `services` | business, name, length, buffer before, buffer after, price (in pence), active |
+| `services` | business, name, length, buffer before, buffer after, price (in pence), room weight (0–10, from 06), active |
 | `practitioner_service` (after v1) | which practitioners offer which services, with each practitioner's own length, buffers and price |
 | `working_patterns` | practitioner, starts on, ends on (nullable), cycle starts on, 1 to 4 weeks of hours. No two overlap for one practitioner |
 | `edited_days` | practitioner, date, hours (possibly none) |
@@ -404,7 +409,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 |---|---|---|
 | 04 | Availability engine | Slot calculation (5.1), including time zones, clock changes and the booking window; an `availability:show` command to try it; thorough unit tests; randomised rule checks; mutation testing with Infection on every pull request |
 | 05 | Making bookings | Booking action; customers; locking + exclusion constraint |
-| 06 | Waste score | Waste score (5.3) in the engine; a day's stranded and fragmented time |
+| 06 | Waste score | Waste score and extra waste (5.3) in the engine; room weights on services; a day's stranded and fragmented time |
 | 07 | Strictness and relaxation | Strictness filter and relaxation window in the engine (5.4), with strictness looked up for each time so it can vary by time of day later; settings stored on the business |
 
 ### Phase 3: Playground

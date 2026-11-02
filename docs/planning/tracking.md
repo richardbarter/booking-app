@@ -28,7 +28,7 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 ## Next up
 
-1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch (`docs/sub-plans-03-07`), one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 is drafted for v1's single-user scope, and was revised on 2026-11-02 after the user's first read. 04 and 05 are drafted (2026-11-02); 06 is next.
+1. Write sub-plans 03 to 07 with the `draft-sub-plan` skill, on one `docs/` branch (`docs/sub-plans-03-07`), one plan at a time: 03, then 04 (which holds the engine's shared design), then 05 to 07. Ask each plan's questions before writing it. Nothing is built until all five are reviewed, because the engine plans share interfaces and the randomised rule checks, so a later plan may change an earlier one. 03 is drafted for v1's single-user scope, and was revised on 2026-11-02 after the user's first read. 04, 05 and 06 are drafted (2026-11-02); 07 is next.
 2. Before building 03, write a `build-sub-plan` skill in `.ai/skills/`, the counterpart of `draft-sub-plan` for building a merged plan. It replaces the personal `build-feature` skill for this repo, which belongs to another project.
 3. Build 03 to 07 in order, then plan 08.
 
@@ -46,7 +46,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Planned | | Drafted 2026-11-02, awaiting review with 03 and 05 to 07 |
 | 05 | Making bookings | Planned | | Drafted 2026-11-02, awaiting review with 03, 04, 06 and 07 |
-| 06 | Waste score | Not started | | |
+| 06 | Waste score | Planned | | Drafted 2026-11-02, awaiting review with 03 to 05 and 07 |
 | 07 | Strictness and relaxation | Not started | | |
 | | **Phase 3: Playground** | | | |
 | 08 | Scheduling playground | Not started | | |
@@ -144,6 +144,9 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-02 | `CreateBooking` locks the practitioner's row, checks the time again with `AvailabilityService`, and saves the booking with the slot's times and the service's price. An exclusion constraint on `tstzrange(blocked_from, blocked_until, '[)')` refuses overlapping blocked time for one practitioner unless cancelled, and its error (`23P01`) becomes the same `SlotNotAvailable` | Checked in a throwaway PostgreSQL 18 database: overlaps refused, touching allowed, cancelled ignored, un-cancelling into an overlap refused, no-shows still block, and the constraint's index serves range queries. Storing the times and price means later service changes never move or reprice a booking |
 | 2026-11-02 | Production masks query values in database error messages (`mask_bindings_in_exception_messages`, set by `DB_MASK_BINDINGS` in `fly.toml`), added to 03 | Checked locally: a failed query's message includes the values, so a customer's name or a time off reason could reach Nightwatch and Fly's logs. Nightwatch's own query records use placeholders |
 | 2026-11-02 | The manage token waits for 12, and the cancel, move and no-show actions for their first screens (12 and 13) | Nothing before 12 can send a manage link, and 05's statuses already settle what cancelling and no-shows mean for the diary |
+| 2026-11-02 | The waste score is a slot's stranded minutes, plus its lost room (for each kind of appointment, how many fewer fit, valued at their length and averaged by room weight), plus 5 minutes when it splits a free gap, rounded to whole minutes. Extra waste compares it with the best offered time in the same gap, and strictness (07) uses extra waste. It's never stored | Checked with a throwaway prototype: it ranks the overview's example (ends best, middle next, off-grid worst) and the sample morning sensibly. Its parts can be explained. The constants are a first version, to be tuned with the playground (08) and the simulator (20) |
+| 2026-11-02 | At the tightest strictness, bookings are packed from the edges of each free gap. Times in the middle that cost no room come back first as the slider loosens | The user's decision. Two pieces can't hold the same mixes of appointments as one piece of the same total, which counting each kind of appointment separately doesn't see |
+| 2026-11-02 | Each service has a room weight from 0 to 10 (default 10), for how much the waste score protects room for it. Services with the same times add their weights together. Stranded time counts every active service whatever its weight; fragmented time uses the longest service with a weight above 0. The owner sets it in plain words in 10; 19 can suggest it from the share of searches | The user's idea: a rarely booked long service shouldn't restrict everyone else's times. Raw bookings would understate long services, which get squeezed out, so 19 uses searches. In the prototype, weighting the rehab session 2 instead of 10 cut 10:30's extra waste from 20 to 9 |
 
 ## Notes for the next session
 
