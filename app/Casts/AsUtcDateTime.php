@@ -23,6 +23,13 @@ use InvalidArgumentException;
 class AsUtcDateTime implements CastsAttributes, ComparesCastableAttributes
 {
     /**
+     * Eloquent would otherwise keep the object it was given and hand that back,
+     * in the caller's time zone, until the model is reloaded. A mutable Carbon
+     * changed after it was set would also change what's saved.
+     */
+    public bool $withoutObjectCaching = true;
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     public function get(Model $model, string $key, mixed $value, array $attributes): ?CarbonImmutable

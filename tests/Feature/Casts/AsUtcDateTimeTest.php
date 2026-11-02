@@ -4,6 +4,7 @@ namespace Tests\Feature\Casts;
 
 use App\Models\Scopes\BusinessScope;
 use App\Models\TimeOff;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,28 @@ class AsUtcDateTimeTest extends TestCase
         $this->assertInstanceOf(CarbonImmutable::class, $startsAt);
         $this->assertSame('2026-07-01T09:00:00+00:00', $startsAt->toIso8601String());
         $this->assertSame('UTC', $startsAt->getTimezone()->getName());
+    }
+
+    public function test_reading_back_a_time_just_set_gives_it_in_utc(): void
+    {
+        $timeOff = new TimeOff;
+
+        $timeOff->starts_at = CarbonImmutable::parse('2026-07-14 14:00', 'Europe/London');
+
+        $this->assertInstanceOf(CarbonImmutable::class, $timeOff->starts_at);
+        $this->assertSame('2026-07-14T13:00:00+00:00', $timeOff->starts_at->toIso8601String());
+    }
+
+    public function test_changing_a_mutable_carbon_after_setting_it_does_not_change_what_is_saved(): void
+    {
+        $timeOff = $this->reload($this->timeOffFromTenInLondon());
+        $newStart = Carbon::parse('2026-07-01 11:00', 'Europe/London');
+
+        $timeOff->starts_at = $newStart;
+        $newStart->addHour();
+        $timeOff->save();
+
+        $this->assertSame('2026-07-01 10:00:00+00', DB::table('time_off')->where('id', $timeOff->id)->value('starts_at'));
     }
 
     public function test_setting_a_string_throws_because_it_has_no_time_zone(): void

@@ -5,8 +5,10 @@ namespace App\Casts;
 use App\Scheduling\Hours\PatternWeeks;
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Contracts\Database\Eloquent\ComparesCastableAttributes;
+use Illuminate\Contracts\Database\Eloquent\SerializesCastableAttributes;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
+use JsonException;
 
 /**
  * Stores a working pattern's 1 to 4 weeks of hours as JSON, building
@@ -15,7 +17,7 @@ use InvalidArgumentException;
  *
  * @implements CastsAttributes<PatternWeeks, PatternWeeks|array<mixed>>
  */
-class AsPatternWeeks implements CastsAttributes, ComparesCastableAttributes
+class AsPatternWeeks implements CastsAttributes, ComparesCastableAttributes, SerializesCastableAttributes
 {
     /**
      * @param  array<string, mixed>  $attributes
@@ -41,7 +43,8 @@ class AsPatternWeeks implements CastsAttributes, ComparesCastableAttributes
 
     /**
      * Two stored values are the same when they hold the same hours, however
-     * the JSON was spaced or ordered.
+     * the JSON was spaced or ordered. A stored value that's no longer valid
+     * always counts as changed, so a valid one can replace it.
      */
     public function compare(Model $model, string $key, mixed $firstValue, mixed $secondValue): bool
     {
@@ -49,8 +52,23 @@ class AsPatternWeeks implements CastsAttributes, ComparesCastableAttributes
             return $firstValue === $secondValue;
         }
 
-        return PatternWeeks::fromArray(self::decode($firstValue, $key))->toArray()
-            === PatternWeeks::fromArray(self::decode($secondValue, $key))->toArray();
+        try {
+            return PatternWeeks::fromArray(self::decode($firstValue, $key))->toArray()
+                === PatternWeeks::fromArray(self::decode($secondValue, $key))->toArray();
+        } catch (InvalidArgumentException|JsonException) {
+            return false;
+        }
+    }
+
+    /**
+     * The stored form, for toArray() and JSON.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return list<mixed>|null
+     */
+    public function serialize(Model $model, string $key, mixed $value, array $attributes): ?array
+    {
+        return $value instanceof PatternWeeks ? $value->toArray() : null;
     }
 
     /**

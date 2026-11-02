@@ -45,6 +45,35 @@ class AsPatternWeeksTest extends TestCase
         $pattern->getAttribute('weeks');
     }
 
+    public function test_invalid_weeks_in_the_database_can_be_replaced(): void
+    {
+        $practitioner = Practitioner::factory()->create();
+        $id = DB::table('working_patterns')->insertGetId([
+            'business_id' => $practitioner->business_id,
+            'practitioner_id' => $practitioner->id,
+            'starts_on' => '2026-11-02',
+            'cycle_starts_on' => '2026-11-02',
+            'weeks' => '[{"mon": [["09:00", "17:00"]]}]',
+        ]);
+        $pattern = $this->reload($id);
+        $weeks = WorkingPattern::factory()->make()->weeks;
+
+        $pattern->weeks = $weeks;
+        $pattern->save();
+
+        $this->assertSame($weeks->toArray(), $this->reload($id)->weeks->toArray());
+    }
+
+    public function test_to_array_gives_the_weeks_in_their_stored_form(): void
+    {
+        $pattern = WorkingPattern::factory()->make();
+
+        $this->assertSame(
+            [['mon' => [['09:00', '17:00']], 'tue' => [['09:00', '17:00']], 'wed' => [['09:00', '17:00']], 'thu' => [['09:00', '17:00']], 'fri' => [['09:00', '17:00']], 'sat' => [], 'sun' => []]],
+            $pattern->toArray()['weeks'],
+        );
+    }
+
     public function test_setting_invalid_weeks_throws_before_saving(): void
     {
         $this->expectException(InvalidArgumentException::class);

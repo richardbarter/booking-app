@@ -351,7 +351,9 @@ The week of the cycle is `intdiv(days from cycleStartsOn to the Monday of the da
 - `AsUtcDateTime`, a `CastsAttributes<CarbonImmutable, CarbonInterface>`. It converts to UTC before saving and returns `CarbonImmutable` in UTC. Setting a string throws a `TypeError`, since a string has no zone to convert from.
 - `AsDayHours` and `AsPatternWeeks` encode and decode JSON with `JSON_THROW_ON_ERROR`, building the value objects so invalid hours fail in both directions. They can be set with the value object or its stored form as an array.
 
-All three also implement `ComparesCastableAttributes`. Eloquent keeps the object a class cast returns and writes it back through `set()` on every save, and the text `set()` writes differs from what PostgreSQL returns (`+00:00` against `+00`, and jsonb's own spacing and key order). Comparing by meaning means reading an attribute never marks it changed, and only a real change is saved.
+All three also implement `ComparesCastableAttributes`. Eloquent keeps the object a class cast returns and writes it back through `set()` on every save, and the text `set()` writes differs from what PostgreSQL returns (`+00:00` against `+00`, and jsonb's own spacing and key order). Comparing by meaning means reading an attribute never marks it changed, and only a real change is saved. A stored value that's no longer valid counts as changed, so a valid one can replace it through Eloquent, although reading it still throws.
+
+`AsDayHours` and `AsPatternWeeks` also implement `SerializesCastableAttributes`, so `toArray()` and JSON give the hours in their stored form rather than an empty object. `AsUtcDateTime` turns off Eloquent's object caching (`$withoutObjectCaching`), so a time read back before a reload is always the UTC `CarbonImmutable`, and a mutable `Carbon` changed after it was set can't change what's saved.
 
 ### Configuration
 

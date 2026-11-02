@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Practitioner;
 use App\Models\WorkingPattern;
+use App\Scheduling\Hours\WeekHours;
 use Carbon\CarbonInterface;
 use Database\Factories\Concerns\TakesBusinessFromPractitioner;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -85,7 +86,7 @@ class WorkingPatternFactory extends Factory
     {
         $week = [];
 
-        foreach (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as $day) {
+        foreach (WeekHours::DAY_KEYS as $day) {
             $week[$day] = in_array($day, $workingDays, true) ? self::NINE_TO_FIVE : [];
         }
 

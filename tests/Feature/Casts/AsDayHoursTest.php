@@ -49,6 +49,30 @@ class AsDayHoursTest extends TestCase
         $editedDay->getAttribute('hours');
     }
 
+    public function test_invalid_hours_in_the_database_can_be_replaced(): void
+    {
+        $practitioner = Practitioner::factory()->create();
+        $id = DB::table('edited_days')->insertGetId([
+            'business_id' => $practitioner->business_id,
+            'practitioner_id' => $practitioner->id,
+            'date' => '2026-11-11',
+            'hours' => '[["09:03", "10:00"]]',
+        ]);
+        $editedDay = $this->reload($id);
+
+        $editedDay->hours = DayHours::fromArray([['09:00', '10:00']]);
+        $editedDay->save();
+
+        $this->assertSame([['09:00', '10:00']], $this->reload($id)->hours->toArray());
+    }
+
+    public function test_to_array_gives_the_hours_in_their_stored_form(): void
+    {
+        $editedDay = new EditedDay(['hours' => [['09:00', '13:00'], ['14:00', '17:30']]]);
+
+        $this->assertSame([['09:00', '13:00'], ['14:00', '17:30']], $editedDay->toArray()['hours']);
+    }
+
     public function test_setting_invalid_hours_throws_before_saving(): void
     {
         $this->expectException(InvalidArgumentException::class);

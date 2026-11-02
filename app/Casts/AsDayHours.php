@@ -5,8 +5,10 @@ namespace App\Casts;
 use App\Scheduling\Hours\DayHours;
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Contracts\Database\Eloquent\ComparesCastableAttributes;
+use Illuminate\Contracts\Database\Eloquent\SerializesCastableAttributes;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
+use JsonException;
 
 /**
  * Stores one day of hours as JSON, such as [["09:00", "13:00"]], building
@@ -14,7 +16,7 @@ use InvalidArgumentException;
  *
  * @implements CastsAttributes<DayHours, DayHours|array<mixed>>
  */
-class AsDayHours implements CastsAttributes, ComparesCastableAttributes
+class AsDayHours implements CastsAttributes, ComparesCastableAttributes, SerializesCastableAttributes
 {
     /**
      * @param  array<string, mixed>  $attributes
@@ -40,7 +42,8 @@ class AsDayHours implements CastsAttributes, ComparesCastableAttributes
 
     /**
      * Two stored values are the same when they hold the same hours, however
-     * the JSON was spaced or ordered.
+     * the JSON was spaced or ordered. A stored value that's no longer valid
+     * always counts as changed, so a valid one can replace it.
      */
     public function compare(Model $model, string $key, mixed $firstValue, mixed $secondValue): bool
     {
@@ -48,8 +51,23 @@ class AsDayHours implements CastsAttributes, ComparesCastableAttributes
             return $firstValue === $secondValue;
         }
 
-        return DayHours::fromArray(self::decode($firstValue, $key))->toArray()
-            === DayHours::fromArray(self::decode($secondValue, $key))->toArray();
+        try {
+            return DayHours::fromArray(self::decode($firstValue, $key))->toArray()
+                === DayHours::fromArray(self::decode($secondValue, $key))->toArray();
+        } catch (InvalidArgumentException|JsonException) {
+            return false;
+        }
+    }
+
+    /**
+     * The stored form, for toArray() and JSON.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return list<mixed>|null
+     */
+    public function serialize(Model $model, string $key, mixed $value, array $attributes): ?array
+    {
+        return $value instanceof DayHours ? $value->toArray() : null;
     }
 
     /**

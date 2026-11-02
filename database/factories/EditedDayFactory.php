@@ -8,7 +8,8 @@ use Database\Factories\Concerns\TakesBusinessFromPractitioner;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * A day a week from now, worked from 10:00 to 16:00.
+ * A day within the next year, worked from 10:00 to 16:00. Each date is
+ * different, so a practitioner can have several.
  *
  * @extends Factory<EditedDay>
  */
@@ -26,7 +27,7 @@ class EditedDayFactory extends Factory
         return [
             'practitioner_id' => Practitioner::factory(),
             'business_id' => fn (array $attributes): int => $this->practitionersBusinessId($attributes),
-            'date' => now()->addWeek()->toDateString(),
+            'date' => now()->addDays(fake()->unique()->numberBetween(1, 366))->toDateString(),
             'hours' => [['10:00', '16:00']],
         ];
     }

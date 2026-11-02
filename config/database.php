@@ -97,10 +97,7 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
-            // A time sent without an offset always means UTC, locally and on Neon.
             'timezone' => 'UTC',
-            // Keeps query values, such as names and time off reasons, out of
-            // exception messages and so out of the logs. On in production.
             'mask_bindings_in_exception_messages' => env('DB_MASK_BINDINGS', false),
         ],
 
