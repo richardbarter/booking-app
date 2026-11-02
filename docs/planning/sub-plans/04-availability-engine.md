@@ -235,7 +235,7 @@ Laravel 13 declares a command's signature and description with these attributes 
 
 It uses real time, so times today inside the minimum notice aren't shown. It prints no customer details or time off reasons, so it's safe to run in production over `fly ssh console` when debugging.
 
-After `php artisan migrate:fresh --seed`, `php artisan availability:show 1` lists the sample business's six services.
+After `php artisan migrate:fresh --seed`, `php artisan availability:show 1` lists the sample business's three services.
 
 ### Mutation testing
 
@@ -393,10 +393,11 @@ Rule 5 uses `LocalClock`, which is why `LocalClock` has its own hand-written tes
 **Feature: `AvailabilityService`** (`tests/Feature/Services/AvailabilityServiceTest.php`)
 
 The sample business, at a fixed time with `travelTo()` (Monday 2 November 2026, 08:00 in London, the start of the pattern's week 1):
-- **Physio assessment** (60 minutes, 15 after) on Monday 9 November: 09:00 to 11:45 and 14:00 to 16:15, every 15 minutes (22 times).
+- **Physio assessment** (60 minutes, no buffers) on Monday 9 November: 09:00 to 12:00 and 14:00 to 16:30, every 15 minutes (24 times).
 - **The same service on Tuesday 10 November:** only the morning, because of the time off from 14:00.
-- **The same service on Wednesday 11 November:** the edited day's 10:00 to 14:45 (20 times).
-- **Rehab session** (90 minutes, 15 before and 15 after) on 9 November: 09:15 to 11:15 and 14:15 to 15:45.
+- **The same service on Wednesday 11 November:** the edited day's 10:00 to 15:00 (21 times).
+- **Sports massage, 90 minutes** on 9 November: 09:00 to 11:30 and 14:00 to 16:00 (20 times).
+- **Buffers,** which the sample business doesn't use: the same Monday with a service added for the test, of 90 minutes with 15 before and 15 after, offers 09:15 to 11:15 and 14:15 to 15:45.
 - **On 2 November itself:** nothing before 10:00, because of the 2 hours' notice.
 
 Other cases:
@@ -413,8 +414,8 @@ Other cases:
 - **Time:** `travelTo()` moves which of today's times are inside the minimum notice.
 
 **Feature: `availability:show`** (`tests/Feature/Console/Commands/ShowAvailabilityTest.php`)
-- With the sample business at the fixed time above, it prints Monday 9 November's working hours, free gaps and the 22 times for the physio assessment.
-- With no service, it lists the six services.
+- With the sample business at the fixed time above, it prints Monday 9 November's working hours, free gaps and the 24 times for the physio assessment.
+- With no service, it lists the three services.
 - Each failure case gives its message and exit code 1:
   - an unknown business
   - another business's service
@@ -453,7 +454,7 @@ Other cases:
   - work out a day's stranded and fragmented time from its `freeGaps`
 - **07:**
   - strictness is a step after the booking window, asking what strictness applies at each time
-  - 07 decides whether 05's check again applies strictness, or only checks that the time still fits
+  - 07 decided that 05's check again applies strictness: only offered times can be booked
 - **08:** the playground's timeline draws a day from its `workingTimes`, `freeGaps` and `slots`, for any date, since only slots are limited by the booking window.
 - **11:**
   - the public API asks for at most a month or so at a time; `DateRange` refuses anything over 366 dates

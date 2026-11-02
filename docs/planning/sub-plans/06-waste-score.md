@@ -2,7 +2,7 @@
 
 ## Goal
 
-Give every time the engine offers a **waste score**: how much room booking it would cost the bookings still to come. It's in minutes, and made of parts that can be explained ("leaves 15 minutes nobody can book", "leaves no room for a rehab session"). Also work out each day's stranded and fragmented time. The strictness slider (07) uses the scores to decide which times to hide. The playground (08) shows them, and the efficiency score (14) uses the day's figures for past days.
+Give every time the engine offers a **waste score**: how much room booking it would cost the bookings still to come. It's in minutes, and made of parts that can be explained ("leaves 15 minutes nobody can book", "leaves no room for a 90-minute massage"). Also work out each day's stranded and fragmented time. The strictness slider (07) uses the scores to decide which times to hide. The playground (08) shows them, and the efficiency score (14) uses the day's figures for past days.
 
 ## Depends on
 
@@ -43,13 +43,13 @@ When a customer books a time, the free gap it sits in (its **free stretch**) is 
 
 1. **Stranded minutes.** The minutes left before or after the time, in pieces too short for any active service (whatever its room weight). Nobody could ever book them. A 30-minute booking at 09:15, in a gap from 09:00, strands 15 minutes.
 2. **Lost room.** For each kind of appointment the practitioner offers, how many fewer of them the gap can still take, valued at their length. This is averaged over the kinds, weighted by each one's room weight (see the formula below). It's what makes splitting a 90-minute gap into two 30-minute pieces worse than taking 30 minutes from one end: the first leaves no room for a 60 or a 90, and the second leaves room for a 60.
-3. **Splitting a gap.** 5 minutes when the time leaves free time on both sides, rather than sitting against an edge of its gap. An edge is the start or end of working hours, a booking, or time off. This is the small preference for the edges. Two pieces can't hold the same mixes of appointments as one piece of the same total, which the counts per kind of appointment don't see. For example, 09:45–13:00 holds an assessment and then a rehab session, but 09:00–09:45 plus 10:30–13:00 doesn't.
+3. **Splitting a gap.** 5 minutes when the time leaves free time on both sides, rather than sitting against an edge of its gap. An edge is the start or end of working hours, a booking, or time off. This is the small preference for the edges. Two pieces can't hold the same mixes of appointments as one piece of the same total, which the counts per kind of appointment don't see. For example, after a follow-up at 09:00, the stretch 09:30–13:00 holds a 90-minute massage and two assessments. After one at 09:30, the pieces 09:00–09:30 and 10:00–13:00 don't.
 
 **The waste score** is the sum of the three, rounded to whole minutes. **Extra waste** is how much more a time's score is than the lowest score among the times offered in the same gap. The best time in each gap has extra waste 0. Strictness (07) compares extra waste, because part of every booking's score can't be avoided: a booking always takes room, wherever it goes.
 
 **The score depends only on the diary**, not on when someone looks, so the same time always gets the same score. Extra waste is measured against the times actually offered (inside the booking window), so the least wasteful time a customer can still choose is always the best in its gap.
 
-**Kinds of appointment.** Services with the same length and buffers take the same diary time, so they count as one kind, with their room weights added together. In the sample business, the physio follow-up and the 30-minute massage (both 30 minutes plus 15 after) are one kind, with weight 20.
+**Kinds of appointment.** Services with the same length and buffers take the same diary time, so they count as one kind, with their room weights added together. For example, two 30-minute services with no buffers, both at the default weight, are one kind with weight 20.
 
 ### The formula
 
@@ -86,18 +86,19 @@ These were checked with a throwaway prototype of the formula. The interval is 15
 | 09:45 | 15 | 70 | 5 | 90 | 50 |
 | 10:00 | 0 | 40 | 0 | 40 | 0 |
 
-**The sample business's morning:** free from 09:00 to 13:00, booking a physio follow-up (30 minutes plus 15 after). The four kinds are 30 + 15 (weight 20), 60 + 15 (weight 20), 90 + 15 (weight 10) and the rehab session, 15 + 90 + 15 (weight 10).
+**The sample business's morning:** free from 09:00 to 13:00, booking a physio follow-up. The three kinds are the follow-up (30 minutes, weight 10), the assessment (60 minutes, weight 10) and the 90-minute massage (weight 5, as it's booked less often), all with no buffers (03).
 
 | Extra waste | Start times | Why |
 |---|---|---|
-| 0 | 09:00, 12:15 | Against an edge, leaving one piece |
-| 5 | 09:45, 11:30 | Leave exactly room for another follow-up, but split the morning |
-| 15 | 10:15, 11:00 | Leave less room for longer appointments |
-| 20 | 09:15, 12:00, 10:30, 10:45 | 09:15 and 12:00 strand 15 minutes; 10:30 and 10:45 leave no room for a rehab session |
-| 25 | 10:00, 11:15 | Leave awkward pieces for longer appointments |
-| 45 | 09:30, 11:45 | Strand 30 minutes |
+| 0 | 09:00, 12:30 | Against an edge, leaving one piece |
+| 5 | 09:30, 10:30, 11:00, 12:00 | Leave whole half-hours on both sides, so they cost no room, but they split the morning |
+| 23 | 10:00, 11:30 | Leave room for one fewer 90-minute massage |
+| 32 | 09:15, 12:15 | Strand 15 minutes |
+| 35 | 10:15, 11:15 | Leave pieces with an odd 15 minutes in them, and room for one fewer 90-minute massage |
+| 41 | 10:45 | Split the morning into two pieces of 1h 45, leaving room for one fewer follow-up and one fewer assessment |
+| 59 | 09:45, 11:45 | Leave 45 minutes that only fits one follow-up, and room for fewer assessments and massages |
 
-With the rehab session weighted 2 instead of 10, as an owner might set a rarely booked service, 10:30 and 10:45 drop from 20 to 9 extra. They're then hidden much later as strictness rises, which is the behaviour the user asked for.
+With the 90-minute massage at the full weight of 10 instead of 5, 10:00 and 11:30 rise from 23 to 35 extra, because they cost room for one. The lower weight is what keeps them offered at higher strictness. That's the behaviour the user asked for, for a service that's booked less often.
 
 ### Each day's stranded and fragmented time
 
@@ -126,7 +127,7 @@ The day's stranded and fragmented minutes are the totals of those gaps. This is 
 |---|---|---|
 | `room_weight` | smallint | default 10; check: 0 to 10. How much the waste score protects room for this service: 10 fully, 0 not at all |
 
-Existing services get 10, so nothing changes until an owner sets a weight. 10 decides the plain-word levels shown to owners (for example Often, Sometimes, Rarely and Don't keep room), and the number each one stores. The migration's `down()` drops the column.
+Existing services get 10, so nothing changes until an owner sets a weight. `CreateSampleBusiness` (03) gives the sample business's 90-minute massage a weight of 5, since it's booked less often, and leaves the follow-up and the assessment at 10. 10 decides the plain-word levels shown to owners (for example Often, Sometimes, Rarely and Don't keep room), and the number each one stores. The migration's `down()` drops the column.
 
 ## Backend
 
@@ -150,7 +151,7 @@ New value objects, `final readonly` like 04's:
 - `ServiceFit` does the fitting and counting: whether a kind of appointment fits in a piece, and how many fit. It uses the date's start times on the slot interval, which `SlotFinder` already lists through `LocalClock`. So clock changes and 30-minute time zones work the same way as for slots.
 - `WasteScorer` scores a day's slots and builds its `GapSummary`. It holds the constants (`SPLIT_MINUTES = 5`), merges kinds with the same times by adding their weights, and works out each gap's counts once rather than for every slot.
 
-Minutes are whole minutes of each piece (`intdiv` of its seconds by 60). The counting works in integer seconds internally, for speed. A month for the sample business means about 30 days × 2 gaps × 15 slots × 4 kinds × 3 pieces, which is small, but Carbon objects in the inner loop would make it slow.
+Minutes are whole minutes of each piece (`intdiv` of its seconds by 60). The counting works in integer seconds internally, for speed. A month for the sample business means about 30 days × 2 gaps × 15 slots × 3 kinds × 3 pieces, which is small, but Carbon objects in the inner loop would make it slow.
 
 ### `AvailabilityService` (04 and 05)
 
@@ -173,15 +174,15 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
   - a kind fits when a start time on the interval puts its blocked time, buffers included, inside the piece
   - it doesn't fit when the piece is long enough but no start time on the interval works, such as a 30-minute service in 10:07–10:40 with a 15-minute interval
 - **Counting:**
-  - back to back, buffers add up: a 4-hour piece holds five follow-ups of 30 + 15
-  - a rehab session needs its buffer before inside the piece
+  - back to back, buffers add up: a 4-hour piece holds five 30-minute appointments with 15 minutes after each
+  - a kind with a buffer before needs it inside the piece too
   - an empty piece holds nothing
 - **Clock changes:** counting works on a date when the clocks change, using that date's start times.
 
 **Unit: `WasteScorer`**
 - **The worked examples:** the overview's example and the sample morning give the tables above, waste and extra waste for every start time.
 - **Weights:**
-  - with the rehab session weighted 2, 10:30's extra waste is 9
+  - with the 90-minute massage weighted 10 instead of 5, 10:00's extra waste is 35 rather than 23
   - with every weight 0, lost room is 0 and nothing is fragmented
   - services with the same times count as one kind, with their weights added together
 - **The split:** a slot that fills its gap exactly has no stranded minutes, no split and no leftover pieces; one against one edge has no split; one with free time on both sides has a split of 5.
@@ -206,7 +207,7 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
 
 **Feature: `AvailabilityService`**
 - With the sample business at 04's fixed time, Monday 9 November's follow-up times have the sample morning's extra waste.
-- Setting the rehab session's `room_weight` to 2 changes 10:30's extra waste to 9.
+- Setting the 90-minute massage's `room_weight` to 10 changes 10:00's extra waste from 23 to 35.
 - An inactive service doesn't count when scoring.
 - The query count is the same for 1 date and 60 (six).
 
@@ -228,8 +229,8 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
 
 **Why it works this way.** These points came out of discussing the design with the user (2026-11-02). They're recorded so a later change doesn't undo them by accident:
 - **The customer chooses a service first, then sees its times** (overview, section 3). So each search scores the times for one service only. The score still weighs the room left for every service, because it's about the bookings still to come on that day. One practitioner has one booking at a time, so "room" always means later bookings, never simultaneous ones.
-- **Some waste can't be avoided.** When the lengths don't combine, such as a free hour and a follow-up that takes 45 minutes of diary time, every choice leaves something over. Strictness never hides every time in a gap with room, so the best time is still offered. Taking that booking beats leaving the whole hour empty.
-- **Why the edges matter: an example.** On an empty morning, say a follow-up is booked at 09:45 rather than 09:00. That leaves a 45-minute hole at 09:00. If the next two customers want assessments, they go after 10:30, and the hole stays empty unless a 30-minute customer wants exactly 09:00. Booked at 09:00, the assessments fit at 09:45 and 11:00, with room left for another follow-up at 12:15. The middle time only wastes nothing if the right customer turns up, so it's offered once the slider loosens a little, not at the tightest setting.
+- **Some waste can't be avoided.** When the lengths don't combine, such as 45 free minutes and a 30-minute follow-up, every choice leaves something over. Strictness never hides every time in a gap with room, so the best time is still offered. Taking that booking beats leaving the whole hour empty.
+- **Why the edges matter: an example.** The user first discussed this with the original six services, which had 15 minutes of clean-up after each (03's notes). It works the same with today's three. On an empty morning, say a follow-up is booked at 09:30 rather than 09:00. That leaves a 30-minute hole at 09:00. If the next customers want a 90-minute massage and two assessments, only the massage and one assessment fit from 10:00, and the hole stays empty unless another follow-up wants exactly 09:00. Booked at 09:00, all three fit from 09:30, back to back until 13:00. The middle time only wastes nothing if the right customer turns up, so it's offered once the slider loosens a little, not at the tightest setting.
 - **The tightest setting is restrictive on purpose.** It can leave only two times on an empty morning. Three things soften this:
   - the default strictness (07) won't be the tightest
   - the relaxation window (07) releases protected room near the date
@@ -244,9 +245,9 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
   - the relaxation window turns this off near the date
   - strictness by time of day (overview, 5.4) changes which threshold applies, not the score
 - **08:**
-  - the playground explains a hidden time from its `WasteScore`: "leaves 15 minutes nobody can book" from the stranded minutes, and "leaves room for one fewer rehab session" from the lost room, compared with the best time in the gap
+  - the playground explains a hidden time from its `WasteScore`: "leaves 15 minutes nobody can book" from the stranded minutes, and "leaves room for one fewer 90-minute massage" from the lost room, compared with the best time in the gap
   - its timeline highlights the day's stranded gaps
-  - whether the sample business keeps its buffers is decided there
+  - the sample business has no buffers (03), so the timeline is easy to read. A second sample business with buffers is noted in 03 for later
 - **10:**
   - the service screen sets `room_weight` with plain-word levels
   - the wording should say what it does, for example "Keep room for this service: Often / Sometimes / Rarely / Don't keep room"

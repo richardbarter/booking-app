@@ -25,7 +25,7 @@ Let a booking be made safely: a `CreateBooking` action that checks the time with
 - The manage token for cancel and reschedule links (12, with the emails that carry them)
 - Emails and events after a booking (12), and live updates (17)
 - Pages, routes, Form Requests and rate limits (08, 11 and 13)
-- Strictness when checking again (07 decides)
+- Strictness when checking again (07, which decided that only offered times can be booked)
 - Notes from customers. They could hold health details, and clinical records of any kind are out of scope
 
 ## Decisions
@@ -308,13 +308,14 @@ Feature tests on PostgreSQL. Names start with `test_`, and files mirror `app/`. 
 
 With the sample business at a fixed time (`travelTo()`, as in 04):
 - **Saving:**
-  - booking a physio assessment at 10:00 on Monday 9 November saves the booking with `ends_at` 11:00, `blocked_until` 11:15, the service's price, status confirmed and the source
+  - booking a physio assessment at 10:00 on Monday 9 November saves the booking with `ends_at` 11:00, `blocked_from` 10:00 and `blocked_until` 11:00 (the sample business has no buffers), the service's price, status confirmed and the source
   - it creates the customer with the email in lower case
 - **A repeat email:**
   - a second booking with the same email, in a different case or with spaces, uses the same customer
   - the customer's name and phone don't change
   - the booking records the new name and phone
-- **Buffers:** after that booking, a 30-minute follow-up (15 minutes after, none before) can start at 11:15 but not 11:00.
+- **Back to back:** after that booking, a follow-up can start at 11:00, since bookings that only touch don't overlap.
+- **Buffers,** with a service added for the test, of 30 minutes with 15 after: booked at 10:00, it's saved with `blocked_until` 10:45, and the next booking can start at 10:45 but not 10:30.
 - **Refusals (`SlotNotAvailable`, with nothing written, not even a new customer):**
   - a time already taken
   - 09:07, which isn't on the slot interval
@@ -363,4 +364,4 @@ With the sample business at a fixed time (`travelTo()`, as in 04):
 
 **Locks and Neon.** Each booking holds one row lock for a few milliseconds. Nothing waits on a timer, so the database still sleeps when nobody's booking.
 
-**Strictness and checking again.** 07 adds strictness to the engine. Whether `CreateBooking`'s check applies it, or only checks that the time still fits, is 07's question (04's notes).
+**Strictness and checking again.** 07 adds strictness to the engine and decided that the check applies it: only offered times can be booked, so a hidden time can't be booked by calling the API directly. `CreateBooking` already looks for the start among the day's `slots`, which strictness filters, so its code doesn't change. Once 07 sets a default strictness of 50, this plan's tests set the sample business's strictness to 0, since they test fitting and booking, not strictness (07).

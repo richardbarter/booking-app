@@ -77,8 +77,8 @@ Use these names consistently in code, UI and docs.
 | Waste score | How much room a slot would cost the bookings still to come if it were booked, in minutes: the stranded time it leaves, the room it takes from each kind of appointment (by room weight), and a small cost for splitting a free gap. Worked out from the diary alone; strictness decides how much to tolerate. |
 | Extra waste | How much more a slot's waste score is than the best slot offered in the same free gap. The best has 0. |
 | Room weight | How much the waste score protects room for a service, from 0 (not at all) to 10 (fully, the default). Set by the owner for services booked more or less often. |
-| Strictness | A business setting from 0 to 100. 0 offers every slot that fits; 100 offers only the least wasteful ones. |
-| Relaxation window | How close to an appointment time strictness stops applying, so late bookings aren't turned away. |
+| Strictness | A business setting from 0 to 100, default 50. 0 offers every slot that fits; higher settings hide slots with more extra waste; 100 offers only the least wasteful ones in each free gap. |
+| Relaxation window | How close to an appointment time strictness stops applying, so late bookings aren't turned away. Default 48 hours; strictness switches off all at once. |
 | Stranded time | Free time in a gap too short for any service the practitioner offers. Nobody could ever book it. |
 | Fragmented time | Free time in a gap that fits shorter services but not the longest one the owner keeps room for (room weight above 0). |
 | Missed booking | A search that ended without a booking, on a day when there was enough free time in total for the service but not in one piece. |
@@ -129,12 +129,14 @@ A time's **extra waste** is how much more it scores than the best time offered i
 Each business sets its strictness from 0 to 100:
 
 - **0 (loosest):** every slot that fits is offered.
-- **In between:** slots above a waste threshold are hidden, so most choices remain.
-- **100 (tightest):** only the least wasteful slot in each free gap is offered, so customers always have something to choose.
+- **In between:** a slot is hidden when its extra waste (5.3) is above a threshold of `120 × (100 − strictness) ÷ 100` minutes, so most choices remain. At 50, times that waste more than 60 minutes more than the best time in their gap are hidden.
+- **100 (tightest):** only the least wasteful slots in each free gap are offered, so customers always have something to choose.
 
-While the owner drags the slider, the admin screen shows a live preview, e.g. "Customers can choose from 18 start times tomorrow (32 at loosest)".
+New businesses start at 50 (sub-plan 07). The 120-minute scale and the default are a first version, to be tuned with the playground. Only offered times can be booked: the final check before saving a booking (5.2) applies strictness too. Hidden times are kept with their waste scores, so the playground can show them and say why.
 
-**Relaxation window:** the nearer an appointment time gets, the less likely it is that someone else will book the time being protected. So strictness stops applying within a set number of hours of the slot (default 48, adjustable). If nobody has booked 09:00 by the day before, 09:15 opens up.
+While the owner drags the slider, the admin screen shows a live preview of a day beyond the relaxation window, e.g. "Customers can choose from 18 start times next Tuesday (32 at loosest)".
+
+**Relaxation window:** the nearer an appointment time gets, the less likely it is that someone else will book the time being protected. So strictness stops applying, all at once, within a set number of hours of the slot (default 48, adjustable from 0 to 720). If nobody has booked 09:00 by the day before, 09:15 opens up.
 
 **Strictness by time of day (later).** Some parts of the week are busier than others, so an owner will be able to set strictness for parts of it: loose from 09:00 to 11:00 on a quiet Monday morning, say, and strict from 11:00 to 17:00. An owner who wants certainty will also be able to fix a period's start times, such as 09:00, 10:15 and 11:30. Fixed times are offered whatever their waste score. They suit businesses whose services are all the same length. With mixed lengths they bring back the gaps the changing times avoid: if 09:00 and 10:00 are fixed times, a 30-minute booking at 09:00 leaves 30 minutes nobody can book. So the strictness filter (07) asks what strictness applies at each time, rather than reading one number, and the settings and their screens come once the single slider has been tried (see the open questions). It's the hand-set version of what learning from history (5.7) does automatically.
 
@@ -466,7 +468,8 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | Question | Needed by |
 |---|---|
 | When to add the custom domain: before links are shared at the playground milestone, or in 22 as planned (`bookalive.io` was unregistered on 2026-10-27) | 08 / 22 |
-| Default strictness and relaxation window, and whether to set them provisionally in 07 and tune them once the playground shows the dynamic slots working | 07 / 08 |
+| Tune the first versions once the playground shows them working: the default strictness (50) and relaxation window (48 hours) from 07, the 120-minute strictness scale, and 06's waste score constants (5 minutes for splitting a gap, stranded minutes and lost room counting equally) | 08 |
+| A second sample business: the original six services with 15-minute clean-ups after each and a rehab session with setup before, kept in sub-plan 03's notes. It would show buffers and services that share a length in the playground. When to add it, and whether visitors choose between sample businesses | After 08 |
 | Strictness by time of day and fixed start times (5.4). Where the settings are stored: with the working pattern, so they follow its cycle, or in a weekly schedule of their own, so they survive a change of hours (fixed times may suit the pattern, and busy and quiet times a schedule of their own). Which period a slot belongs to when it crosses a boundary (its start time is simplest). Whether the relaxation window opens up other times in a fixed period, or the fixed times are final. How the randomised checks treat fixed periods, which can leave a free gap with no time offered. Whether they come in 10 or after v1 | 07 / 10 |
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
 | Production email provider (e.g. Resend, Postmark, Amazon SES) | 12 |

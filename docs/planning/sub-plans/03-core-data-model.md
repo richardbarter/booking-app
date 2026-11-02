@@ -49,7 +49,7 @@ The user's answers to this plan's questions (2026-10-29, 2026-10-30 and 2026-11-
 | Prices and lengths | Set on each service. Per-practitioner prices and lengths come with staff. Lengths the customer chooses (a 30, 60 or 90-minute massage) are separate services in v1 |
 | Booking window | Set for the business: 2 hours' notice and up to 90 days ahead by default. Per-practitioner windows come with staff |
 | Start times | Every 15 minutes by default, with 10, 15, 20, 30 or 60 as the choices. Every 5 minutes isn't offered, because times like 09:05 look odd to customers |
-| Sample business | A made-up independent physio and sports massage therapist, with a fortnightly pattern and six services from 30 to 90 minutes |
+| Sample business | A made-up independent physio and sports massage therapist, with a fortnightly pattern and three services of 30, 60 and 90 minutes, with no buffers and the 90-minute one booked less often (changed from six services on 2026-11-02; the original set is kept in the notes for a second sample business) |
 | How the engine handles practitioners | It works on one practitioner, which the code that loads its data gets with `sole()`. Nothing in v1 combines practitioners. "Anyone available" comes with staff, as a layer that runs the engine for each practitioner and merges the results. Building the booking calculation may change how that layer looks, so it isn't designed now |
 | How a login is linked to its business | The simplest way: each user belongs to one business, through `users.business_id`, added in 09. Other arrangements wait until there are staff |
 
@@ -369,22 +369,20 @@ The week of the cycle is `intdiv(days from cycleStartsOn to the Monday of the da
 
 | Service | Length | Before | After | Price |
 |---|---|---|---|---|
-| Physio assessment | 60 | 0 | 15 | £70 |
-| Physio follow-up | 30 | 0 | 15 | £50 |
-| Rehab session | 90 | 15 | 15 | £95 |
-| Sports massage, 30 minutes | 30 | 0 | 15 | £35 |
-| Sports massage, 60 minutes | 60 | 0 | 15 | £55 |
-| Sports massage, 90 minutes | 90 | 0 | 15 | £75 |
+| Physio follow-up | 30 | 0 | 0 | £50 |
+| Physio assessment | 60 | 0 | 0 | £70 |
+| Sports massage, 90 minutes | 90 | 0 | 0 | £75 |
+
+The 90-minute massage is booked less often than the other two. 06 adds room weights, and `CreateSampleBusiness` then gives it a weight of 5, with the others at the default of 10.
 
 Plus one time off (Tuesday of next week, 14:00 to 17:30 local) and one edited day (Wednesday of next week, 10:00–16:00).
 
 This gives the engine plans what they need to see:
 - a fortnightly pattern with a late day and a Saturday
-- buffers after appointments, and one before
 - 30, 60 and 90-minute services, for long appointments being squeezed out
 - time off and an edited day
 
-Buffers are multiples of 15 minutes, so unbookable gaps come from the times customers choose rather than from the setup itself.
+**No buffers** (the user's decision, 2026-11-02). Clean-up is inside each length, so the playground's timeline is easy to read: a 60-minute booking takes exactly 60 minutes of the diary. The engine's tests cover buffers with diaries of their own.
 
 ### Factories
 
@@ -458,7 +456,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
 - `DatabaseConnectionTest` also asserts that the session time zone is `UTC`.
 
 **Feature: sample business**
-- `CreateSampleBusiness` creates one practitioner and the six services in the table.
+- `CreateSampleBusiness` creates one practitioner and the three services in the table.
 - On a fixed date, `WorkingHours` built from the practitioner's patterns and edited days gives the expected hours for that week and the next, including the alternating weeks and the edited Wednesday. The time off is stored as the right UTC times.
 - Called twice, it creates two separate businesses that can't see each other's data.
 - It works with model events turned off, as in `DatabaseSeeder`.
@@ -476,6 +474,19 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
 ## Notes
 
 **Personal data.** The practitioner's name is personal data. A time off reason could be sensitive, such as a medical appointment, so it's optional, for the business only, and never sent to customers or a public API (11). Exception messages from the value objects mention times, never names.
+
+**A second sample business, for later.** The sample business first had six services, each with 15 minutes of clean-up after it. That set is kept here for a second, more detailed sample business, which would show buffers at work in the playground:
+
+| Service | Length | Before | After | Price |
+|---|---|---|---|---|
+| Physio assessment | 60 | 0 | 15 | £70 |
+| Physio follow-up | 30 | 0 | 15 | £50 |
+| Rehab session | 90 | 15 | 15 | £95 |
+| Sports massage, 30 minutes | 30 | 0 | 15 | £35 |
+| Sports massage, 60 minutes | 60 | 0 | 15 | £55 |
+| Sports massage, 90 minutes | 90 | 0 | 15 | £75 |
+
+It has buffers after every appointment and one before (the rehab session's setup), and services that share lengths, so their room weights add together (06). The overview's open questions list it.
 
 **For later sub-plans**
 - **04** (now drafted; `04-availability-engine.md` settles each of these):
