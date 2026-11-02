@@ -47,9 +47,9 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 03 | Core data model | Planned | Plan #7 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07 |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07 |
-| 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised on 2026-11-02 to add `booking:create` |
+| 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |
 | 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07 |
-| 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised on 2026-11-02 to give `booking:create` a `--strictness=` option |
+| 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option |
 | | **Phase 3: Playground** | | | |
 | 08 | Scheduling playground | Not started | | |
 | ★ | **Playground milestone** | | | |
