@@ -17,6 +17,11 @@ class DatabaseConnectionTest extends TestCase
         $this->assertSame('testing', DB::scalar('select current_database()'));
     }
 
+    public function test_the_session_time_zone_is_utc(): void
+    {
+        $this->assertSame('UTC', DB::scalar('show timezone'));
+    }
+
     public function test_btree_gist_extension_is_available()
     {
         $available = DB::scalar("select count(*) from pg_available_extensions where name = 'btree_gist'");
