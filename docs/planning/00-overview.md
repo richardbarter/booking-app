@@ -364,10 +364,10 @@ Child tables reference their parents through composite foreign keys that include
 **For each sub-plan:**
 1. Read this overview and `tracking.md`.
 2. Draft the sub-plan with the `draft-sub-plan` skill on a `docs/` branch, and merge it once reviewed.
-3. Build it on a branch named `feature/NN-short-name`, with the `build-sub-plan` skill. That skill is written just before building 03, once there are plans to build from.
-4. Write the tests, and get them passing.
-5. Open a pull request, then merge it.
-6. Update `tracking.md`.
+3. Build it with the `build-sub-plan` skill, on a branch named `feature/NN-short-name` from an up-to-date `main`, once the plans it depends on are done.
+4. Write the tests alongside the code, and get them and `composer ci:check` passing.
+5. Update `tracking.md` and open a pull request. The user reviews and merges it, and the merge deploys.
+6. Check the deploy, and anything else the plan can only check after the merge.
 
 **Code conventions** live in `CLAUDE.md`, which is created in sub-plan 01:
 - Controllers follow Authorize, Validate, Act, Respond.
