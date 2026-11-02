@@ -50,7 +50,7 @@ None of these is known for certain at the moment the decision has to be made.
 | When to relax the rules | Time protected for a long appointment is unlikely to fill the day before | Booking curves; controls that change as the date approaches |
 | No-shows and cancellations | A customer doesn't turn up | Overbooking (airlines); outpatient scheduling research |
 
-This app tackles the first six. No-shows are out of scope for now.
+This app tackles the first six, though the third, which practitioner gets the booking, only arises once businesses have staff (after version 1). No-shows are out of scope for now.
 
 ## 3. How other fields deal with it
 
@@ -181,7 +181,7 @@ That's why real systems, this app included, combine sensible rules, data and sim
 
 | Idea | Where it comes from | How the app uses it |
 |---|---|---|
-| Fragmentation and best fit | Memory allocation | The waste score's *stranded time*, and best-fit practitioner assignment |
+| Fragmentation and best fit | Memory allocation | The waste score's *stranded time*, and (once businesses have staff) best-fit practitioner assignment |
 | Protection levels and EMSR | Airline revenue management | The waste score's *lost capacity* for longer services |
 | Assortment optimisation | Choice-based revenue management | The strictness slider: the business chooses how restricted the set of offered times is |
 | Rules that relax near the date | Hotel minimum-stay rules | The relaxation window |
