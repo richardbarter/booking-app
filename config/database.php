@@ -97,6 +97,8 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'timezone' => 'UTC',
+            'mask_bindings_in_exception_messages' => env('DB_MASK_BINDINGS', false),
         ],
 
         'sqlsrv' => [

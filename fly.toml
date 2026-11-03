@@ -21,6 +21,8 @@ APP_ENV = "production"
 APP_DEBUG = "false"
 APP_URL = "https://bookalive.fly.dev"
 DB_CONNECTION = "pgsql"
+# Query values (names, time off reasons) never reach error messages or the logs.
+DB_MASK_BINDINGS = "true"
 LOG_CHANNEL = "stderr"
 LOG_LEVEL = "info"
 # Sends nothing until sub-plan 12 adds a mail provider. Not "log", which would

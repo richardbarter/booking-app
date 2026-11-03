@@ -20,6 +20,14 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 Sub-plans 03 to 07 (the core data model and the scheduling engine) were reviewed and merged in pull request #7 on 2026-11-02. They're built in order with the `build-sub-plan` skill, one pull request each.
 
+Sub-plan 03 is built, in pull request #10:
+- **Tables:** businesses with their booking settings, one practitioner per business (through a unique index on `practitioners.business_id`, which goes when staff arrive), services, working patterns, edited days and time off. Check, unique and exclusion constraints keep the data valid, and composite foreign keys on `(business_id, practitioner_id)` stop a row mixing two businesses. Every `business_id` cascades on delete.
+- **Tenancy:** tenant-owned models use `BelongsToBusiness`, whose scope filters by `CurrentBusiness` and throws `MissingCurrentBusiness` when none is set. `business_id` and `practitioner_id` aren't mass-assignable. A guard test checks every table with a `business_id`, including later sub-plans' tables.
+- **Hours:** plain PHP value objects in `app/Scheduling/Hours`, ending in `WorkingHours::on()`, which 04 builds on. They need no Laravel, and their tests extend PHPUnit's `TestCase`.
+- **Times:** the PostgreSQL connection runs in UTC, instants go through `AsUtcDateTime`, and production masks query values in database error messages (`DB_MASK_BINDINGS`).
+- **Sample business:** `CreateSampleBusiness` makes Alex Morgan Physio & Sports Massage, and `DatabaseSeeder` calls it.
+- **Code:** PHPUnit has 268 tests, which take about 4.7s on the host and 6.3s in CI. Larastan at level 9 has no errors.
+
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
 - Docker 29.9.2 and Compose v5.6.1, through Docker Desktop's WSL integration
@@ -30,9 +38,10 @@ Sub-plans 03 to 07 (the core data model and the scheduling engine) were reviewed
 
 ## Next up
 
-1. Build 03 with the `build-sub-plan` skill, on `feature/03-core-data-model`.
-2. Build 04 to 07 in order, one pull request each. Each starts once the one before is merged and its deploy has been checked.
-3. Then draft 08 with the `draft-sub-plan` skill.
+1. Once 03's pull request is merged, check its deploy: Fly's release command ran the new migrations on Neon, including enabling `btree_gist`, and `fly ssh console -C "php artisan config:show database.connections.pgsql.mask_bindings_in_exception_messages"` shows true. Record the results and tick those items in 03 on 04's branch.
+2. Build 04 with the `build-sub-plan` skill, on `feature/04-availability-engine`. It needs PCOV on the host (`sudo apt install php8.5-pcov`), which the developer runs.
+3. Build 05 to 07 in order, one pull request each. Each starts once the one before is merged and its deploy has been checked.
+4. Then draft 08 with the `draft-sub-plan` skill.
 
 ## Sub-plan status
 
@@ -44,7 +53,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
-| 03 | Core data model | Planned | Plan #7 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07 |
+| 03 | Core data model | Done | Plan #7, build #10 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 268 PHPUnit tests in about 4.7s. The production checks wait for the merge |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07 |
 | 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |
@@ -156,6 +165,8 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-02 | The sample business has three services with no buffers: a 30-minute physio follow-up, a 60-minute physio assessment and a 90-minute sports massage, the massage with a room weight of 5 (booked less often). The original six services with 15-minute clean-ups are kept in 03's notes for a second sample business later. The strictness scale becomes 120 minutes (it was 80) | The user's decision: simpler to follow in the playground, and the room weight is used from day one. Buffers are still covered by the engine tests' own diaries. With three services and no buffers, an 80-minute scale hid more than half of some rows at 50; 120 keeps 50 a middle setting (22 of 24 assessment times on an empty Monday) |
 | 2026-11-02 | Merged sub-plans are built with a project skill, `build-sub-plan`, beside `draft-sub-plan` in `.ai/skills/`. It replaces the personal `build-feature` skill for this repo. A build stops for the user only when it's blocked: the plan is wrong or unclear, a dependency isn't approved, or a decision isn't in the plan. Otherwise it checks and commits after each part and carries on. Each plan starts once the one before is merged and its deploy has been checked. The build's pull request ticks the "Done when" items with evidence and marks the plan done, and checks that can only run after the merge are recorded on the next branch. The review pass uses the `code-review` skill at the `high` level, plus the skill's own checklist | The user's answers. The plan has already been reviewed, so the pull request is where the build is reviewed, and stopping after every part would add rounds without much value. Waiting for each merge keeps the history simple and builds on reviewed code. Marking a plan done in its own pull request saves an extra pull request and deploy for each plan. `code-review` comes with Claude Code, and the checklist covers Cursor, which reads the same skill |
 | 2026-11-02 | A `booking:create` Artisan command (05) books a time through `CreateBooking`, so the engine can be tried around bookings of your own before the playground. It refuses to run in production, its bookings are undone by starting again with `php artisan migrate:fresh --seed`, and 07 gives it `availability:show`'s `--strictness=` option | The user's decision: otherwise the only bookings before 08 are the seeder's three, so there's no way to book a time and watch the offered times, waste scores and hidden times change. It writes bookings and nothing can cancel one until 12 and 13, so it's for local development only, and cancelling stays with 12 and 13. Booking at another strictness, without saving it, shows how a wasteful booking fragments the diary. As the command only runs locally, customers still can only book offered times |
+| 2026-11-02 | `business_id` and `practitioner_id` aren't in any model's `#[Fillable]`. Code sets them through relations (`$business->practitioners()->create()`, `associate()`) or `BelongsToBusiness`'s creating hook. 05 finds or creates customers with `$business->customers()->createOrFirst()` | The user's decision while building 03. A request field can then never move a row to another business. Practitioners and services have no composite foreign key to catch that, and the other tables' keys only check that the row matches its practitioner |
+| 2026-11-02 | 03's production check names the one setting: `config:show database.connections.pgsql.mask_bindings_in_exception_messages`, not the whole `pgsql` connection | The user's decision while building 03. Showing the whole connection prints `url`, the Neon connection string with its password, into the terminal, and secrets never go in chat or a command's output |
 
 ## Notes for the next session
 

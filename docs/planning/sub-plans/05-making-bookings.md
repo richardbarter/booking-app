@@ -209,8 +209,9 @@ A new `app/Enums` folder. `php artisan make:enum` puts enums there once the fold
 
 ### Models
 
-`Customer` and `Booking`, following 03's models: `#[Fillable]`, `@property` docblocks, typed relations, a factory and `BelongsToBusiness`.
+`Customer` and `Booking`, following 03's models: `#[Fillable]` with no foreign keys in it, `@property` docblocks, typed relations, a factory and `BelongsToBusiness`. As in 03, `business_id` and the other foreign keys aren't fillable, so code sets them through relations, and a request field can never move a row to another business.
 - `Customer`: `business`, `bookings`.
+- `Business` gains `customers` (has many), for `CreateBooking`'s `createOrFirst()`.
 - `Booking`:
   - relations: `business`, `practitioner`, `service`, `customer`
   - casts: the four instants with `AsUtcDateTime`, `status` as `BookingStatus` and `source` as `BookingSource`
@@ -245,9 +246,9 @@ The customer details come as an array, as a Form Request's `validated()` gives t
 1. Lock the practitioner: `$business->practitioners()->lockForUpdate()->sole()`.
 2. Check again: call `forService()` for the start's date in the business's time zone, and find the slot whose `startsAt` is the same instant as `$startsAt`, whatever zone the caller gave it in. None means `SlotNotAvailable`, and so does a start with seconds, which is never on the slot interval. `forService()` already refuses an inactive service (`ServiceNotBookable`), another business's service, and a current business that isn't `$business` (04).
 3. Normalise the details: trim each one, and lower-case the email.
-4. Find or create the customer with `createOrFirst(['business_id' => ..., 'email' => ...], ['name' => ..., 'phone' => ...])`. An existing customer's details aren't changed.
+4. Find or create the customer with `$business->customers()->createOrFirst(['email' => ...], ['name' => ..., 'phone' => ...])`. The relation sets `business_id`, which isn't fillable (03), and scopes the lookup to the business. An existing customer's details aren't changed.
 5. Create the booking, with:
-   - `business_id` set explicitly, as it is for the customer, so both work with model events off, as in `DatabaseSeeder` (03 does the same in `CreateSampleBusiness`)
+   - `business_id` and the other foreign keys set through relations (`associate()`), as the customer's is, so both work with model events off, as in `DatabaseSeeder` (03 does the same in `CreateSampleBusiness`)
    - the slot's four instants
    - the service's price
    - the details as given
