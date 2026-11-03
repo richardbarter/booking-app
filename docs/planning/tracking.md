@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 ## Current status
 
@@ -20,7 +20,7 @@ Sub-plan 02 is done. Pull request https://github.com/richardbarter/booking-app/p
 
 Sub-plans 03 to 07 (the core data model and the scheduling engine) were reviewed and merged in pull request #7 on 2026-11-02. They're built in order with the `build-sub-plan` skill, one pull request each.
 
-Sub-plan 03 is built, in pull request #10:
+Sub-plan 03 is done. Pull request #10 merged on 2026-11-03, and its run on `main` passed `checks`, `audit` and `deploy`. Fly's release v12 ran the seven new migrations on Neon, including enabling `btree_gist` (246ms). The check that production masks query values in database errors waits for the developer to run it (see **Next up**). What 03 built:
 - **Tables:** businesses with their booking settings, one practitioner per business (through a unique index on `practitioners.business_id`, which goes when staff arrive), services, working patterns, edited days and time off. Check, unique and exclusion constraints keep the data valid, and composite foreign keys on `(business_id, practitioner_id)` stop a row mixing two businesses. Every `business_id` cascades on delete.
 - **Tenancy:** tenant-owned models use `BelongsToBusiness`, whose scope filters by `CurrentBusiness` and throws `MissingCurrentBusiness` when none is set. `business_id` and `practitioner_id` aren't mass-assignable. A guard test checks every table with a `business_id`, including later sub-plans' tables.
 - **Hours:** plain PHP value objects in `app/Scheduling/Hours`, ending in `WorkingHours::on()`, which 04 builds on. They need no Laravel, and their tests extend PHPUnit's `TestCase`.
@@ -38,7 +38,7 @@ Sub-plan 03 is built, in pull request #10:
 
 ## Next up
 
-1. Once 03's pull request is merged, check its deploy: Fly's release command ran the new migrations on Neon, including enabling `btree_gist`, and `fly ssh console -C "php artisan config:show database.connections.pgsql.mask_bindings_in_exception_messages"` shows true. Record the results and tick those items in 03 on 04's branch.
+1. Finish 03's production checks: the developer runs `fly ssh console -C "php artisan config:show database.connections.pgsql.mask_bindings_in_exception_messages"`, which should show true. Record the result here and tick the last item in 03, on 04's branch. The migrations check passed on 2026-11-03.
 2. Build 04 with the `build-sub-plan` skill, on `feature/04-availability-engine`. It needs PCOV on the host (`sudo apt install php8.5-pcov`), which the developer runs.
 3. Build 05 to 07 in order, one pull request each. Each starts once the one before is merged and its deploy has been checked.
 4. Then draft 08 with the `draft-sub-plan` skill.
@@ -53,7 +53,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 01 | Project setup | Done | — (merged locally; no remote until 02) | Uses newer versions than the plan; see the decisions log |
 | 01b | WSL development environment | Done | — (merged locally; no remote until 02) | Added after 01: moves development off the Windows filesystem. PHPUnit 2.5s, down from 7.3s on Windows |
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
-| 03 | Core data model | Done | Plan #7, build #10 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 268 PHPUnit tests in about 4.7s. The production checks wait for the merge |
+| 03 | Core data model | Done | Plan #7, build #10 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 268 PHPUnit tests in about 4.7s. Merged on 2026-11-03; release v12 ran its migrations on Neon. The masking check is still to run |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07 |
 | 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |
@@ -167,6 +167,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-02 | A `booking:create` Artisan command (05) books a time through `CreateBooking`, so the engine can be tried around bookings of your own before the playground. It refuses to run in production, its bookings are undone by starting again with `php artisan migrate:fresh --seed`, and 07 gives it `availability:show`'s `--strictness=` option | The user's decision: otherwise the only bookings before 08 are the seeder's three, so there's no way to book a time and watch the offered times, waste scores and hidden times change. It writes bookings and nothing can cancel one until 12 and 13, so it's for local development only, and cancelling stays with 12 and 13. Booking at another strictness, without saving it, shows how a wasteful booking fragments the diary. As the command only runs locally, customers still can only book offered times |
 | 2026-11-02 | `business_id` and `practitioner_id` aren't in any model's `#[Fillable]`. Code sets them through relations (`$business->practitioners()->create()`, `associate()`) or `BelongsToBusiness`'s creating hook. 05 finds or creates customers with `$business->customers()->createOrFirst()` | The user's decision while building 03. A request field can then never move a row to another business. Practitioners and services have no composite foreign key to catch that, and the other tables' keys only check that the row matches its practitioner |
 | 2026-11-02 | 03's production check names the one setting: `config:show database.connections.pgsql.mask_bindings_in_exception_messages`, not the whole `pgsql` connection | The user's decision while building 03. Showing the whole connection prints `url`, the Neon connection string with its password, into the terminal, and secrets never go in chat or a command's output |
+| 2026-11-03 | A playground sandbox lasts as long as the visitor's session, not 24 hours: it's deleted after 2 hours without a visit (`SESSION_LIFETIME` is 120 minutes). The sandbox's ID is kept in the session, and its expiry moves forward as the visitor uses it, as the session's does. A sandbox past its expiry counts as gone even before the clean-up deletes it, since the clean-up runs at most hourly | The user's decision while reviewing 03. With a 24-hour sandbox, a visitor whose session ended after 2 hours would get a new sandbox and leave the old one unused for the rest of the day. A 24-hour session was ruled out because the lifetime applies to the whole app, so admin logins (09) would stay signed in for a day |
 
 ## Notes for the next session
 
