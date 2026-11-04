@@ -19,6 +19,8 @@ use Carbon\CarbonInterface;
  */
 final readonly class SlotFinder
 {
+    private const int SECONDS_IN_MINUTE = 60;
+
     public function find(
         Diary $diary,
         ServiceTimes $service,
@@ -45,24 +47,35 @@ final readonly class SlotFinder
     }
 
     /**
+     * Start times are checked in whole seconds, since a day has up to 144
+     * of them and Carbon objects are only made for the ones that fit.
+     *
      * @param  list<CarbonImmutable>  $startTimes
      * @param  list<TimeRange>  $freeGaps
      * @return list<Slot>
      */
     private static function slots(array $startTimes, array $freeGaps, ServiceTimes $service, BookingWindow $window): array
     {
+        $gaps = self::inWholeSeconds($freeGaps);
         $slots = [];
 
         foreach ($startTimes as $startsAt) {
-            $endsAt = $startsAt->addMinutes($service->durationMinutes);
-            $blocked = new TimeRange(
-                $startsAt->subMinutes($service->bufferBeforeMinutes),
-                $endsAt->addMinutes($service->bufferAfterMinutes),
+            $start = $startsAt->getTimestamp();
+            $gap = self::gapContaining(
+                $gaps,
+                $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE,
+                $start + ($service->durationMinutes + $service->bufferAfterMinutes) * self::SECONDS_IN_MINUTE,
             );
-            $gap = self::gapContaining($freeGaps, $blocked);
 
             if ($gap !== null && $window->allows($startsAt)) {
-                $slots[] = new Slot($startsAt, $endsAt, $blocked->start, $blocked->end, $gap);
+                $endsAt = $startsAt->addMinutes($service->durationMinutes);
+                $slots[] = new Slot(
+                    $startsAt,
+                    $endsAt,
+                    $startsAt->subMinutes($service->bufferBeforeMinutes),
+                    $endsAt->addMinutes($service->bufferAfterMinutes),
+                    $gap,
+                );
             }
         }
 
@@ -70,12 +83,30 @@ final readonly class SlotFinder
     }
 
     /**
+     * Each free gap with its start and end in whole seconds, rounded
+     * inwards, so a range of whole seconds fits inside the rounded gap
+     * exactly when it fits inside the real one. Blocked time can end
+     * part-way through a second.
+     *
      * @param  list<TimeRange>  $freeGaps
+     * @return list<array{TimeRange, int, int}>
      */
-    private static function gapContaining(array $freeGaps, TimeRange $blocked): ?TimeRange
+    private static function inWholeSeconds(array $freeGaps): array
     {
-        foreach ($freeGaps as $gap) {
-            if ($gap->contains($blocked)) {
+        return array_map(fn (TimeRange $gap): array => [
+            $gap,
+            $gap->start->getTimestamp() + ($gap->start->microsecond > 0 ? 1 : 0),
+            $gap->end->getTimestamp(),
+        ], $freeGaps);
+    }
+
+    /**
+     * @param  list<array{TimeRange, int, int}>  $gaps
+     */
+    private static function gapContaining(array $gaps, int $from, int $until): ?TimeRange
+    {
+        foreach ($gaps as [$gap, $start, $end]) {
+            if ($start <= $from && $until <= $end) {
                 return $gap;
             }
         }

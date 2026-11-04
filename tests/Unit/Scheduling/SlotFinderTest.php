@@ -79,6 +79,21 @@ class SlotFinderTest extends TestCase
         $this->assertSame('10:10', $this->offered($everyTen)[0]);
     }
 
+    public function test_blocked_time_ending_part_way_through_a_second_keeps_that_second_from_being_booked(): void
+    {
+        $blocked = new TimeRange(CarbonImmutable::parse('2026-11-09 09:00', 'UTC'), CarbonImmutable::parse('2026-11-09 10:00:00.5', 'UTC'));
+
+        $availability = (new SlotFinder)->find(
+            new Diary(new WorkingHours([], [self::MONDAY => DayHours::fromArray([['09:00', '11:00']])]), [$blocked]),
+            new ServiceTimes(30),
+            $this->settings(),
+            $this->dates(self::MONDAY, self::MONDAY),
+            $this->now(),
+        );
+
+        $this->assertSame(['10:15', '10:30'], $this->offered($availability));
+    }
+
     /**
      * @return array<string, array{int, list<array{string, string}>, list<string>}>
      */
