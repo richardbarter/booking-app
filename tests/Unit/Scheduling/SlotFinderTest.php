@@ -178,12 +178,12 @@ class SlotFinderTest extends TestCase
             $this->now('2026-11-02 08:00'),
         );
 
-        $lastDate = $availability->day('2026-11-03');
-        $dateAfter = $availability->day('2026-11-04');
-        $this->assertCount(11, $lastDate->slots ?? []);
-        $this->assertSame([], $dateAfter?->slots);
-        $this->assertSame([['09:00', '12:00']], $this->ranges($dateAfter->workingTimes ?? []));
-        $this->assertSame([['09:00', '12:00']], $this->ranges($dateAfter->freeGaps ?? []));
+        $lastDate = $this->day($availability, '2026-11-03');
+        $dateAfter = $this->day($availability, '2026-11-04');
+        $this->assertCount(11, $lastDate->slots);
+        $this->assertSame([], $dateAfter->slots);
+        $this->assertSame([['09:00', '12:00']], $this->ranges($dateAfter->workingTimes));
+        $this->assertSame([['09:00', '12:00']], $this->ranges($dateAfter->freeGaps));
     }
 
     public function test_past_dates_have_no_slots(): void

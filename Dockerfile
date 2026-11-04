@@ -92,6 +92,10 @@ FROM php AS dev
 
 USER root
 
+# PCOV, the code coverage driver Infection needs for mutation testing.
+# Development only: the production image doesn't have it.
+RUN install-php-extensions pcov
+
 # Nightwatch runs in production only, so there's no agent to send events to.
 RUN rm /etc/supervisor/conf.d/nightwatch.conf
 

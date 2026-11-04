@@ -15,7 +15,7 @@ class BookingSettingsTest extends TestCase
      */
     public static function slotIntervals(): array
     {
-        return ['10' => [10], '15' => [15], '20' => [20], '30' => [30], '60' => [60]];
+        return ['10 minutes' => [10], '15 minutes' => [15], '20 minutes' => [20], '30 minutes' => [30], '60 minutes' => [60]];
     }
 
     #[DataProvider('slotIntervals')]
@@ -31,7 +31,7 @@ class BookingSettingsTest extends TestCase
      */
     public static function otherIntervals(): array
     {
-        return ['0' => [0], '5' => [5], '45' => [45], '120' => [120]];
+        return ['0 minutes' => [0], '5 minutes' => [5], '45 minutes' => [45], '120 minutes' => [120]];
     }
 
     #[DataProvider('otherIntervals')]

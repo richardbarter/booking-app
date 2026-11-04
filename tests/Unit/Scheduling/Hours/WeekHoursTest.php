@@ -64,7 +64,7 @@ class WeekHoursTest extends TestCase
         unset($stored['sun']);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('exactly the keys mon, tue, wed, thu, fri, sat, sun');
+        $this->expectExceptionMessage('A week must have exactly the keys mon, tue, wed, thu, fri, sat, sun.');
 
         WeekHours::fromArray($stored);
     }

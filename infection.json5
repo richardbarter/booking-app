@@ -1,0 +1,18 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": ["app/Scheduling"],
+    },
+    "testFrameworkExtraArgs": "--testsuite=Scheduling",
+    "mutators": {
+        "@default": true,
+        // Equivalent mutants: the regex has already checked that both parts
+        // are two digits, and PHP gives the same int for "09" * 60 + "30"
+        // as for (int) "09" * 60 + (int) "30", so removing a cast changes
+        // nothing.
+        "CastInt": {
+            "ignore": ["App\\Scheduling\\Hours\\LocalTimeRange::parse"],
+        },
+    },
+    "minMsi": 90,
+}

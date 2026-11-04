@@ -7,6 +7,15 @@
     <testsuites>
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
+            <exclude>tests/Unit/Scheduling</exclude>
+        </testsuite>
+        <!--
+            The scheduling engine's tests, which need no database or Laravel.
+            Infection runs only this suite. A folder in two suites makes
+            PHPUnit warn, so Unit leaves it out.
+        -->
+        <testsuite name="Scheduling">
+            <directory>tests/Unit/Scheduling</directory>
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>

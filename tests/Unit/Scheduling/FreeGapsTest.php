@@ -35,7 +35,7 @@ class FreeGapsTest extends TestCase
 
     public function test_blocked_time_at_the_end_trims_a_working_time(): void
     {
-        $gaps = FreeGaps::between([$this->range('09:00', '12:00')], [$this->range('11:00', '12:00'), $this->range('15:00', '16:00')]);
+        $gaps = FreeGaps::between([$this->range('09:00', '12:00')], [$this->range('11:00', '12:00')]);
 
         $this->assertSame([['09:00', '11:00']], $this->times($gaps));
     }

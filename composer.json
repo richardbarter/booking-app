@@ -21,6 +21,7 @@
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",
+        "infection/infection": "^0.35.9",
         "larastan/larastan": "^3.9",
         "laravel/boost": "^2.10",
         "laravel/pail": "^1.2.5",
@@ -67,7 +68,8 @@
             "npm run check",
             "npm run types:check",
             "npm run test -- --run",
-            "@test"
+            "@test",
+            "@test:mutation"
         ],
         "types:check": [
             "phpstan analyse --memory-limit=1G"
@@ -77,6 +79,11 @@
             "@lint:check",
             "@types:check",
             "@php artisan test"
+        ],
+        "test:mutation": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv PAO_DISABLE=1",
+            "infection --threads=max --show-mutations=max"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
@@ -112,7 +119,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "infection/extension-installer": false
         }
     },
     "minimum-stability": "stable",

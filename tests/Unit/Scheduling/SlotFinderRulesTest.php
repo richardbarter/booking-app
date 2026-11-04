@@ -9,6 +9,7 @@ use App\Scheduling\Slot;
 use App\Scheduling\SlotFinder;
 use App\Scheduling\TimeRange;
 use Carbon\CarbonImmutable;
+use Closure;
 use DateTimeImmutable;
 use DateTimeZone;
 use PHPUnit\Framework\TestCase;
@@ -26,9 +27,10 @@ use Tests\Support\Scheduling\ScenarioGenerator;
  * A failure names the rule, the seed and the scenario, and prints the
  * scenario as JSON, so it can be turned into a worked example.
  *
- * Each rule is checked by its own method. The scenarios and the engine's
- * results are worked out once and shared by the methods, since they only
- * read them.
+ * Each rule has its own test method. The rules are all checked in one pass
+ * over the scenarios, the first time a method asks, keeping only how many
+ * checks passed and each rule's first failure. Keeping every scenario's
+ * result for the other methods would take over 200MB.
  */
 class SlotFinderRulesTest extends TestCase
 {
@@ -39,77 +41,206 @@ class SlotFinderRulesTest extends TestCase
     private const int SECONDS_IN_MINUTE = 60;
 
     /**
-     * @var array<string, list<array{Scenario, Availability}>>
+     * For each seed and number of scenarios, and each rule: how many checks
+     * passed, and the first failure.
+     *
+     * @var array<string, array<int, array{checks: int<0, max>, failure: ?string}>>
      */
-    private static array $results = [];
+    private static array $outcomes = [];
 
     public function test_rule_1_each_slots_times_agree_with_the_service(): void
     {
-        foreach ($this->results() as [$scenario, $availability]) {
-            foreach ($this->slotsOf($availability) as [$day, $slot]) {
-                $start = $slot->startsAt->getTimestamp();
-                $service = $scenario->service;
-
-                $this->check(
-                    $slot->endsAt->getTimestamp() === $start + $service->durationMinutes * self::SECONDS_IN_MINUTE
-                        && $slot->blockedFrom->getTimestamp() === $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE
-                        && $slot->blockedUntil->getTimestamp() === $slot->endsAt->getTimestamp() + $service->bufferAfterMinutes * self::SECONDS_IN_MINUTE,
-                    'each slot\'s times agree with the service',
-                    $scenario,
-                    "{$day->date}: {$this->describe($slot)}",
-                );
-            }
-        }
+        $this->assertRuleHolds(1);
     }
 
     public function test_rule_2_each_slot_lies_inside_working_time_and_overlaps_no_blocked_time(): void
     {
-        foreach ($this->results() as [$scenario, $availability]) {
-            foreach ($this->slotsOf($availability) as [$day, $slot]) {
-                $from = $slot->blockedFrom->getTimestamp();
-                $until = $slot->blockedUntil->getTimestamp();
-
-                $this->check(
-                    $this->insideOne($from, $until, $this->timestamps($day->workingTimes))
-                        && ! $this->overlapsAny($from, $until, $this->timestamps($scenario->blockedTimes)),
-                    'each slot, with its buffers, lies inside working time and overlaps no blocked time',
-                    $scenario,
-                    "{$day->date}: {$this->describe($slot)}",
-                );
-            }
-        }
+        $this->assertRuleHolds(2);
     }
 
     public function test_rule_3_each_slot_starts_on_the_slot_interval_on_its_days_local_date(): void
     {
-        foreach ($this->results() as [$scenario, $availability]) {
-            foreach ($this->slotsOf($availability) as [$day, $slot]) {
-                $local = $slot->startsAt->setTimezone($scenario->settings->timezone);
-                $minuteOfDay = $local->hour * 60 + $local->minute;
-
-                $this->check(
-                    $local->format('Y-m-d') === $day->date
-                        && $local->second === 0
-                        && $minuteOfDay % $scenario->settings->slotIntervalMinutes === 0,
-                    'each slot starts on the slot interval, on its day\'s local date',
-                    $scenario,
-                    "{$day->date}: {$this->describe($slot)}",
-                );
-            }
-        }
+        $this->assertRuleHolds(3);
     }
 
     public function test_rule_4_each_slot_is_inside_the_booking_window(): void
     {
-        foreach ($this->results() as [$scenario, $availability]) {
-            foreach ($this->slotsOf($availability) as [$day, $slot]) {
-                $this->check(
-                    $this->insideWindow($scenario, $slot->startsAt->getTimestamp(), $day->date),
-                    'each slot is inside the booking window',
-                    $scenario,
-                    "{$day->date}: {$this->describe($slot)}",
-                );
+        $this->assertRuleHolds(4);
+    }
+
+    public function test_rule_5_the_slots_are_exactly_those_a_brute_force_check_finds(): void
+    {
+        $this->assertRuleHolds(5);
+    }
+
+    public function test_rule_6_each_days_free_gaps_are_its_working_times_minus_blocked_time(): void
+    {
+        $this->assertRuleHolds(6);
+    }
+
+    public function test_rule_7_there_is_one_day_for_each_date_in_order(): void
+    {
+        $this->assertRuleHolds(7);
+    }
+
+    private function assertRuleHolds(int $rule): void
+    {
+        $outcome = $this->outcomes()[$rule];
+
+        if ($outcome['failure'] !== null) {
+            $this->fail($outcome['failure']);
+        }
+
+        $this->addToAssertionCount($outcome['checks']);
+    }
+
+    /**
+     * @return array<int, array{checks: int<0, max>, failure: ?string}>
+     */
+    private function outcomes(): array
+    {
+        $seed = $this->setting('SCHEDULING_SEED', self::DEFAULT_SEED);
+        $count = $this->setting('SCHEDULING_SCENARIOS', self::DEFAULT_SCENARIOS);
+
+        return self::$outcomes["{$seed}:{$count}"] ??= $this->checkEveryRule($seed, $count);
+    }
+
+    /**
+     * @return array<int, array{checks: int<0, max>, failure: ?string}>
+     */
+    private function checkEveryRule(int $seed, int $count): array
+    {
+        $rules = $this->rules();
+        $outcomes = array_map(fn (): array => ['checks' => 0, 'failure' => null], $rules);
+        $generator = new ScenarioGenerator($seed);
+
+        for ($number = 1; $number <= $count; $number++) {
+            $scenario = $generator->scenario($number);
+            $availability = (new SlotFinder)->find(
+                $scenario->diary(),
+                $scenario->service,
+                $scenario->settings,
+                $scenario->dates,
+                $scenario->now,
+            );
+
+            foreach ($rules as $rule => [$description, $checkRule]) {
+                if ($outcomes[$rule]['failure'] !== null) {
+                    continue;
+                }
+
+                $checkRule($scenario, $availability, function (bool $holds, string $detail) use (&$outcomes, $rule, $description, $scenario): void {
+                    if ($outcomes[$rule]['failure'] !== null) {
+                        return;
+                    }
+
+                    if ($holds) {
+                        $outcomes[$rule]['checks']++;
+
+                        return;
+                    }
+
+                    $outcomes[$rule]['failure'] = sprintf(
+                        "Rule %d failed: %s.\nSeed %d, scenario %d. %s\n%s",
+                        $rule,
+                        $description,
+                        $scenario->seed,
+                        $scenario->number,
+                        $detail,
+                        $scenario->toJson(),
+                    );
+                });
             }
+        }
+
+        return $outcomes;
+    }
+
+    /**
+     * Each rule's description and its check. A check is given a scenario,
+     * the engine's result, and a function to call with whether each part of
+     * the rule holds.
+     *
+     * @return array<int, array{string, Closure(Scenario, Availability, Closure(bool, string): void): void}>
+     */
+    private function rules(): array
+    {
+        return [
+            1 => ['each slot\'s times agree with the service', $this->slotTimesAgree(...)],
+            2 => ['each slot, with its buffers, lies inside working time and overlaps no blocked time', $this->slotsFit(...)],
+            3 => ['each slot starts on the slot interval, on its day\'s local date', $this->slotsOnTheInterval(...)],
+            4 => ['each slot is inside the booking window', $this->slotsInsideTheWindow(...)],
+            5 => ['the slots are exactly those a brute-force check finds', $this->slotsMatchBruteForce(...)],
+            6 => ['each day\'s free gaps are its working times minus blocked time, and each slot sits in one', $this->freeGapsMatch(...)],
+            7 => ['there\'s one day for each date, in order', $this->oneDayForEachDate(...)],
+        ];
+    }
+
+    /**
+     * @param  Closure(bool, string): void  $check
+     */
+    private function slotTimesAgree(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        $service = $scenario->service;
+
+        foreach ($this->slotsOf($availability) as [$day, $slot]) {
+            $start = $slot->startsAt->getTimestamp();
+            $end = $slot->endsAt->getTimestamp();
+
+            $check(
+                $end === $start + $service->durationMinutes * self::SECONDS_IN_MINUTE
+                    && $slot->blockedFrom->getTimestamp() === $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE
+                    && $slot->blockedUntil->getTimestamp() === $end + $service->bufferAfterMinutes * self::SECONDS_IN_MINUTE,
+                "{$day->date}: {$this->describe($slot)}",
+            );
+        }
+    }
+
+    /**
+     * @param  Closure(bool, string): void  $check
+     */
+    private function slotsFit(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        $blocked = $this->timestamps($scenario->blockedTimes);
+
+        foreach ($this->slotsOf($availability) as [$day, $slot]) {
+            $from = $slot->blockedFrom->getTimestamp();
+            $until = $slot->blockedUntil->getTimestamp();
+
+            $check(
+                $this->insideOne($from, $until, $this->timestamps($day->workingTimes)) && ! $this->overlapsAny($from, $until, $blocked),
+                "{$day->date}: {$this->describe($slot)}",
+            );
+        }
+    }
+
+    /**
+     * @param  Closure(bool, string): void  $check
+     */
+    private function slotsOnTheInterval(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        foreach ($this->slotsOf($availability) as [$day, $slot]) {
+            $local = $slot->startsAt->setTimezone($scenario->settings->timezone);
+
+            $check(
+                $local->format('Y-m-d') === $day->date
+                    && $local->second === 0
+                    && ($local->hour * 60 + $local->minute) % $scenario->settings->slotIntervalMinutes === 0,
+                "{$day->date}: {$this->describe($slot)}",
+            );
+        }
+    }
+
+    /**
+     * @param  Closure(bool, string): void  $check
+     */
+    private function slotsInsideTheWindow(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        foreach ($this->slotsOf($availability) as [$day, $slot]) {
+            $check(
+                $this->insideWindow($scenario, $slot->startsAt->getTimestamp(), $day->date),
+                "{$day->date}: {$this->describe($slot)}",
+            );
         }
     }
 
@@ -118,172 +249,137 @@ class SlotFinderRulesTest extends TestCase
      * directly against the working times, the blocked times and the window,
      * without free gaps. This catches times that are missed as well as
      * times that shouldn't be there.
+     *
+     * @param  Closure(bool, string): void  $check
      */
-    public function test_rule_5_the_slots_are_exactly_those_a_brute_force_check_finds(): void
+    private function slotsMatchBruteForce(Scenario $scenario, Availability $availability, Closure $check): void
     {
-        foreach ($this->results() as [$scenario, $availability]) {
-            $clock = new LocalClock($scenario->settings->timezone);
-            $hours = $scenario->diary()->workingHours;
-            $blocked = $this->timestamps($scenario->blockedTimes);
-            $service = $scenario->service;
+        $clock = new LocalClock($scenario->settings->timezone);
+        $hours = $scenario->diary()->workingHours;
+        $blocked = $this->timestamps($scenario->blockedTimes);
+        $service = $scenario->service;
 
-            foreach ($availability->days as $day) {
-                $date = CarbonImmutable::parse($day->date, 'UTC');
-                $workingTimes = $this->timestamps($clock->workingTimes($date, $hours->on($date)));
-                $expected = [];
+        foreach ($availability->days as $day) {
+            $date = CarbonImmutable::parse($day->date, 'UTC');
+            $workingTimes = $this->timestamps($clock->workingTimes($date, $hours->on($date)));
+            $expected = [];
 
-                for ($minute = 0; $minute < 1440; $minute += $scenario->settings->slotIntervalMinutes) {
-                    $start = $clock->startTimeOn($date, $minute)?->getTimestamp();
+            for ($minute = 0; $minute < 1440; $minute += $scenario->settings->slotIntervalMinutes) {
+                $start = $clock->startTimeOn($date, $minute)?->getTimestamp();
 
-                    if ($start === null) {
-                        continue;
-                    }
-
-                    $from = $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE;
-                    $until = $start + ($service->durationMinutes + $service->bufferAfterMinutes) * self::SECONDS_IN_MINUTE;
-
-                    if ($this->insideOne($from, $until, $workingTimes)
-                        && ! $this->overlapsAny($from, $until, $blocked)
-                        && $this->insideWindow($scenario, $start, $day->date)) {
-                        $expected[] = $start;
-                    }
+                if ($start === null) {
+                    continue;
                 }
 
-                $actual = array_map(fn (Slot $slot): int => $slot->startsAt->getTimestamp(), $day->slots);
+                $from = $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE;
+                $until = $start + ($service->durationMinutes + $service->bufferAfterMinutes) * self::SECONDS_IN_MINUTE;
 
-                $this->check(
-                    $actual === $expected,
-                    'the slots are exactly those a brute-force check finds',
-                    $scenario,
-                    sprintf(
-                        '%s: expected %s, got %s',
-                        $day->date,
-                        $this->localTimes($expected, $scenario->settings->timezone),
-                        $this->localTimes($actual, $scenario->settings->timezone),
-                    ),
-                );
+                if ($this->insideOne($from, $until, $workingTimes)
+                    && ! $this->overlapsAny($from, $until, $blocked)
+                    && $this->insideWindow($scenario, $start, $day->date)) {
+                    $expected[] = $start;
+                }
             }
+
+            $actual = array_map(fn (Slot $slot): int => $slot->startsAt->getTimestamp(), $day->slots);
+
+            $check($actual === $expected, sprintf(
+                '%s: expected %s, got %s',
+                $day->date,
+                $this->localTimes($expected, $scenario->settings->timezone),
+                $this->localTimes($actual, $scenario->settings->timezone),
+            ));
         }
     }
 
     /**
      * Works out each day's free time a second way: it cuts the working
      * times at every blocked time's start and end, keeps the pieces no
-     * blocked time touches, and joins pieces that meet.
+     * blocked time touches, and joins pieces that meet. Then checks the
+     * lists are in time order, and each slot's gap is one of the day's
+     * gaps and contains it.
+     *
+     * @param  Closure(bool, string): void  $check
      */
-    public function test_rule_6_each_days_free_gaps_are_its_working_times_minus_blocked_time(): void
+    private function freeGapsMatch(Scenario $scenario, Availability $availability, Closure $check): void
     {
-        foreach ($this->results() as [$scenario, $availability]) {
-            $blocked = $this->timestamps($scenario->blockedTimes);
+        $blocked = $this->timestamps($scenario->blockedTimes);
 
-            foreach ($availability->days as $day) {
-                $expected = [];
-
-                foreach ($this->timestamps($day->workingTimes) as [$start, $end]) {
-                    $cuts = [$start, $end];
-
-                    foreach ($blocked as [$blockedFrom, $blockedUntil]) {
-                        $cuts = [...$cuts, ...array_filter([$blockedFrom, $blockedUntil], fn (int $cut): bool => $start < $cut && $cut < $end)];
-                    }
-
-                    $cuts = array_values(array_unique($cuts));
-                    sort($cuts);
-
-                    for ($index = 0; $index + 1 < count($cuts); $index++) {
-                        [$pieceStart, $pieceEnd] = [$cuts[$index], $cuts[$index + 1]];
-
-                        if ($this->overlapsAny($pieceStart, $pieceEnd, $blocked)) {
-                            continue;
-                        }
-
-                        $last = count($expected) - 1;
-
-                        if ($last >= 0 && $expected[$last][1] === $pieceStart) {
-                            $expected[$last][1] = $pieceEnd;
-                        } else {
-                            $expected[] = [$pieceStart, $pieceEnd];
-                        }
-                    }
-                }
-
-                $gaps = $this->timestamps($day->freeGaps);
-
-                $this->check(
-                    $gaps === $expected,
-                    'each day\'s free gaps are its working times minus blocked time',
-                    $scenario,
-                    "{$day->date}: expected ".json_encode($expected).', got '.json_encode($gaps),
-                );
-                $this->check(
-                    $this->inOrderWithoutTouching($this->timestamps($day->workingTimes)) && $this->inOrderWithoutTouching($gaps),
-                    'working times and free gaps are in time order, apart from each other',
-                    $scenario,
-                    $day->date,
-                );
-
-                $previousStart = null;
-
-                foreach ($day->slots as $slot) {
-                    $gap = [$slot->gap->start->getTimestamp(), $slot->gap->end->getTimestamp()];
-                    $start = $slot->startsAt->getTimestamp();
-
-                    $this->check(
-                        in_array($gap, $gaps, true)
-                            && $gap[0] <= $slot->blockedFrom->getTimestamp()
-                            && $slot->blockedUntil->getTimestamp() <= $gap[1]
-                            && ($previousStart === null || $previousStart < $start),
-                        'each slot\'s gap is one of its day\'s free gaps and contains it, and the slots are in time order',
-                        $scenario,
-                        "{$day->date}: {$this->describe($slot)}",
-                    );
-
-                    $previousStart = $start;
-                }
-            }
-        }
-    }
-
-    public function test_rule_7_there_is_one_day_for_each_date_in_order(): void
-    {
-        foreach ($this->results() as [$scenario, $availability]) {
+        foreach ($availability->days as $day) {
+            $workingTimes = $this->timestamps($day->workingTimes);
+            $gaps = $this->timestamps($day->freeGaps);
             $expected = [];
-            $utc = new DateTimeZone('UTC');
-            $date = new DateTimeImmutable($scenario->dates->first, $utc);
-            $last = new DateTimeImmutable($scenario->dates->last, $utc);
 
-            while ($date <= $last) {
-                $expected[] = $date->format('Y-m-d');
-                $date = $date->modify('+1 day');
+            foreach ($workingTimes as [$start, $end]) {
+                $cuts = [$start, $end];
+
+                foreach ($blocked as [$blockedFrom, $blockedUntil]) {
+                    $cuts = [...$cuts, ...array_filter([$blockedFrom, $blockedUntil], fn (int $cut): bool => $start < $cut && $cut < $end)];
+                }
+
+                $cuts = array_values(array_unique($cuts));
+                sort($cuts);
+
+                for ($index = 0; $index + 1 < count($cuts); $index++) {
+                    [$pieceStart, $pieceEnd] = [$cuts[$index], $cuts[$index + 1]];
+
+                    if ($this->overlapsAny($pieceStart, $pieceEnd, $blocked)) {
+                        continue;
+                    }
+
+                    $last = count($expected) - 1;
+
+                    if ($last >= 0 && $expected[$last][1] === $pieceStart) {
+                        $expected[$last][1] = $pieceEnd;
+                    } else {
+                        $expected[] = [$pieceStart, $pieceEnd];
+                    }
+                }
             }
 
-            $actual = array_map(fn (DayAvailability $day): string => $day->date, $availability->days);
+            $check($gaps === $expected, "{$day->date}: free gaps expected ".json_encode($expected).', got '.json_encode($gaps));
+            $check(
+                $this->inOrderWithoutTouching($workingTimes) && $this->inOrderWithoutTouching($gaps),
+                "{$day->date}: working times and free gaps out of order, or touching",
+            );
 
-            $this->check($actual === $expected, 'there\'s one day for each date, in order', $scenario, implode(', ', $actual));
+            $previousStart = null;
+
+            foreach ($day->slots as $slot) {
+                $gap = [$slot->gap->start->getTimestamp(), $slot->gap->end->getTimestamp()];
+                $start = $slot->startsAt->getTimestamp();
+
+                $check(
+                    in_array($gap, $gaps, true)
+                        && $gap[0] <= $slot->blockedFrom->getTimestamp()
+                        && $slot->blockedUntil->getTimestamp() <= $gap[1]
+                        && ($previousStart === null || $previousStart < $start),
+                    "{$day->date}: {$this->describe($slot)}",
+                );
+
+                $previousStart = $start;
+            }
         }
     }
 
     /**
-     * Each scenario with the engine's result, worked out once for each seed
-     * and number of scenarios.
-     *
-     * @return list<array{Scenario, Availability}>
+     * @param  Closure(bool, string): void  $check
      */
-    private function results(): array
+    private function oneDayForEachDate(Scenario $scenario, Availability $availability, Closure $check): void
     {
-        $seed = $this->setting('SCHEDULING_SEED', self::DEFAULT_SEED);
-        $count = $this->setting('SCHEDULING_SCENARIOS', self::DEFAULT_SCENARIOS);
+        $utc = new DateTimeZone('UTC');
+        $date = new DateTimeImmutable($scenario->dates->first, $utc);
+        $last = new DateTimeImmutable($scenario->dates->last, $utc);
+        $expected = [];
 
-        return self::$results["{$seed}:{$count}"] ??= array_map(function (int $number) use ($seed): array {
-            $scenario = (new ScenarioGenerator($seed))->scenario($number);
+        while ($date <= $last) {
+            $expected[] = $date->format('Y-m-d');
+            $date = $date->modify('+1 day');
+        }
 
-            return [$scenario, (new SlotFinder)->find(
-                $scenario->diary(),
-                $scenario->service,
-                $scenario->settings,
-                $scenario->dates,
-                $scenario->now,
-            )];
-        }, range(1, $count));
+        $actual = array_map(fn (DayAvailability $day): string => $day->date, $availability->days);
+
+        $check($actual === $expected, 'days: '.implode(', ', $actual));
     }
 
     private function setting(string $name, int $default): int
@@ -301,22 +397,6 @@ class SlotFinderRulesTest extends TestCase
         }
 
         return $number;
-    }
-
-    private function check(bool $holds, string $rule, Scenario $scenario, string $detail): void
-    {
-        if (! $holds) {
-            $this->fail(sprintf(
-                "Rule failed: %s.\nSeed %d, scenario %d. %s\n%s",
-                $rule,
-                $scenario->seed,
-                $scenario->number,
-                $detail,
-                $scenario->toJson(),
-            ));
-        }
-
-        $this->addToAssertionCount(1);
     }
 
     /**

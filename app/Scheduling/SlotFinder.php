@@ -95,8 +95,8 @@ final readonly class SlotFinder
     {
         return array_map(fn (TimeRange $gap): array => [
             $gap,
-            $gap->start->getTimestamp() + ($gap->start->microsecond > 0 ? 1 : 0),
-            $gap->end->getTimestamp(),
+            $gap->start->ceilSecond()->getTimestamp(),
+            $gap->end->floorSecond()->getTimestamp(),
         ], $freeGaps);
     }
 
