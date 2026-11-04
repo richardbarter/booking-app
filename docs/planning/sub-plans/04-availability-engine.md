@@ -152,7 +152,7 @@ Plain PHP, as 03's `Hours` classes are: `final readonly` value objects, no Eloqu
 
 The value objects check what they hold:
 - `ServiceTimes`: a length above 0 and buffers of 0 or more.
-- `BookingSettings`: a slot interval of 10, 15, 20, 30 or 60, notice of 0 or more, and a maximum advance of 1 or more. The database checks the same rules (03).
+- `BookingSettings`: a slot interval of 10, 15, 20, 30 or 60, notice of 0 or more, and a maximum advance of 1 or more. The database checks these too (03), and also caps the notice at 30 days and the advance at 365, with the notice shorter than the advance. The engine works for any larger values, so it doesn't refuse them, and the randomised checks try some.
 - `DateRange`: refuses a last date before the first, or more than 366 dates. 366 covers the longest booking window (365 days) plus today.
 
 The engine's entry point, which 05 to 07 build on:
@@ -199,7 +199,7 @@ It:
    - the practitioner, with `$business->practitioners()->sole()`
    - the patterns in force during the range (`starts_on` on or before the last date, and `ends_on` empty or on or after the first)
    - the edited days in the range
-   - the time off overlapping the range: from the start of the first date to the end of the last, in the business's time zone, queried as UTC times. Only the start and end are read. The reason never reaches the engine
+   - the time off overlapping the range: from the start of the first date to the end of the last, in the business's time zone, queried as UTC times. They're bound with their offset (`Y-m-d H:i:sP`, as `AsUtcDateTime` writes), because Laravel binds a Carbon without one, which would make the query depend on the connection's time zone (found in review; a test changes the session's zone). Only the start and end are read. The reason never reaches the engine
 4. **Builds the value objects:**
    - `WorkingHours`, from `WorkingPattern::toRepeatingPattern()` and the edited days' hours
    - the `Diary`, with the time off as blocked times
@@ -457,7 +457,7 @@ Other cases:
 
 **For later sub-plans**
 - **05:**
-  - `AvailabilityService` loads the practitioner's active bookings overlapping the range as blocked times, from `blocked_from` to `blocked_until`
+  - `AvailabilityService` loads the practitioner's active bookings overlapping the range as blocked times, from `blocked_from` to `blocked_until`, binding the range with its offset as the time off query does
   - the booking action checks again inside its transaction, after locking the practitioner's row: it runs `forService()` for the booking's date and checks the requested start is one of the slots
   - it catches `ServiceNotBookable`
   - the randomised checks already treat blocked time generally, so bookings need no new rule

@@ -121,6 +121,20 @@ class AvailabilityServiceTest extends TestCase
         $this->assertSame(['12:00', ...$this->every15('14:00', '15:00')], $offered);
     }
 
+    public function test_finds_time_off_at_the_end_of_the_range_whatever_the_connections_time_zone(): void
+    {
+        $business = $this->sampleBusiness();
+        $business->practitioners()->sole()->timeOff()->create([
+            'starts_at' => CarbonImmutable::parse('2026-11-09 16:00', 'Europe/London'),
+            'ends_at' => CarbonImmutable::parse('2026-11-11 10:00', 'Europe/London'),
+        ]);
+        DB::statement("SET TIME ZONE 'Pacific/Auckland'");
+
+        $offered = $this->offered($business, 'Physio assessment', '2026-11-09');
+
+        $this->assertSame([...$this->every15('09:00', '12:00'), ...$this->every15('14:00', '15:00')], $offered);
+    }
+
     public function test_uses_each_pattern_only_for_its_own_dates(): void
     {
         $business = $this->sampleBusiness();

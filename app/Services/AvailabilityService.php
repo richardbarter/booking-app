@@ -127,17 +127,18 @@ class AvailabilityService
 
     /**
      * The time off overlapping the dates, from the first date's first
-     * moment to the end of the last, in the business's time zone. The
-     * clock gives those moments in UTC, which the connection's time zone
-     * is, so the query compares them as UTC. Only the start and end are
-     * read: the reason never reaches the engine.
+     * moment to the end of the last, in the business's time zone. Both
+     * are bound with their offset, as AsUtcDateTime writes them, so the
+     * query doesn't depend on the connection's time zone: Laravel would
+     * bind a Carbon without one. Only the start and end are read: the
+     * reason never reaches the engine.
      *
      * @return list<TimeRange>
      */
     private function timeOff(Practitioner $practitioner, LocalClock $clock, DateRange $dates): array
     {
-        $rangeStart = $clock->day(CarbonImmutable::parse($dates->first, 'UTC'))->start;
-        $rangeEnd = $clock->day(CarbonImmutable::parse($dates->last, 'UTC'))->end;
+        $rangeStart = $clock->day(CarbonImmutable::parse($dates->first, 'UTC'))->start->format('Y-m-d H:i:sP');
+        $rangeEnd = $clock->day(CarbonImmutable::parse($dates->last, 'UTC'))->end->format('Y-m-d H:i:sP');
 
         $timeOff = $practitioner->timeOff()
             ->where('starts_at', '<', $rangeEnd)

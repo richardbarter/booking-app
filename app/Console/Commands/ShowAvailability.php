@@ -34,7 +34,7 @@ class ShowAvailability extends Command
 
     public function handle(CurrentBusiness $currentBusiness, AvailabilityService $availability): int
     {
-        $businessId = $this->id($this->argument('business'));
+        $businessId = $this->parseId($this->argument('business'));
         $business = $businessId === null ? null : Business::query()->find($businessId);
 
         if ($business === null) {
@@ -72,7 +72,7 @@ class ShowAvailability extends Command
 
     private function showDay(Business $business, AvailabilityService $availability): int
     {
-        $serviceId = $this->id($this->argument('service'));
+        $serviceId = $this->parseId($this->argument('service'));
         $service = $serviceId === null ? null : Service::query()->find($serviceId);
 
         if ($service === null) {
@@ -81,7 +81,7 @@ class ShowAvailability extends Command
             return self::FAILURE;
         }
 
-        $date = $this->date($business);
+        $date = $this->dateFromOption($business);
 
         if ($date === null) {
             $this->error(sprintf('The date must be a real date written as YYYY-MM-DD, got "%s".', $this->option('date')));
@@ -111,8 +111,8 @@ class ShowAvailability extends Command
     {
         $this->line(CarbonImmutable::parse($day->date, $timezone)->format('l j F Y').", {$timezone}");
         $this->newLine();
-        $this->line('Working hours  '.$this->ranges($day->workingTimes, $day->date, $timezone));
-        $this->line('Free gaps      '.$this->ranges($day->freeGaps, $day->date, $timezone));
+        $this->line('Working hours  '.$this->formatRanges($day->workingTimes, $day->date, $timezone));
+        $this->line('Free gaps      '.$this->formatRanges($day->freeGaps, $day->date, $timezone));
         $this->line('Offered times  '.count($day->slots));
 
         $times = array_map(fn (Slot $slot): string => $slot->startsAt->setTimezone($timezone)->format('H:i'), $day->slots);
@@ -133,11 +133,13 @@ class ShowAvailability extends Command
 
     /**
      * Ranges in local time, such as "09:00–13:00, 14:00–17:30". A range
-     * ending at the next date's first moment ends at 24:00.
+     * ending at the next date's first moment ends at 24:00, and a time
+     * part-way through a minute shows its seconds, such as 10:00:30, so a
+     * gap never looks longer than it is.
      *
      * @param  list<TimeRange>  $ranges
      */
-    private function ranges(array $ranges, string $date, string $timezone): string
+    private function formatRanges(array $ranges, string $date, string $timezone): string
     {
         if ($ranges === []) {
             return 'none';
@@ -146,15 +148,21 @@ class ShowAvailability extends Command
         return implode(', ', array_map(function (TimeRange $range) use ($date, $timezone): string {
             $end = $range->end->setTimezone($timezone);
 
-            return $range->start->setTimezone($timezone)->format('H:i').'–'.($end->format('Y-m-d') > $date ? '24:00' : $end->format('H:i'));
+            return $this->formatTime($range->start->setTimezone($timezone)).'–'
+                .($end->format('Y-m-d') > $date ? '24:00' : $this->formatTime($end));
         }, $ranges));
+    }
+
+    private function formatTime(CarbonImmutable $time): string
+    {
+        return $time->format($time->second === 0 ? 'H:i' : 'H:i:s');
     }
 
     /**
      * The --date option, or today in the business's time zone. Null when
      * the option isn't a real YYYY-MM-DD date.
      */
-    private function date(Business $business): ?CarbonImmutable
+    private function dateFromOption(Business $business): ?CarbonImmutable
     {
         $option = $this->option('date');
 
@@ -175,7 +183,7 @@ class ShowAvailability extends Command
      * A database ID from an argument, or null if it isn't a whole number
      * of 1 or more.
      */
-    private function id(?string $argument): ?int
+    private function parseId(?string $argument): ?int
     {
         $id = filter_var($argument, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 

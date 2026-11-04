@@ -67,6 +67,21 @@ class ShowAvailabilityTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_shows_the_seconds_of_a_gap_that_starts_part_way_through_a_minute(): void
+    {
+        $business = $this->sampleBusiness();
+        $assessment = $this->service($business, 'Physio assessment');
+        app(CurrentBusiness::class)->run($business, fn () => $business->practitioners()->sole()->timeOff()->create([
+            'starts_at' => CarbonImmutable::parse('2026-11-09 09:00', 'Europe/London'),
+            'ends_at' => CarbonImmutable::parse('2026-11-09 10:00:30', 'Europe/London'),
+        ]));
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => '2026-11-09'])
+            ->expectsOutput('Free gaps      10:00:30–13:00, 14:00–17:30')
+            ->expectsOutput('  10:15 10:30 10:45 11:00 11:15 11:30 11:45 12:00 14:00 14:15 14:30 14:45')
+            ->assertSuccessful();
+    }
+
     public function test_shows_hours_to_midnight_as_ending_at_24_00(): void
     {
         $business = $this->sampleBusiness();

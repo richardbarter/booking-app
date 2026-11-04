@@ -48,7 +48,8 @@ final readonly class SlotFinder
 
     /**
      * Start times are checked in whole seconds, since a day has up to 144
-     * of them and Carbon objects are only made for the ones that fit.
+     * of them, and the slots' other times are only worked out with Carbon
+     * for the ones that fit.
      *
      * @param  list<CarbonImmutable>  $startTimes
      * @param  list<TimeRange>  $freeGaps
