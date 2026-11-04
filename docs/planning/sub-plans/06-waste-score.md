@@ -148,7 +148,7 @@ New value objects, `final readonly` like 04's:
 - `SlotFinder::find()` keeps its signature. Scoring is a new step after the booking window, as 04's diagram showed.
 
 **New classes:**
-- `ServiceFit` does the fitting and counting: whether a kind of appointment fits in a piece, and how many fit. It uses the date's start times on the slot interval, which `SlotFinder` already lists through `LocalClock`. So clock changes and 30-minute time zones work the same way as for slots.
+- `ServiceFit` does the fitting and counting: whether a kind of appointment fits in a piece, and how many fit. It uses the date's start times on the slot interval, from `LocalClock::startTimesOn()`, as `SlotFinder` does. So clock changes and 30-minute time zones work the same way as for slots.
 - `WasteScorer` scores a day's slots and builds its `GapSummary`. It holds the constants (`SPLIT_MINUTES = 5`), merges kinds with the same times by adding their weights, and works out each gap's counts once rather than for every slot.
 
 Minutes are whole minutes of each piece (`intdiv` of its seconds by 60). The counting works in integer seconds internally, for speed. A month for the sample business means about 30 days × 2 gaps × 15 slots × 3 kinds × 3 pieces, which is small, but Carbon objects in the inner loop would make it slow.
