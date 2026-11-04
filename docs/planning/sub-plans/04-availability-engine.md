@@ -288,7 +288,7 @@ After `php artisan migrate:fresh --seed`, `php artisan availability:show 1` list
 
 All 389 changes are now caught, one of them (a loop that never ends) by timing out.
 
-**Measure the run time once it's built.** If Infection takes more than about 3 minutes in CI, mark the randomised checks `#[Group('randomised')]` and leave them out of Infection's runs with `--exclude-group=randomised`. The example tests must then reach 90% on their own. Measured: 17s locally on 31 threads; CI's time is in `tracking.md`.
+**Measure the run time once it's built.** If Infection takes more than about 3 minutes in CI, mark the randomised checks `#[Group('randomised')]` and leave them out of Infection's runs with `--exclude-group=randomised`. The example tests must then reach 90% on their own. Measured: 17s locally on 31 threads, and 52s in CI on 3, well under the limit.
 
 ## Frontend
 
@@ -440,12 +440,12 @@ Other cases:
 
 ## Done when
 
-- [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
-- [ ] `composer test:mutation` scores at least 90% in CI, run through `composer ci:check`
+- [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
+- [x] `composer test:mutation` scores at least 90% in CI, run through `composer ci:check`
 - [x] The randomised checks pass with the default seed, and with at least five other seeds run locally (`SCHEDULING_SEED`)
 - [x] `php artisan availability:show 1 <service> --date=<a weekday next week>` prints the sample business's times locally
-- [ ] PCOV is in the `dev` image and CI, and not in the production image (`docker run --rm <production image> php -m` doesn't list it)
-- [ ] `tracking.md` marks 04 as done, with Infection's run time and score, and PCOV in the development environment list
+- [x] PCOV is in the `dev` image and CI, and not in the production image (`docker run --rm <production image> php -m` doesn't list it)
+- [x] `tracking.md` marks 04 as done, with Infection's run time and score, and PCOV in the development environment list
 
 ## Notes
 

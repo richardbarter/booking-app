@@ -28,13 +28,13 @@ Sub-plan 03 is done. Pull request #10 merged on 2026-11-03, and its run on `main
 - **Sample business:** `CreateSampleBusiness` makes Alex Morgan Physio & Sports Massage, and `DatabaseSeeder` calls it.
 - **Code:** PHPUnit has 268 tests, which take about 4.7s on the host and 6.3s in CI. Larastan at level 9 has no errors.
 
-Sub-plan 04 is built, and its pull request is open for review. What 04 built:
+Sub-plan 04 is built in pull request #14, which is open for review. Its CI run passed `checks` and `audit`. What 04 built:
 - **Engine:** `app/Scheduling` works out a practitioner's slots for a range of dates. `SlotFinder` takes the working hours, turns them into real times with `LocalClock`, takes away blocked time (`FreeGaps`), lists the start times on the slot interval where the service and its buffers fit in one free gap, and keeps those inside the `BookingWindow`. It's plain PHP, given everything it works on, the current time included.
 - **Clock changes:** `LocalClock` follows 04's rule from the zone's transitions (a skipped time is the moment of the change, a repeated time its first occurrence), and only accepts named zones. It's tested in London, Santiago (midnight skipped), Lord Howe Island (30 minutes) and Kathmandu (UTC+5:45).
 - **`AvailabilityService`** loads a business's practitioner, patterns, edited days and time off in four queries whatever the range, and refuses another business's or an inactive service (`ServiceNotBookable`).
 - **`availability:show`** prints a day's working hours, free gaps and offered times. After `php artisan migrate:fresh --seed`, `php artisan availability:show 1 2 --date=2026-11-09` printed the sample business's 24 assessment times.
-- **Tests:** 216 engine tests in the new `Scheduling` suite, including 300 randomised scenarios (129,114 checks) that also passed with five other seeds at 1,500 scenarios each. PHPUnit has 435 tests, which take about 13.5s on the host.
-- **Mutation testing:** Infection 0.35.9 kills all 389 of its mutants in `app/Scheduling` (a score of 100%, against a minimum of 90%), in 17s on the host's 31 threads. It runs on every pull request through `composer ci:check`, which takes 42s on the host.
+- **Tests:** 216 engine tests in the new `Scheduling` suite, including 300 randomised scenarios (129,114 checks) that also passed with five other seeds at 1,500 scenarios each. PHPUnit has 435 tests, which take about 13.5s on the host and 16.6s in CI.
+- **Mutation testing:** Infection 0.35.9 kills all 389 of its mutants in `app/Scheduling` (a score of 100%, against a minimum of 90%), in 17s on the host's 31 threads and 52s on CI's 3. It runs on every pull request through `composer ci:check`, which takes 42s on the host; CI's whole `checks` job took 2m11s.
 - **Found while building:** under an AI agent, `laravel/pao` turns PHPUnit's output into JSON, and Infection then counts every mutant as killed. `composer test:mutation` turns pao off. Symfony 8.1.11, for security advisories published on 2026-11-04, went to `main` in its own pull request, #13.
 
 **Development environment** (installed for 01b, 2026-10-27):
@@ -49,7 +49,7 @@ Sub-plan 04 is built, and its pull request is open for review. What 04 built:
 ## Next up
 
 1. Merge #13 (Symfony 8.1.11), then Dependabot's #12. Until #13 is on `main`, CI's `audit` job fails on every run.
-2. Review and merge 04's pull request, then check that its run on `main` passes `checks`, `audit` and `deploy`. 04 has no migrations.
+2. Review and merge #14 (04), then check that its run on `main` passes `checks`, `audit` and `deploy`. 04 has no migrations.
 3. Build 05 to 07 in order, one pull request each. Each starts once the one before is merged and its deploy has been checked.
 4. Then draft 08 with the `draft-sub-plan` skill.
 
@@ -65,7 +65,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
 | 03 | Core data model | Done | Plan #7, build #10 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 268 PHPUnit tests in about 4.7s. Merged on 2026-11-03; release v12 ran its migrations on Neon, and every production check passed |
 | | **Phase 2: Scheduling engine** | | | |
-| 04 | Availability engine | Done | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests in about 13.5s and Infection at 100% (389 mutants, 17s locally) |
+| 04 | Availability engine | Done | Plan #7, build #14 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests (16.6s in CI) and Infection at 100% (389 mutants, 52s in CI) |
 | 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |
 | 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07 |
 | 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option |
