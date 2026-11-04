@@ -442,8 +442,8 @@ Other cases:
 
 - [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
 - [ ] `composer test:mutation` scores at least 90% in CI, run through `composer ci:check`
-- [ ] The randomised checks pass with the default seed, and with at least five other seeds run locally (`SCHEDULING_SEED`)
-- [ ] `php artisan availability:show 1 <service> --date=<a weekday next week>` prints the sample business's times locally
+- [x] The randomised checks pass with the default seed, and with at least five other seeds run locally (`SCHEDULING_SEED`)
+- [x] `php artisan availability:show 1 <service> --date=<a weekday next week>` prints the sample business's times locally
 - [ ] PCOV is in the `dev` image and CI, and not in the production image (`docker run --rm <production image> php -m` doesn't list it)
 - [ ] `tracking.md` marks 04 as done, with Infection's run time and score, and PCOV in the development environment list
 
