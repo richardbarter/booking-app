@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 ## Current status
 
@@ -54,7 +54,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
 | 03 | Core data model | Done | Plan #7, build #10 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 268 PHPUnit tests in about 4.7s. Merged on 2026-11-03; release v12 ran its migrations on Neon, and every production check passed |
 | | **Phase 2: Scheduling engine** | | | |
-| 04 | Availability engine | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07 |
+| 04 | Availability engine | In progress | Plan #7 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Build started on 2026-11-04 |
 | 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |
 | 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07 |
 | 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option |
