@@ -6,6 +6,7 @@ use App\Exceptions\MissingCurrentBusiness;
 use App\Models\Business;
 use Closure;
 use Illuminate\Container\Attributes\Scoped;
+use LogicException;
 
 /**
  * The business a request or job is working for. Every query on a tenant-owned
@@ -36,6 +37,28 @@ class CurrentBusiness
     public function id(): int
     {
         return $this->get()->id;
+    }
+
+    /**
+     * Check that the business is the current one, for code that's given a
+     * business and also reads tenant-owned models, which only see the
+     * current business's rows. A mismatch is then a clear error rather than
+     * an empty result.
+     *
+     * @throws MissingCurrentBusiness when none is set
+     * @throws LogicException when another business is the current one
+     */
+    public function ensureIs(Business $business): void
+    {
+        $current = $this->get();
+
+        if ($current->isNot($business)) {
+            throw new LogicException(sprintf(
+                'Work was asked for business %d, but the current business is %d.',
+                $business->id,
+                $current->id,
+            ));
+        }
     }
 
     public function has(): bool
