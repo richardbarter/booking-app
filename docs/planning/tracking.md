@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 
 ## Current status
 
@@ -184,6 +184,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-04 | `composer test:mutation` sets `PAO_DISABLE=1` before running Infection, and later plans run Infection only through it | Found while building 04: under an AI agent, `laravel/pao` turns PHPUnit's output into JSON, which Infection can't read, so it counted every mutant as killed. The first run scored 100% when 14 mutants had escaped; the container, without an agent, showed 96%. pao stays on for every other run |
 | 2026-11-04 | Infection's only ignore is `CastInt` in `LocalTimeRange::parse()`. Other mutants that changed nothing were removed by simplifying the code | The regex has already checked both parts are two digits, and PHP gives the same int without the casts. `RepeatingPattern`'s weekday term was redundant because the cycle starts on a Monday, and `SlotFinder` now rounds with `ceilSecond()` and `floorSecond()` |
 | 2026-11-04 | Symfony 8.1.11 went to `main` in its own pull request (#13), merged into 04's branch, rather than inside 04's pull request | The user's decision. Packagist published ten advisories that day for Symfony 8.1.9 packages Laravel uses, so production gets the fix without waiting for 04's review, and CI's `audit` job passes again |
+| 2026-11-05 | `package.json` overrides `editorconfig`'s `minimatch` to 11 and `js-beautify`'s `glob` to 14, so the only `minimatch` installed is 11.0.4. Remove both once `editorconfig` accepts `minimatch` 11 and `js-beautify` accepts `glob` 14 | Dependabot alert 2 (GHSA-g3hv-75wg-m249, medium): `minimatch` before 11.0.1 can spend a long time on a crafted pattern, and only 11 fixes it. It came in through `@vue/test-utils`, then `js-beautify` and its `editorconfig` and `glob`, which were all on their newest releases but still on `minimatch` 10, so Dependabot couldn't update it. The tests never loaded it, as `@vue/test-utils` has `js-beautify`'s formatter built in. `glob` 13 expects `minimatch` 10's regular expressions, so `js-beautify` gets `glob` 14, which is built for `minimatch` 11. `js-beautify`'s command line gave the same output with a glob and an `.editorconfig` before and after the change |
 
 ## Notes for the next session
 
