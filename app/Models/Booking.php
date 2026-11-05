@@ -94,7 +94,7 @@ class Booking extends Model
     #[Scope]
     protected function active(Builder $query): void
     {
-        $query->whereRaw($query->qualifyColumn('status')." <> 'cancelled'");
+        $query->whereRaw("bookings.status <> 'cancelled'");
     }
 
     /**
