@@ -18,6 +18,10 @@ use InvalidArgumentException;
  */
 final readonly class RepeatingPattern
 {
+    private const int DAYS_IN_WEEK = 7;
+
+    private const int SECONDS_IN_DAY = 86400;
+
     public string $startsOn;
 
     public ?string $endsOn;
@@ -82,13 +86,10 @@ final readonly class RepeatingPattern
             ));
         }
 
-        $isoWeekday = $date->isoWeekday();
-        $daysFromCycleStartToMonday = self::dayNumber($date->format('Y-m-d'))
-            - self::dayNumber($this->cycleStartsOn)
-            - ($isoWeekday - 1);
-        $weekIndex = intdiv($daysFromCycleStartToMonday, 7) % $this->weeks->count();
+        $daysSinceCycleStart = self::dayNumber($date->format('Y-m-d')) - self::dayNumber($this->cycleStartsOn);
+        $weekIndex = intdiv($daysSinceCycleStart, self::DAYS_IN_WEEK) % $this->weeks->count();
 
-        return $this->weeks->week($weekIndex)->forWeekday($isoWeekday);
+        return $this->weeks->week($weekIndex)->forWeekday($date->isoWeekday());
     }
 
     /**
@@ -97,6 +98,6 @@ final readonly class RepeatingPattern
      */
     private static function dayNumber(string $date): int
     {
-        return intdiv((new DateTimeImmutable($date, new DateTimeZone('UTC')))->getTimestamp(), 86400);
+        return intdiv((new DateTimeImmutable($date, new DateTimeZone('UTC')))->getTimestamp(), self::SECONDS_IN_DAY);
     }
 }

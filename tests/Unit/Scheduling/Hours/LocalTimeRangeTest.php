@@ -27,6 +27,13 @@ class LocalTimeRangeTest extends TestCase
         $this->assertSame(['09:05', '17:30'], $range->toArray());
     }
 
+    public function test_writes_times_late_in_an_hour_back_in_the_same_form(): void
+    {
+        $range = LocalTimeRange::fromStrings('11:55', '19:45');
+
+        $this->assertSame(['11:55', '19:45'], $range->toArray());
+    }
+
     /**
      * @return array<string, array{string, string}>
      */

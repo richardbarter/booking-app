@@ -58,7 +58,7 @@ Use these names consistently in code, UI and docs.
 | Term | Meaning |
 |---|---|
 | Business | A tenant: one clinic, salon or independent practitioner. All other data belongs to a business. |
-| Sandbox | A temporary copy of the sample business, made for one playground visitor and deleted after 24 hours. It's an ordinary business underneath. |
+| Sandbox | A temporary copy of the sample business, made for one playground visitor and deleted after 2 hours without a visit. It's an ordinary business underneath. |
 | Current business | The business a request or job is working for. Every query on tenant-owned data is filtered by it, and with none set the query fails. |
 | Practitioner | The person whose diary is booked. Hours, time off and bookings belong to the practitioner. In v1 each business has exactly one, the owner; staff come after v1. |
 | Service | Something a customer can book. Has a length, optional buffer time before and after it, and a price. In v1 the practitioner offers every active service. With staff, each service is offered by chosen practitioners, who can have their own length, buffers and price for it. |
@@ -142,7 +142,7 @@ While the owner drags the slider, the admin screen shows a live preview of a day
 
 ### 5.5 Scheduling playground
 
-A public page, with no sign-up, that shows the core idea in action. Each visitor gets their own sandbox: a temporary copy of the sample business from sub-plan 03 (an independent physio and sports massage therapist, with services from 30 to 90 minutes). Sandboxes are deleted after 24 hours, and visitors never see or affect each other's bookings.
+A public page, with no sign-up, that shows the core idea in action. Each visitor gets their own sandbox: a temporary copy of the sample business from sub-plan 03 (an independent physio and sports massage therapist, with services from 30 to 90 minutes). A sandbox lasts as long as the visitor's session: it's deleted after 2 hours without a visit. Visitors never see or affect each other's bookings.
 
 On the page:
 - a day timeline showing bookings and free gaps, with stranded time highlighted
@@ -469,9 +469,11 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 |---|---|
 | When to add the custom domain: before links are shared at the playground milestone, or in 22 as planned (`bookalive.io` was unregistered on 2026-10-27) | 08 / 22 |
 | Tune the first versions once the playground shows them working: the default strictness (50) and relaxation window (48 hours) from 07, the 120-minute strictness scale, and 06's waste score constants (5 minutes for splitting a gap, stranded minutes and lost room counting equally) | 08 |
+| Bookalive's colours: the primary, secondary, accent and other theme colours, in light and dark mode (today they're the starter kit's greys). v1 probably has one fixed theme that we choose, rather than colours each business can set. A session of its own, once there are basic pages to see the colours on while choosing them, perhaps starting from a palette generator such as Coolors. It covers the playground timeline's colours for offered, hidden, booked and stranded time, which must be clear in both modes without relying on colour alone, and whether the data model's per-business brand colour (10 or 11) stays in v1 | 08, once its first pages exist |
 | A second sample business: the original six services with 15-minute clean-ups after each and a rehab session with setup before, kept in sub-plan 03's notes. It would show buffers and services that share a length in the playground. When to add it, and whether visitors choose between sample businesses | After 08 |
 | Strictness by time of day and fixed start times (5.4). Where the settings are stored: with the working pattern, so they follow its cycle, or in a weekly schedule of their own, so they survive a change of hours (fixed times may suit the pattern, and busy and quiet times a schedule of their own). Which period a slot belongs to when it crosses a boundary (its start time is simplest). Whether the relaxation window opens up other times in a fixed period, or the fixed times are final. How the randomised checks treat fixed periods, which can leave a free gap with no time offered. Whether they come in 10 or after v1 | 07 / 10 |
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
+| When a visitor's sandbox is made: on their first visit to the playground, or on their first action. Bots and link previews keep no cookies, so making one on every page view would make a business for each hit. Waiting for the first action avoids that, but the page then needs to show the sample diary before a sandbox exists | 08 |
 | Production email provider (e.g. Resend, Postmark, Amazon SES) | 12 |
 | Week templates and hours snapshots: saved weeks of hours to apply, and saved copies of a practitioner's hours to restore after experimenting. Decide once a first version of the hours and the dynamic slots can be tried. A template would copy its hours when applied; a snapshot would cover one practitioner. Should a snapshot include strictness? | After v1 |
 | Customer accounts: an optional account for returning customers, so they can see their bookings and book again quickly, perhaps signing up through Google. Google's sign-in page can't be shown inside the widget's iframe, so it would open in a popup window. A booking never changes an existing customer's details today (05); a customer who has proved their email could update their own | After v1 |

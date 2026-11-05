@@ -474,8 +474,8 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
 - [x] `php artisan migrate:fresh --seed` creates the schema and the sample business locally, and `php artisan migrate:rollback --step=7` takes it back to the existing tables without errors. After `migrate:fresh` every migration is in one batch, so a plain `migrate:rollback` would remove the existing tables too
 - [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
 - [x] The guard test covers every tenant-owned table and model
-- [ ] The deploy after merging runs the new migrations on Neon, including enabling `btree_gist` (Fly's release command succeeds)
-- [ ] Production masks query values in error messages: `fly ssh console -C "php artisan config:show database.connections.pgsql.mask_bindings_in_exception_messages"` shows true. The command names the one setting, because showing the whole connection would print the database URL and its password
+- [x] The deploy after merging runs the new migrations on Neon, including enabling `btree_gist` (Fly's release command succeeds). Release v12 on 2026-11-03 ran all seven, with `btree_gist` in 246ms
+- [x] Production masks query values in error messages: `fly ssh console -C "php artisan config:show database.connections.pgsql.mask_bindings_in_exception_messages"` shows true. The command names the one setting, because showing the whole connection would print the database URL and its password. It showed true on 2026-11-03, on release v12
 - [x] `tracking.md` marks 03 as done
 
 ## Notes
@@ -525,5 +525,7 @@ It has buffers after every appointment and one before (the rehab session's setup
   - validate the time zone and the booking window
   - scope `exists` and `unique` rules by business
 - **10 or 11:** the business's URL slug.
+- **09 to 11:** controllers take the business from `CurrentBusiness`, set by middleware from the session, the URL or the logged-in user, never by looking a business up from a request field. `BelongsToBusiness` only fills `business_id` when it's empty, so loading another business from input and creating rows through it is the one way a write could cross businesses. (Noted by the user while reviewing 03.)
+- **10 or 11, whichever first shows a price:** format prices in one helper, on the server and in the frontend, so adding currencies later is a change in one place. v1 stays in pounds, with `price_pence`. (Noted by the user while reviewing 03.)
 - **Edited days and time off** can both stop someone working on a date. Edited days are for different hours (working a Saturday, finishing early). Time off is for absences (holidays, sickness), and it can cover part of a day or several days. 10's screens should steer the owner to the right one.
 - **Changing a business's time zone** keeps local hours and dates as they are, and keeps stored instants as the same moments. 10 should warn that existing bookings keep their real times.

@@ -90,6 +90,7 @@ Working hours are local clock times. On the two days a year when the clocks chan
 - **A repeated time** means its first occurrence. When the clocks go back, 01:30 means 01:30 BST.
 - **24:00** means the first moment of the next day.
 - **A range wholly inside a skipped hour** (01:00–01:45 on the night the clocks go forward) has no time in it, and is dropped.
+- **Ranges the skipped hour brings together become one.** With hours of 00:00–01:15 and 01:30–03:00 on the night the clocks go forward, both ends meet at the moment of the change, so the practitioner works without a break in real time. Joining them keeps working times apart from each other, which the free gaps and the randomised checks rely on. (Settled while building.)
 
 Start times follow the same rule, so a skipped clock time is never offered, and a repeated one is offered once. Lengths, buffers and minimum notice are real minutes. So a 60-minute appointment from 00:30 on the night the clocks go forward ends at 02:30 BST.
 
@@ -97,7 +98,7 @@ Start times follow the same rule, so a skipped clock time is never offered, and 
 - A skipped time moves forward by the size of the jump, so 01:30 becomes 02:30 BST. Hours ending at 01:30 would gain 30 minutes the practitioner never listed, and hours starting at 01:30 would lose 30 minutes that do happen.
 - For a repeated time, `CarbonImmutable::create()`, `parse()` and `createFromFormat()` give the second occurrence (01:30 GMT). But `setTime()` on a date already in that time zone gives the first (01:30 BST).
 
-So `LocalClock` works out the rule itself from the time zone's transitions (`DateTimeZone::getTransitions()`), and its tests pin down each case. The rule isn't left to whichever PHP method the code happens to use. Two alternatives were rejected:
+So `LocalClock` works out the rule itself from the time zone's transitions (`DateTimeZone::getTransitions()`), and its tests pin down each case. The rule isn't left to whichever PHP method the code happens to use. It only accepts named zones, such as `Europe/London`: abbreviations such as `BST` and fixed offsets such as `+05:45` have no transitions (checked: `getTransitions()` returns `false` for them), and a business's time zone is always a named one. Two alternatives were rejected:
 - **PHP's default:** it changes the hours as described above, and two methods give two answers.
 - **Refusing hours that touch a clock change:** a pattern is set once, and the date of the change moves every year.
 
@@ -138,9 +139,9 @@ Plain PHP, as 03's `Hours` classes are: `final readonly` value objects, no Eloqu
 |---|---|---|
 | `TimeRange` | two instants in UTC, start before end, half-open | `overlaps(TimeRange)`, `contains(TimeRange)` |
 | `DateRange` | a first and last date, inclusive, 1 to 366 dates | `between(CarbonInterface $from, CarbonInterface $to)`, `dates(): list<string>` |
-| `LocalClock` | a time zone | `day($date): TimeRange` (the date's first moment to the next date's), `workingTimes($date, DayHours): list<TimeRange>`, `startTimeOn($date, int $minuteOfDay): ?CarbonImmutable` (null when the clocks skip it), `dateOf(CarbonInterface $instant): string` |
+| `LocalClock` | a named time zone | `day($date): TimeRange` (the date's first moment to the next date's), `workingTimes($date, DayHours): list<TimeRange>`, `startTimeOn($date, int $minuteOfDay): ?CarbonImmutable` (null when the clocks skip it), `startTimesOn($date, int $intervalMinutes): list<CarbonImmutable>` (every start time on the interval, as `startTimeOn()` gives them), `dateOf(CarbonInterface $instant): string` |
 | `Diary` | one practitioner's `WorkingHours` and `list<TimeRange>` of blocked time | — |
-| `ServiceTimes` | length, buffer before and buffer after, in minutes | — |
+| `ServiceTimes` | `durationMinutes`, `bufferBeforeMinutes` and `bufferAfterMinutes`, named after the service's columns | — |
 | `BookingSettings` | the business's time zone (`DateTimeZone`), slot interval, minimum notice in minutes and maximum advance in days | — |
 | `BookingWindow` | `BookingSettings` and now | `earliestStart(): CarbonImmutable`, `lastDate(): string`, `allows(CarbonImmutable $startsAt): bool` |
 | `FreeGaps` | — | `between(list<TimeRange> $workingTimes, list<TimeRange> $blockedTimes): list<TimeRange>` (static) |
@@ -151,7 +152,7 @@ Plain PHP, as 03's `Hours` classes are: `final readonly` value objects, no Eloqu
 
 The value objects check what they hold:
 - `ServiceTimes`: a length above 0 and buffers of 0 or more.
-- `BookingSettings`: a slot interval of 10, 15, 20, 30 or 60, notice of 0 or more, and a maximum advance of 1 or more. The database checks the same rules (03).
+- `BookingSettings`: a slot interval of 10, 15, 20, 30 or 60, notice of 0 or more, and a maximum advance of 1 or more. The database checks these too (03), and also caps the notice at 30 days and the advance at 365, with the notice shorter than the advance. The engine works for any larger values, so it doesn't refuse them, and the randomised checks try some.
 - `DateRange`: refuses a last date before the first, or more than 366 dates. 366 covers the longest booking window (365 days) plus today.
 
 The engine's entry point, which 05 to 07 build on:
@@ -170,6 +171,8 @@ final readonly class SlotFinder
 ```
 
 `FreeGaps::between()` copes with blocked times that overlap each other, start before or end after the working times, cover a whole day, or span several days. Each free gap is as long as it can be, and any part with no time in it is dropped. Free gaps are worked out per date, so two days' working times that meet at midnight never join into one gap.
+
+**`SlotFinder` checks start times in whole seconds.** A day has up to 144 start times, and building Carbon objects for each one that's then thrown away took most of the engine's time (measured: the randomised checks' 300 scenarios took 2.3s in the engine, and 0.8s this way). It makes Carbon objects only for the slots it keeps. A free gap's ends are rounded inwards to whole seconds (`ceilSecond()` and `floorSecond()`), so blocked time ending part-way through a second still blocks that second; a start time is always a whole minute.
 
 ### `AvailabilityService` (`app/Services`)
 
@@ -196,7 +199,7 @@ It:
    - the practitioner, with `$business->practitioners()->sole()`
    - the patterns in force during the range (`starts_on` on or before the last date, and `ends_on` empty or on or after the first)
    - the edited days in the range
-   - the time off overlapping the range: from the start of the first date to the end of the last, in the business's time zone, queried as UTC times. Only the start and end are read. The reason never reaches the engine
+   - the time off overlapping the range: from the start of the first date to the end of the last, in the business's time zone, queried as UTC times. They're bound with their offset (`Y-m-d H:i:sP`, as `AsUtcDateTime` writes), because Laravel binds a Carbon without one, which would make the query depend on the connection's time zone (found in review; a test changes the session's zone). Only the start and end are read. The reason never reaches the engine
 4. **Builds the value objects:**
    - `WorkingHours`, from `WorkingPattern::toRepeatingPattern()` and the edited days' hours
    - the `Diary`, with the time off as blocked times
@@ -242,7 +245,7 @@ After `php artisan migrate:fresh --seed`, `php artisan availability:show 1` list
 **What Infection does.** It makes small changes to the engine's code (flips a `<` to `<=`, removes a line, and so on), runs the tests that cover that code, and expects a test to fail each time. A change that no test catches "escapes", and shows a gap in the tests. The score is the share of changes caught.
 
 **Checked locally in a throwaway PHP 8.5 container:**
-- Infection 0.35.8, the latest, installs beside PHPUnit 13.4 and runs with it, using PCOV 1.0.12. This is the check that the overview's testing section asked for.
+- Infection 0.35.8, the latest when planned, installs beside PHPUnit 13.4 and runs with it, using PCOV 1.0.12. This is the check that the overview's testing section asked for. The build installed 0.35.9, the latest by then.
 - It exits with code 1 when the score is below the minimum, so CI fails.
 - It honours `testFrameworkExtraArgs: "--testsuite=Scheduling"`. The older `testFrameworkOptions` setting is deprecated.
 
@@ -267,9 +270,10 @@ After `php artisan migrate:fresh --seed`, `php artisan availability:show 1` list
 
    `minMsi` counts changes in untested code as escaped, so it's the stricter of Infection's two scores.
 4. **`composer.json`:**
-   - A `test:mutation` script runs `infection --threads=max --show-mutations=max`.
+   - A `test:mutation` script sets `PAO_DISABLE=1` (`@putenv`), then runs `infection --threads=max --show-mutations=max`.
    - `ci:check` runs it after `@test`, so CI runs it on every pull request and `composer ci:check` runs it locally.
    - On GitHub Actions, Infection also shows escaped changes as annotations on the pull request.
+   - **Why `PAO_DISABLE`** (found while building): under an AI agent such as Claude Code or Cursor, the `laravel/pao` development package turns PHPUnit's output into JSON. Infection reads PHPUnit's output to tell whether a test failed, so it counted every change as caught: the first run scored 100% when 14 changes had escaped. CI has no agent, so it was never fooled, but a run in an agent's terminal was. Turning pao off for Infection's runs alone keeps its output for everything else.
 5. **PCOV in three places:**
    - The `dev` stage of the `Dockerfile` installs it with `install-php-extensions pcov`, as root. The production image doesn't get it.
    - CI's `checks` job sets `coverage: pcov` in `setup-php`.
@@ -277,7 +281,14 @@ After `php artisan migrate:fresh --seed`, `php artisan availability:show 1` list
 
 **If a change escapes,** add a test that catches it. Only a change shown to make no difference to behaviour (an "equivalent mutant") may be ignored, in `infection.json5`, with a comment saying why. That's in the same spirit as fixing the cause of every Larastan error.
 
-**Measure the run time once it's built.** If Infection takes more than about 3 minutes in CI, mark the randomised checks `#[Group('randomised')]` and leave them out of Infection's runs with `--exclude-group=randomised`. The example tests must then reach 90% on their own.
+**What the build found.** 14 of the first 410 changes escaped:
+- Gaps in the tests, now covered: blocked time ending exactly at the end of the hours, a range in 03's `DayHours` with only one time that isn't a string, writing a time late in an hour (19:45), and the full message for a week with the wrong keys.
+- Code that made no difference, now gone: `RepeatingPattern` subtracted the weekday before dividing by 7, which changes nothing because the cycle starts on a Monday, and it divided by a bare 86400 (now a named constant, as `DateRange` has). `SlotFinder`'s rounding is now `ceilSecond()` and `floorSecond()`, and `LocalTimeRange::parse()` reads named groups.
+- The one ignore in `infection.json5`: the int casts in `LocalTimeRange::parse()`. The regex has already checked both parts are two digits, and PHP gives the same int without the casts.
+
+All 389 changes are now caught, one of them (a loop that never ends) by timing out.
+
+**Measure the run time once it's built.** If Infection takes more than about 3 minutes in CI, mark the randomised checks `#[Group('randomised')]` and leave them out of Infection's runs with `--exclude-group=randomised`. The example tests must then reach 90% on their own. Measured: 17s locally on 31 threads, and 52s in CI on 3, well under the limit.
 
 ## Frontend
 
@@ -377,9 +388,11 @@ A generator in `tests/Support/Scheduling/` builds random scenarios from a seed:
   - 0 to 5 edited days, some with no hours
 - **Blocked time:** 0 to 15 periods, to the minute. Some overlap, some span midnight or several days, and some start before the range or end after it.
 
-The generator uses `Random\Randomizer` with a seeded `Random\Engine\Mt19937`, which touches no global state. The seed and the number of scenarios are fixed (300 by default), and the `SCHEDULING_SEED` and `SCHEDULING_SCENARIOS` environment variables change them. A failure names the rule, the seed and the scenario number, and prints the scenario as JSON, so it can be turned into a worked example.
+The generator uses `Random\Randomizer` with a seeded `Random\Engine\Mt19937`, which touches no global state. Each scenario has its own engine, seeded from the seed and its number, so one can be recreated on its own. The seed and the number of scenarios are fixed (300 by default), and the `SCHEDULING_SEED` and `SCHEDULING_SCENARIOS` environment variables change them. A failure names the rule, the seed and the scenario number, and prints the scenario as JSON, so it can be turned into a worked example.
 
-Each rule is its own test method, run over every scenario. These rules always hold:
+**Tuned while building, within the ranges above.** At first, only 2 slots in the default run fell within an hour of a clock change. So scenarios that start near a change lean their hours' ends towards 00:00, 24:00 and 22:00 to 05:00, and three quarters of them also edit the date of the change. Two thirds of scenarios look from before the first date, half have under 3 hours' notice, and 1 in 10 blocked times lasts more than 4 hours. The default run now has 36 slots within an hour of a change, and 192 of the 300 scenarios offer times.
+
+Each rule is its own test method, run over every scenario. The rules are all checked in one pass over the scenarios, the first time a method asks, keeping only how many checks passed and each rule's first failure. Keeping every scenario's result for the other methods took 214MB, more than the container's 256MB allows once coverage is on. These rules always hold:
 1. Each slot's fields agree: `endsAt` is the start plus the length, and `blockedFrom` and `blockedUntil` add the buffers.
 2. Each slot, with its buffers, lies inside one of its day's working times and overlaps no blocked time.
 3. Each slot starts on a clock time on the slot interval, in the business's time zone, on its day's date.
@@ -427,12 +440,12 @@ Other cases:
 
 ## Done when
 
-- [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
-- [ ] `composer test:mutation` scores at least 90% in CI, run through `composer ci:check`
-- [ ] The randomised checks pass with the default seed, and with at least five other seeds run locally (`SCHEDULING_SEED`)
-- [ ] `php artisan availability:show 1 <service> --date=<a weekday next week>` prints the sample business's times locally
-- [ ] PCOV is in the `dev` image and CI, and not in the production image (`docker run --rm <production image> php -m` doesn't list it)
-- [ ] `tracking.md` marks 04 as done, with Infection's run time and score, and PCOV in the development environment list
+- [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean
+- [x] `composer test:mutation` scores at least 90% in CI, run through `composer ci:check`
+- [x] The randomised checks pass with the default seed, and with at least five other seeds run locally (`SCHEDULING_SEED`)
+- [x] `php artisan availability:show 1 <service> --date=<a weekday next week>` prints the sample business's times locally
+- [x] PCOV is in the `dev` image and CI, and not in the production image (`docker run --rm <production image> php -m` doesn't list it)
+- [x] `tracking.md` marks 04 as done, with Infection's run time and score, and PCOV in the development environment list
 
 ## Notes
 
@@ -444,7 +457,7 @@ Other cases:
 
 **For later sub-plans**
 - **05:**
-  - `AvailabilityService` loads the practitioner's active bookings overlapping the range as blocked times, from `blocked_from` to `blocked_until`
+  - `AvailabilityService` loads the practitioner's active bookings overlapping the range as blocked times, from `blocked_from` to `blocked_until`, binding the range with its offset as the time off query does
   - the booking action checks again inside its transaction, after locking the practitioner's row: it runs `forService()` for the booking's date and checks the requested start is one of the slots
   - it catches `ServiceNotBookable`
   - the randomised checks already treat blocked time generally, so bookings need no new rule
@@ -452,10 +465,14 @@ Other cases:
   - add the lengths of the services the practitioner offers (in v1, every active service) to what the engine is given
   - score each slot from its `gap`
   - work out a day's stranded and fragmented time from its `freeGaps`
+  - `LocalClock::startTimesOn()` gives a date's start times on the slot interval, for `ServiceFit`
+  - count in whole seconds, as `SlotFinder` does: each Carbon `addMinutes()` costs about 3µs (measured), which adds up over every slot, piece and kind of appointment
+- **Every later plan:** run Infection through `composer test:mutation`, never `vendor/bin/infection` on its own. The script sets `PAO_DISABLE=1`, without which an AI agent's run reports every change as caught.
 - **07:**
   - strictness is a step after the booking window, asking what strictness applies at each time
   - 07 decided that 05's check again applies strictness: only offered times can be booked
 - **08:** the playground's timeline draws a day from its `workingTimes`, `freeGaps` and `slots`, for any date, since only slots are limited by the booking window.
+- **10:** the time zone a business chooses must be a named zone, such as `Europe/London`, from `DateTimeZone::listIdentifiers()`. `LocalClock` refuses any other (an abbreviation or a fixed offset), so `AvailabilityService` would throw for that business
 - **11:**
   - the public API asks for at most a month or so at a time; `DateRange` refuses anything over 366 dates
   - route model binding should only find active services, so `ServiceNotBookable` is the rare case of a service switched off mid-visit

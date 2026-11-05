@@ -102,4 +102,28 @@ class DayHoursTest extends TestCase
 
         DayHours::fromArray($data);
     }
+
+    /**
+     * @return array<string, array{array<mixed>}>
+     */
+    public static function rangesWithATimeThatIsNotAString(): array
+    {
+        return [
+            'both' => [[[900, 1300]]],
+            'the start' => [[[900, '13:00']]],
+            'the end' => [[['09:00', 1300]]],
+        ];
+    }
+
+    /**
+     * @param  array<mixed>  $data
+     */
+    #[DataProvider('rangesWithATimeThatIsNotAString')]
+    public function test_from_array_says_each_range_must_be_a_pair_of_times(array $data): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Each time range must be a pair of times');
+
+        DayHours::fromArray($data);
+    }
 }

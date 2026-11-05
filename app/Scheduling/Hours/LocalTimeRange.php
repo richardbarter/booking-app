@@ -49,11 +49,11 @@ final readonly class LocalTimeRange
 
     private static function parse(string $time): int
     {
-        if (preg_match('/^(\d{2}):([0-5]\d)$/D', $time, $matches) !== 1) {
+        if (preg_match('/^(?<hours>\d{2}):(?<minutes>[0-5]\d)$/D', $time, $matches) !== 1) {
             throw new InvalidArgumentException(sprintf('A time must be written as HH:MM, got "%s".', $time));
         }
 
-        return (int) $matches[1] * 60 + (int) $matches[2];
+        return (int) $matches['hours'] * 60 + (int) $matches['minutes'];
     }
 
     private static function assertValidMinute(int $minute): void
