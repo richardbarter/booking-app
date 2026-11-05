@@ -18,7 +18,7 @@ Let a booking be made safely: a `CreateBooking` action that checks the time with
 - Statuses and sources as enums, and the rule that a past confirmed booking counts as attended
 - Factories, a few sample bookings for local development, and tests
 - A `booking:create` command that books a time through `CreateBooking`, locally only, to try the engine before the playground
-- Updates to the overview, 03 and `tracking.md`
+- Updates to the overview, 03, 04 and `tracking.md`
 
 **Out of scope**
 - Customer accounts and sign-in (guest booking only in v1; see the overview's open questions)
@@ -49,6 +49,14 @@ Added after the plans were merged (2026-11-02), with the user's answers:
 | How to undo its bookings | Start again with `php artisan migrate:fresh --seed`. Cancelling stays with 12 and 13, which design the real cancel action |
 | Booking a time that strictness hides | 07 gives it `availability:show`'s `--strictness=` option, which books as if the business were at that setting, without saving it |
 
+Added before the build (2026-11-05), from checking the plan against 04's code, with the user's agreement:
+
+| Question | Answer |
+|---|---|
+| Which date to check a start on | The start's date in the business's time zone. `CreateBooking` converts the start before calling `forService()`, which reads each date as it's given (04), so a start given in another zone could otherwise be checked against the wrong day |
+| A current business that isn't the one booking | `CreateBooking` checks it before locking, with `CurrentBusiness::ensureIs()`, where 04's check moves so both share it. Otherwise the lock's query, which is scoped to the current business, finds no practitioner and throws `ModelNotFoundException`, a misleading error |
+| The range the bookings query uses | Time off's, bound with its offset, so neither query depends on the connection's time zone (04's review) |
+
 ## Design
 
 ### Customers
@@ -75,7 +83,8 @@ A no-show still blocks its time, because that time was reserved and has passed a
 
 ```mermaid
 flowchart TD
-    A[CreateBooking: business, service, start time, customer details, source] --> B[Begin a transaction]
+    A[CreateBooking: business, service, start time, customer details, source] --> A2[Check the current business is this one]
+    A2 --> B[Begin a transaction]
     B --> C[Lock the practitioner's row]
     C --> D[Check again: AvailabilityService for that date]
     D --> E{Is the start time one of the slots?}
@@ -227,7 +236,10 @@ A `RuntimeException` for a start time that can't be booked, whatever the reason.
 ```php
 class CreateBooking
 {
-    public function __construct(private AvailabilityService $availability) {}
+    public function __construct(
+        private CurrentBusiness $currentBusiness,
+        private AvailabilityService $availability,
+    ) {}
 
     /**
      * @param  array{name: string, email: string, phone: string}  $customer
@@ -242,9 +254,16 @@ class CreateBooking
 }
 ```
 
-The customer details come as an array, as a Form Request's `validated()` gives them. Inside one `DB::transaction()`:
+The customer details come as an array, as a Form Request's `validated()` gives them.
+
+First it checks that the current business is `$business`, with `CurrentBusiness::ensureIs()`, which throws `LogicException` for another business and `MissingCurrentBusiness` for none. 04's `AvailabilityService` made this check itself; it moves to `CurrentBusiness` so both share it. It has to come before the lock: the lock's query is scoped to the current business, so with another one it would find no practitioner and throw `ModelNotFoundException`.
+
+Then, inside one `DB::transaction()`:
 1. Lock the practitioner: `$business->practitioners()->lockForUpdate()->sole()`.
-2. Check again: call `forService()` for the start's date in the business's time zone, and find the slot whose `startsAt` is the same instant as `$startsAt`, whatever zone the caller gave it in. None means `SlotNotAvailable`, and so does a start with seconds, which is never on the slot interval. `forService()` already refuses an inactive service (`ServiceNotBookable`), another business's service, and a current business that isn't `$business` (04).
+2. Check again:
+   - turn the start into the business's time zone and call `forService()` with it as both dates. `forService()` reads each date as it's given (04), so a start given in UTC or another zone could fall on a different date there
+   - find the slot whose `startsAt` is the same instant as `$startsAt`, whatever zone the caller gave it in. None means `SlotNotAvailable`, and so does a start with seconds, which is never on the slot interval
+   - `forService()` also refuses an inactive service (`ServiceNotBookable`) and another business's service (`InvalidArgumentException`). `CreateBooking` lets both through, for its callers to catch (`booking:create` here, and 11's pages)
 3. Normalise the details: trim each one, and lower-case the email.
 4. Find or create the customer with `$business->customers()->createOrFirst(['email' => ...], ['name' => ..., 'phone' => ...])`. The relation sets `business_id`, which isn't fillable (03), and scopes the lookup to the business. An existing customer's details aren't changed.
 5. Create the booking, with:
@@ -262,13 +281,15 @@ It returns the booking. It dispatches nothing yet; 12 adds the confirmation emai
 A fifth query loads the practitioner's active bookings that overlap the range, reading only `blocked_from` and `blocked_until`:
 
 ```php
-// $rangeStart and $rangeEnd: the start of the first date and the end of the last, in UTC,
-// the same span 04 uses for time off.
+// $rangeStart and $rangeEnd: the start of the first date and the end of the last, as
+// 'Y-m-d H:i:sP' strings with their offset, worked out once and shared with time off's query.
 $practitioner->bookings()->active()
     ->whereRaw("tstzrange(blocked_from, blocked_until, '[)') && tstzrange(?, ?, '[)')", [$rangeStart, $rangeEnd])
 ```
 
-They join time off as the `Diary`'s blocked times. The engine doesn't change, and the randomised checks already cover blocked time of any kind. The query count stays the same for any range (now five).
+The range is time off's, bound with its offset as 04 does, so the query doesn't depend on the connection's time zone: Laravel would bind a Carbon without one. The bookings join time off as the `Diary`'s blocked times. The engine doesn't change, and the randomised checks already cover blocked time of any kind. The query count stays the same for any range (now five).
+
+`AvailabilityService`'s check that the current business is `$business` moves to `CurrentBusiness::ensureIs()`, so `CreateBooking` can make it too, with the same `LogicException`.
 
 ### `booking:create` (`app/Console/Commands/BookSlot.php`)
 
@@ -354,6 +375,7 @@ With the sample business at a fixed time (`travelTo()`, as in 04):
 - **Saving:**
   - booking a physio assessment at 10:00 on Monday 9 November saves the booking with `ends_at` 11:00, `blocked_from` 10:00 and `blocked_until` 11:00 (the sample business has no buffers), the service's price, status confirmed and the source
   - it creates the customer with the email in lower case
+  - a start given in `Pacific/Kiritimati` (UTC+14), where 10:00 on Monday 9 November in London is already 10 November, books that time
 - **A repeat email:**
   - a second booking with the same email, in a different case or with spaces, uses the same customer
   - the customer's name and phone don't change
@@ -371,6 +393,7 @@ With the sample business at a fixed time (`travelTo()`, as in 04):
 - **Other refusals:**
   - an inactive service throws `ServiceNotBookable`
   - another business's service throws `InvalidArgumentException`
+  - with another business as the current one, it throws `LogicException`, with nothing written
   - with no current business, it throws `MissingCurrentBusiness`
 - **Later changes don't move bookings:** changing the service's price, length or buffers afterwards doesn't change an existing booking.
 - **When the database catches the race:** `AvailabilityService` is replaced in the container with one that still offers a taken time, as if the other booking landed after the check. The constraint refuses the booking, and the action throws `SlotNotAvailable`, not `QueryException`, with nothing written. This is the only way to reach that branch without two processes.
@@ -384,7 +407,10 @@ With the sample business at a fixed time (`travelTo()`, as in 04):
 - **Blocking:** a confirmed booking removes its blocked time, buffers included, from the free gaps; a cancelled one doesn't; a no-show does.
 - **Range edges:** a booking that starts before the range or ends after it still blocks the dates inside it.
 - **Isolation:** another business's booking at the same time changes nothing.
+- **The connection's time zone:** with the session's time zone changed, a booking at the end of the range still blocks it, as 04's test checks for time off.
 - **Query count:** the same for 1 date and 60 (five).
+
+**Feature: `CurrentBusiness::ensureIs()`**, beside 03's `CurrentBusiness` tests: it passes for the current business, and throws `LogicException` for another business and `MissingCurrentBusiness` with none. 04's test that `AvailabilityService` refuses a business that isn't the current one still passes.
 
 **Feature: `Booking::attended()`** keeps confirmed bookings that have ended, and leaves out future, cancelled and no-show bookings. A booking ending exactly at `$now` counts as attended.
 
