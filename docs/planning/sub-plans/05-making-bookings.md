@@ -400,8 +400,9 @@ With the sample business at a fixed time (`travelTo()`, as in 04):
 
 **Feature: the lock** (`tests/Feature/Actions/CreateBookingLockTest.php`)
 - This test uses `DatabaseTruncation` rather than `RefreshDatabase`, so its rows are committed and a second connection can see them. The second connection is a copy of `pgsql` set up in the test.
-- The second connection begins a transaction and locks the practitioner's row with `FOR UPDATE`. With `lock_timeout` set to 500ms on the default connection, `CreateBooking` fails with SQLSTATE `55P03` (lock timeout), which shows it waits for the practitioner's lock.
-- Checked locally: a second session holding `FOR UPDATE` on a row makes another fail with `55P03` once its `lock_timeout` passes.
+- The second connection begins a transaction and locks the practitioner's row with `FOR SHARE`. With `lock_timeout` set to 500ms on the default connection, `CreateBooking` fails with SQLSTATE `55P03` (lock timeout), which shows it waits for the practitioner's lock.
+- `FOR SHARE`, not `FOR UPDATE`, because saving the booking checks its foreign key to the practitioner, which takes `FOR KEY SHARE` on the same row. `FOR UPDATE` blocks that check too, so the test passed with `CreateBooking`'s lock removed (found while building). `FOR SHARE` blocks only `CreateBooking`'s own `FOR UPDATE`: without it, the booking is saved and the test fails.
+- The test empties the tables again afterwards, as `DatabaseTruncation` only empties them before each test, so later tests don't see its committed rows.
 
 **Feature: `AvailabilityService`**, adding to 04's tests:
 - **Blocking:** a confirmed booking removes its blocked time, buffers included, from the free gaps; a cancelled one doesn't; a no-show does.
