@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\FindsBusinessAndService;
 use App\Exceptions\ServiceNotBookable;
 use App\Models\Business;
 use App\Models\Service;
@@ -30,16 +31,15 @@ use Illuminate\Console\Command;
 #[Description('Show the times the engine offers for a service on a date')]
 class ShowAvailability extends Command
 {
+    use FindsBusinessAndService;
+
     private const int TIMES_PER_LINE = 12;
 
     public function handle(CurrentBusiness $currentBusiness, AvailabilityService $availability): int
     {
-        $businessId = $this->parseId($this->argument('business'));
-        $business = $businessId === null ? null : Business::query()->find($businessId);
+        $business = $this->findBusiness();
 
         if ($business === null) {
-            $this->error(sprintf('There\'s no business with ID %s.', $this->argument('business')));
-
             return self::FAILURE;
         }
 
@@ -72,12 +72,9 @@ class ShowAvailability extends Command
 
     private function showDay(Business $business, AvailabilityService $availability): int
     {
-        $serviceId = $this->parseId($this->argument('service'));
-        $service = $serviceId === null ? null : Service::query()->find($serviceId);
+        $service = $this->findService($business);
 
         if ($service === null) {
-            $this->error(sprintf('Business %d has no service with ID %s.', $business->id, $this->argument('service')));
-
             return self::FAILURE;
         }
 
@@ -177,16 +174,5 @@ class ShowAvailability extends Command
         }
 
         return CarbonImmutable::instance($date);
-    }
-
-    /**
-     * A database ID from an argument, or null if it isn't a whole number
-     * of 1 or more.
-     */
-    private function parseId(?string $argument): ?int
-    {
-        $id = filter_var($argument, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-
-        return $id === false ? null : $id;
     }
 }

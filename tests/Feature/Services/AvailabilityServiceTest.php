@@ -3,8 +3,10 @@
 namespace Tests\Feature\Services;
 
 use App\Actions\CreateSampleBusiness;
+use App\Enums\BookingStatus;
 use App\Exceptions\MissingCurrentBusiness;
 use App\Exceptions\ServiceNotBookable;
+use App\Models\Booking;
 use App\Models\Business;
 use App\Models\Scopes\BusinessScope;
 use App\Models\Service;
@@ -19,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -135,6 +138,78 @@ class AvailabilityServiceTest extends TestCase
         $this->assertSame([...$this->every15('09:00', '12:00'), ...$this->every15('14:00', '15:00')], $offered);
     }
 
+    /**
+     * @return array<string, array{BookingStatus, list<array{string, string}>}>
+     */
+    public static function bookingStatuses(): array
+    {
+        $withTheBooking = [['09:00', '10:45'], ['11:45', '13:00'], ['14:00', '17:30']];
+
+        return [
+            'confirmed' => [BookingStatus::Confirmed, $withTheBooking],
+            'no-show' => [BookingStatus::NoShow, $withTheBooking],
+            'cancelled' => [BookingStatus::Cancelled, [['09:00', '13:00'], ['14:00', '17:30']]],
+        ];
+    }
+
+    /**
+     * @param  list<array{string, string}>  $expectedGaps
+     */
+    #[DataProvider('bookingStatuses')]
+    public function test_a_booking_blocks_its_time_and_buffers_unless_it_is_cancelled(BookingStatus $status, array $expectedGaps): void
+    {
+        $business = $this->sampleBusiness();
+        $service = $business->services()->create([
+            'name' => 'Follow-up with set-up and clean-up',
+            'duration_minutes' => 30,
+            'buffer_before_minutes' => 15,
+            'buffer_after_minutes' => 15,
+            'price_pence' => 5000,
+        ]);
+        Booking::factory()
+            ->for($business->practitioners()->sole())
+            ->for($service)
+            ->at(CarbonImmutable::parse('2026-11-09 11:00', 'Europe/London'))
+            ->create(['status' => $status]);
+
+        $gaps = $this->freeGapsOn($business, '2026-11-09');
+
+        $this->assertSame($expectedGaps, $gaps);
+    }
+
+    public function test_a_booking_starting_before_the_range_or_ending_after_it_blocks_the_dates_inside_it(): void
+    {
+        $business = $this->sampleBusiness();
+        $this->blockWithBooking($business, '2026-11-08 23:00', '2026-11-09 10:00');
+        $this->blockWithBooking($business, '2026-11-09 16:00', '2026-11-10 08:00');
+
+        $offered = $this->offered($business, 'Physio assessment', '2026-11-09');
+
+        $this->assertSame([...$this->every15('10:00', '12:00'), ...$this->every15('14:00', '15:00')], $offered);
+    }
+
+    public function test_finds_a_booking_at_the_end_of_the_range_whatever_the_connections_time_zone(): void
+    {
+        $business = $this->sampleBusiness();
+        $this->blockWithBooking($business, '2026-11-09 16:00', '2026-11-09 17:00');
+        DB::statement("SET TIME ZONE 'Pacific/Auckland'");
+
+        $offered = $this->offered($business, 'Physio assessment', '2026-11-09');
+
+        $this->assertSame([...$this->every15('09:00', '12:00'), ...$this->every15('14:00', '15:00')], $offered);
+    }
+
+    public function test_another_business_booking_at_the_same_times_changes_nothing(): void
+    {
+        $business = $this->sampleBusiness();
+        $other = app(CreateSampleBusiness::class)->handle();
+        app(CurrentBusiness::class)->run($other, fn () => $this->blockWithBooking($other, '2026-11-09 09:00', '2026-11-09 17:30'));
+
+        $offered = $this->offered($business, 'Physio assessment', '2026-11-09');
+
+        $this->assertCount(24, $offered);
+    }
+
     public function test_uses_each_pattern_only_for_its_own_dates(): void
     {
         $business = $this->sampleBusiness();
@@ -157,7 +232,7 @@ class AvailabilityServiceTest extends TestCase
         ], $this->workingTimesByDate($availability));
     }
 
-    public function test_runs_the_same_four_queries_for_one_date_and_for_sixty(): void
+    public function test_runs_the_same_five_queries_for_one_date_and_for_sixty(): void
     {
         $business = $this->sampleBusiness();
         $service = $this->service('Physio assessment');
@@ -170,8 +245,8 @@ class AvailabilityServiceTest extends TestCase
         $availability->forService($business, $service, CarbonImmutable::parse('2026-11-02'), CarbonImmutable::parse('2026-12-31'));
         $forSixtyDates = count(DB::getQueryLog());
 
-        $this->assertSame(4, $forOneDate);
-        $this->assertSame(4, $forSixtyDates);
+        $this->assertSame(5, $forOneDate);
+        $this->assertSame(5, $forSixtyDates);
     }
 
     public function test_another_business_time_off_at_the_same_times_changes_nothing(): void
@@ -288,6 +363,36 @@ class AvailabilityServiceTest extends TestCase
         $this->assertNotNull($day);
 
         return array_map(fn (Slot $slot): string => $slot->startsAt->setTimezone('Europe/London')->format('H:i'), $day->slots);
+    }
+
+    /**
+     * A confirmed booking with no buffers whose appointment covers the
+     * times, in London. Its length needn't match the service's, so it can
+     * run past the dates searched.
+     */
+    private function blockWithBooking(Business $business, string $from, string $until): Booking
+    {
+        $startsAt = CarbonImmutable::parse($from, 'Europe/London');
+        $endsAt = CarbonImmutable::parse($until, 'Europe/London');
+
+        return Booking::factory()
+            ->for($business->practitioners()->sole())
+            ->for($business->services()->firstOrFail())
+            ->create(['starts_at' => $startsAt, 'ends_at' => $endsAt, 'blocked_from' => $startsAt, 'blocked_until' => $endsAt]);
+    }
+
+    /**
+     * @return list<array{string, string}>
+     */
+    private function freeGapsOn(Business $business, string $date): array
+    {
+        $day = $this->availability($business, 'Physio assessment', $date, $date)->day($date);
+        $this->assertNotNull($day);
+
+        return array_map(fn (TimeRange $gap): array => [
+            $gap->start->setTimezone('Europe/London')->format('H:i'),
+            $gap->end->setTimezone('Europe/London')->format('H:i'),
+        ], $day->freeGaps);
     }
 
     /**

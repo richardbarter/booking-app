@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\MissingCurrentBusiness;
 use App\Exceptions\ServiceNotBookable;
+use App\Models\Booking;
 use App\Models\Business;
 use App\Models\Practitioner;
 use App\Models\Service;
@@ -27,7 +28,7 @@ use LogicException;
 
 /**
  * Loads what the engine needs for a business's practitioner and runs it.
- * It's the only part of the engine that reads the database: four queries
+ * It's the only part of the engine that reads the database: five queries
  * whatever the range.
  *
  * In v1 the practitioner offers every active service, at the service's
@@ -62,11 +63,15 @@ class AvailabilityService
             $business->max_advance_days,
         );
         $practitioner = $business->practitioners()->sole();
+        [$rangeStart, $rangeEnd] = $this->range(new LocalClock($settings->timezone), $dates);
 
         return $this->slotFinder->find(
             new Diary(
                 $this->workingHours($practitioner, $dates),
-                $this->timeOff($practitioner, new LocalClock($settings->timezone), $dates),
+                [
+                    ...$this->timeOff($practitioner, $rangeStart, $rangeEnd),
+                    ...$this->bookings($practitioner, $rangeStart, $rangeEnd),
+                ],
             ),
             new ServiceTimes($service->duration_minutes, $service->buffer_before_minutes, $service->buffer_after_minutes),
             $settings,
@@ -77,15 +82,7 @@ class AvailabilityService
 
     private function ensureBookable(Business $business, Service $service): void
     {
-        $current = $this->currentBusiness->get();
-
-        if ($current->isNot($business)) {
-            throw new LogicException(sprintf(
-                'Availability was asked for business %d, but the current business is %d.',
-                $business->id,
-                $current->id,
-            ));
-        }
+        $this->currentBusiness->ensureIs($business);
 
         if ($service->business_id !== $business->id) {
             throw new InvalidArgumentException(sprintf(
@@ -126,25 +123,53 @@ class AvailabilityService
     }
 
     /**
-     * The time off overlapping the dates, from the first date's first
-     * moment to the end of the last, in the business's time zone. Both
-     * are bound with their offset, as AsUtcDateTime writes them, so the
-     * query doesn't depend on the connection's time zone: Laravel would
-     * bind a Carbon without one. Only the start and end are read: the
-     * reason never reaches the engine.
+     * From the first date's first moment to the end of the last, in the
+     * business's time zone, for the time off and bookings queries. Both
+     * ends are formatted with their offset, as AsUtcDateTime writes them,
+     * so the queries don't depend on the connection's time zone: Laravel
+     * would bind a Carbon without one.
+     *
+     * @return array{string, string}
+     */
+    private function range(LocalClock $clock, DateRange $dates): array
+    {
+        return [
+            $clock->day(CarbonImmutable::parse($dates->first, 'UTC'))->start->format('Y-m-d H:i:sP'),
+            $clock->day(CarbonImmutable::parse($dates->last, 'UTC'))->end->format('Y-m-d H:i:sP'),
+        ];
+    }
+
+    /**
+     * The time off overlapping the range. Only the start and end are read:
+     * the reason never reaches the engine.
      *
      * @return list<TimeRange>
      */
-    private function timeOff(Practitioner $practitioner, LocalClock $clock, DateRange $dates): array
+    private function timeOff(Practitioner $practitioner, string $rangeStart, string $rangeEnd): array
     {
-        $rangeStart = $clock->day(CarbonImmutable::parse($dates->first, 'UTC'))->start->format('Y-m-d H:i:sP');
-        $rangeEnd = $clock->day(CarbonImmutable::parse($dates->last, 'UTC'))->end->format('Y-m-d H:i:sP');
-
         $timeOff = $practitioner->timeOff()
             ->where('starts_at', '<', $rangeEnd)
             ->where('ends_at', '>', $rangeStart)
             ->get(['starts_at', 'ends_at']);
 
         return array_values(array_map(fn (TimeOff $period): TimeRange => new TimeRange($period->starts_at, $period->ends_at), $timeOff->all()));
+    }
+
+    /**
+     * The bookings that block time overlapping the range, as their blocked
+     * time, buffers included. The range test and active() are written as
+     * the exclusion constraint is, so its index serves this query. Only the
+     * blocked time is read: no customer details reach the engine.
+     *
+     * @return list<TimeRange>
+     */
+    private function bookings(Practitioner $practitioner, string $rangeStart, string $rangeEnd): array
+    {
+        $bookings = $practitioner->bookings()
+            ->active()
+            ->whereRaw("tstzrange(blocked_from, blocked_until, '[)') && tstzrange(?, ?, '[)')", [$rangeStart, $rangeEnd])
+            ->get(['blocked_from', 'blocked_until']);
+
+        return array_values(array_map(fn (Booking $booking): TimeRange => new TimeRange($booking->blocked_from, $booking->blocked_until), $bookings->all()));
     }
 }

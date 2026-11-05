@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Database;
 
+use App\Models\Booking;
 use App\Models\EditedDay;
 use App\Models\Practitioner;
 use App\Models\Service;
@@ -19,7 +20,7 @@ class DeletingABusinessTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const array TENANT_TABLES = ['practitioners', 'services', 'working_patterns', 'edited_days', 'time_off'];
+    private const array TENANT_TABLES = ['practitioners', 'services', 'working_patterns', 'edited_days', 'time_off', 'customers', 'bookings'];
 
     public function test_deletes_all_its_data_and_leaves_another_businesss_alone(): void
     {
@@ -38,10 +39,11 @@ class DeletingABusinessTest extends TestCase
     private function practitionerWithOneOfEverything(): Practitioner
     {
         $practitioner = Practitioner::factory()->create();
-        Service::factory()->for($practitioner->business)->create();
+        $service = Service::factory()->for($practitioner->business)->create();
         WorkingPattern::factory()->for($practitioner)->create();
         EditedDay::factory()->for($practitioner)->create();
         TimeOff::factory()->for($practitioner)->create();
+        Booking::factory()->for($practitioner)->for($service)->create();
 
         return $practitioner;
     }

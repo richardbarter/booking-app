@@ -37,6 +37,14 @@ Sub-plan 04 is done. Pull request #14 merged on 2026-11-05, and its run on `main
 - **Mutation testing:** Infection 0.35.9 kills all 389 of its mutants in `app/Scheduling` (a score of 100%, against a minimum of 90%), in 17s on the host's 31 threads and 52s on CI's 3. It runs on every pull request through `composer ci:check`, which takes 42s on the host; CI's whole `checks` job took 2m11s.
 - **Found while building:** under an AI agent, `laravel/pao` turns PHPUnit's output into JSON, and Infection then counts every mutant as killed. `composer test:mutation` turns pao off. Symfony 8.1.11, for security advisories published on 2026-11-04, went to `main` in its own pull request, #13.
 
+Sub-plan 05 is built in pull request #17, which is open for review. Its CI run passed `checks` and `audit`. Before the build, its plan was checked against 04's code, and three changes were agreed (see the decisions log). What 05 built:
+- **Tables:** `customers`, one per lower-case email per business, and `bookings`. An exclusion constraint on `tstzrange(blocked_from, blocked_until, '[)')` refuses overlapping blocked time for one practitioner unless one is cancelled. Composite foreign keys keep a booking's practitioner, service and customer in its business, with NO ACTION on delete, and checks cover the times, price, status and source.
+- **`CreateBooking`** checks the current business, locks the practitioner's row, checks the start is one of the day's slots in the business's time zone, finds or creates the customer without changing an existing one, and saves the slot's times and the service's price. An exclusion violation becomes `SlotNotAvailable`, and a refused booking writes nothing.
+- **`AvailabilityService`** loads active bookings as blocked time: five queries whatever the range, with the exclusion constraint's index serving the bookings query (checked with `EXPLAIN`).
+- **`booking:create`** books a time locally, and refuses to run in production. `DatabaseSeeder` makes three sample bookings next Monday through `CreateBooking`.
+- **Tests:** PHPUnit has 514 tests, which take about 14.4s on the host and 17.9s in CI. `composer ci:check` takes 39s on the host, and Infection still kills all 389 mutants (44s in CI).
+- **Found while building:** the lock test holds `FOR SHARE`, since the booking's foreign key check also waits on a `FOR UPDATE`. `createOrFirst()` made PostgreSQL log a returning customer's email, so `CreateBooking` uses `firstOrCreate()`.
+
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
 - Docker 29.9.2 and Compose v5.6.1, through Docker Desktop's WSL integration
@@ -48,7 +56,7 @@ Sub-plan 04 is done. Pull request #14 merged on 2026-11-05, and its run on `main
 
 ## Next up
 
-1. Build 05 with the `build-sub-plan` skill, on `feature/05-making-bookings`. 04's **For later sub-plans** notes say what 05 adds to `AvailabilityService` and the booking action.
+1. Review and merge #17 (05), then check its deploy: the run on `main` passes `checks`, `audit` and `deploy`, and Fly's release command runs the two new migrations on Neon. Record the results and tick that item in 05 on 06's branch.
 2. Then build 06 and 07 in order, one pull request each. Each starts once the one before is merged and its deploy has been checked.
 3. Then draft 08 with the `draft-sub-plan` skill.
 
@@ -65,7 +73,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 03 | Core data model | Done | Plan #7, build #10 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 268 PHPUnit tests in about 4.7s. Merged on 2026-11-03; release v12 ran its migrations on Neon, and every production check passed |
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Done | Plan #7, build #14 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests (16.6s in CI) and Infection at 100% (389 mutants, 52s in CI). Merged on 2026-11-05; release v15 deployed it, with no migrations, and every check passed |
-| 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |
+| 05 | Making bookings | Done | Plan #7, build #17 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create`. Built on 2026-11-05, with 514 PHPUnit tests (17.9s in CI). The deploy check waits for the merge |
 | 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07 |
 | 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option |
 | | **Phase 3: Playground** | | | |
@@ -184,6 +192,11 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-04 | Infection's only ignore is `CastInt` in `LocalTimeRange::parse()`. Other mutants that changed nothing were removed by simplifying the code | The regex has already checked both parts are two digits, and PHP gives the same int without the casts. `RepeatingPattern`'s weekday term was redundant because the cycle starts on a Monday, and `SlotFinder` now rounds with `ceilSecond()` and `floorSecond()` |
 | 2026-11-04 | Symfony 8.1.11 went to `main` in its own pull request (#13), merged into 04's branch, rather than inside 04's pull request | The user's decision. Packagist published ten advisories that day for Symfony 8.1.9 packages Laravel uses, so production gets the fix without waiting for 04's review, and CI's `audit` job passes again |
 | 2026-11-05 | `package.json` overrides `editorconfig`'s `minimatch` to 11 and `js-beautify`'s `glob` to 14, so the only `minimatch` installed is 11.0.4. Remove both once `editorconfig` accepts `minimatch` 11 and `js-beautify` accepts `glob` 14 | Dependabot alert 2 (GHSA-g3hv-75wg-m249, medium): `minimatch` before 11.0.1 can spend a long time on a crafted pattern, and only 11 fixes it. It came in through `@vue/test-utils`, then `js-beautify` and its `editorconfig` and `glob`, which were all on their newest releases but still on `minimatch` 10, so Dependabot couldn't update it. The tests never loaded it, as `@vue/test-utils` has `js-beautify`'s formatter built in. `glob` 13 expects `minimatch` 10's regular expressions, so `js-beautify` gets `glob` 14, which is built for `minimatch` 11. `js-beautify`'s command line gave the same output with a glob and an `.editorconfig` before and after the change |
+| 2026-11-05 | `CreateBooking` turns the start into the business's time zone before asking `forService()` for that date | Found checking 05 against 04's code before the build, and agreed by the user. `forService()` reads each date as it's given, so a start given in a zone where it falls on another date would be checked against the wrong day. London's winter clock matches UTC, so 05's test gives the start in `Pacific/Kiritimati` (UTC+14) |
+| 2026-11-05 | The check that the current business is the one asked for moves from `AvailabilityService` to `CurrentBusiness::ensureIs()`, and `CreateBooking` calls it before locking the practitioner | Found checking 05 against 04's code before the build, and agreed by the user. The lock's query is scoped to the current business, so with another one it found no practitioner and threw `ModelNotFoundException` before `forService()` could give its clear `LogicException` |
+| 2026-11-05 | `AvailabilityService`'s bookings query uses time off's range, bound with its offset | Found checking 05 against 04's code before the build, and agreed by the user. 04's review found that binding a Carbon made the time off query depend on the connection's time zone; 05's plan predated that fix |
+| 2026-11-05 | 05's lock test holds `FOR SHARE` on the practitioner's row, not `FOR UPDATE`, and empties the tables again after it runs | Found while building. Saving a booking checks its foreign key to the practitioner, which takes `FOR KEY SHARE` on that row, so with `FOR UPDATE` the test passed even with `CreateBooking`'s own lock removed. `FOR SHARE` blocks only the action's `FOR UPDATE`. `DatabaseTruncation` empties tables only before each test, so without the clean-up its committed rows would reach later tests |
+| 2026-11-05 | `CreateBooking` finds or creates the customer with `firstOrCreate()`, not the plan's `createOrFirst()` | Found in the build's review. `createOrFirst()` tries the insert first, so every returning customer's booking failed an insert, and PostgreSQL's log recorded each failure with the customer's email (seen in the local database's log). `firstOrCreate()` looks first, and for a new customer falls back to `createOrFirst()`, so two first bookings with one email still can't both insert |
 
 ## Notes for the next session
 

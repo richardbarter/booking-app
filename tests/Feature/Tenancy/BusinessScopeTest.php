@@ -3,7 +3,9 @@
 namespace Tests\Feature\Tenancy;
 
 use App\Exceptions\MissingCurrentBusiness;
+use App\Models\Booking;
 use App\Models\Business;
+use App\Models\Customer;
 use App\Models\EditedDay;
 use App\Models\Practitioner;
 use App\Models\Scopes\BusinessScope;
@@ -31,6 +33,8 @@ class BusinessScopeTest extends TestCase
             'working patterns' => [WorkingPattern::class],
             'edited days' => [EditedDay::class],
             'time off' => [TimeOff::class],
+            'customers' => [Customer::class],
+            'bookings' => [Booking::class],
         ];
     }
 
@@ -63,6 +67,9 @@ class BusinessScopeTest extends TestCase
                 $practitioner->workingPatterns()->count(),
                 $practitioner->editedDays()->count(),
                 $practitioner->timeOff()->count(),
+                $practitioner->business->customers()->count(),
+                $practitioner->bookings()->count(),
+                $this->rowsOf($practitioner)['booking']->customer()->count(),
             ],
             'other business' => [
                 $otherPractitioner->business->practitioners()->count(),
@@ -70,10 +77,13 @@ class BusinessScopeTest extends TestCase
                 $otherPractitioner->workingPatterns()->count(),
                 $otherPractitioner->editedDays()->count(),
                 $otherPractitioner->timeOff()->count(),
+                $otherPractitioner->business->customers()->count(),
+                $otherPractitioner->bookings()->count(),
+                $this->rowsOf($otherPractitioner)['booking']->customer()->count(),
             ],
         ]);
 
-        $this->assertSame(['own' => [1, 1, 1, 1, 1], 'other business' => [0, 0, 0, 0, 0]], $counts);
+        $this->assertSame(['own' => [1, 1, 1, 1, 1, 1, 1, 1], 'other business' => [0, 0, 0, 0, 0, 0, 0, 0]], $counts);
     }
 
     public function test_eager_loading_only_loads_the_current_businesss_rows(): void
@@ -83,7 +93,7 @@ class BusinessScopeTest extends TestCase
 
         $businesses = app(CurrentBusiness::class)->run(
             $practitioner->business,
-            fn () => Business::with(['services', 'practitioners.workingPatterns'])->get()->keyBy('id'),
+            fn () => Business::with(['services', 'customers', 'practitioners.workingPatterns', 'practitioners.bookings.customer'])->get()->keyBy('id'),
         );
 
         $own = $businesses[$practitioner->business_id];
@@ -91,8 +101,11 @@ class BusinessScopeTest extends TestCase
         $this->assertCount(1, $own->services);
         $this->assertCount(1, $own->practitioners);
         $this->assertCount(1, $own->practitioners->sole()->workingPatterns);
+        $this->assertCount(1, $own->customers);
+        $this->assertSame($own->customers->sole()->id, $own->practitioners->sole()->bookings->sole()->customer->id);
         $this->assertCount(0, $other->services);
         $this->assertCount(0, $other->practitioners);
+        $this->assertCount(0, $other->customers);
     }
 
     /**
@@ -136,9 +149,11 @@ class BusinessScopeTest extends TestCase
             (new Practitioner)->resolveRouteBinding($practitioner->id)?->getKey(),
             (new Service)->resolveRouteBinding($rows['service']->id)?->getKey(),
             (new WorkingPattern)->resolveRouteBinding($rows['pattern']->id)?->getKey(),
+            (new Customer)->resolveRouteBinding($rows['customer']->id)?->getKey(),
+            (new Booking)->resolveRouteBinding($rows['booking']->id)?->getKey(),
         ]);
 
-        $this->assertSame([$practitioner->id, $rows['service']->id, $rows['pattern']->id], $found);
+        $this->assertSame([$practitioner->id, $rows['service']->id, $rows['pattern']->id, $rows['customer']->id, $rows['booking']->id], $found);
     }
 
     public function test_route_binding_does_not_find_another_businesss_rows(): void
@@ -151,9 +166,11 @@ class BusinessScopeTest extends TestCase
             (new Practitioner)->resolveRouteBinding($otherPractitioner->id),
             (new Service)->resolveRouteBinding($otherRows['service']->id),
             (new WorkingPattern)->resolveRouteBinding($otherRows['pattern']->id),
+            (new Customer)->resolveRouteBinding($otherRows['customer']->id),
+            (new Booking)->resolveRouteBinding($otherRows['booking']->id),
         ]);
 
-        $this->assertSame([null, null, null], $found);
+        $this->assertSame([null, null, null, null, null], $found);
     }
 
     /**
@@ -163,22 +180,25 @@ class BusinessScopeTest extends TestCase
     private function practitionerWithOneOfEverything(): Practitioner
     {
         $practitioner = Practitioner::factory()->create();
-        Service::factory()->for($practitioner->business)->create();
+        $service = Service::factory()->for($practitioner->business)->create();
         WorkingPattern::factory()->for($practitioner)->create();
         EditedDay::factory()->for($practitioner)->create();
         TimeOff::factory()->for($practitioner)->create();
+        Booking::factory()->for($practitioner)->for($service)->create();
 
         return $practitioner;
     }
 
     /**
-     * @return array{service: Service, pattern: WorkingPattern}
+     * @return array{service: Service, pattern: WorkingPattern, customer: Customer, booking: Booking}
      */
     private function rowsOf(Practitioner $practitioner): array
     {
         return [
             'service' => Service::withoutGlobalScope(BusinessScope::class)->where('business_id', $practitioner->business_id)->sole(),
             'pattern' => WorkingPattern::withoutGlobalScope(BusinessScope::class)->where('business_id', $practitioner->business_id)->sole(),
+            'customer' => Customer::withoutGlobalScope(BusinessScope::class)->where('business_id', $practitioner->business_id)->sole(),
+            'booking' => Booking::withoutGlobalScope(BusinessScope::class)->where('business_id', $practitioner->business_id)->sole(),
         ];
     }
 }

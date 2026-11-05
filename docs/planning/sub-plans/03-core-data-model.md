@@ -437,7 +437,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
 - `run()` restores the previous business afterwards, including when the callback throws.
 - Creating a model inside `run()` fills `business_id`.
 - `resolveRouteBinding()` doesn't find another business's practitioner, service or pattern.
-- **Guard: every tenant-owned table.** For every table with a `business_id` column, the test reads PostgreSQL's catalogue and checks that the table has a foreign key to `businesses` with `ON DELETE CASCADE`. It also checks that every model in `app/Models` whose table has `business_id` uses `BelongsToBusiness`. Later sub-plans' tables are covered without new tests.
+- **Guard: every tenant-owned table.** For every table with a `business_id` column, the test reads PostgreSQL's catalogue and checks that the table has a foreign key to `businesses` with `ON DELETE CASCADE`. It also checks that every model in `app/Models` whose table has `business_id` uses `BelongsToBusiness`. Later sub-plans' tables are covered without new tests, once each plan adds its tables to the test's list of known tenant tables, which the number of tenant models is checked against (05 added `customers` and `bookings`).
 
 **Feature: database rules** (`tests/Feature/Database/`)
 - A second practitioner for the same business is rejected.
@@ -507,7 +507,7 @@ It has buffers after every appointment and one before (the rehab session's setup
   - bookings block from their start minus the buffer before until their end plus the buffer after (`blocked_from` to `blocked_until`), and the exclusion constraint covers that range
   - bookings reference the practitioner and the service with composite foreign keys using `noActionOnDelete()`, so a service with bookings is deactivated rather than deleted. Use NO ACTION, not RESTRICT. Checked locally: both refuse deleting the parent directly, and both let a business delete cascade. But PostgreSQL checks RESTRICT as soon as each row goes, while NO ACTION waits until the end of the delete, so only NO ACTION is sure to let a sandbox's business be deleted with its bookings (08), whatever order the cascade works in
   - store `starts_at` and `ends_at` with `AsUtcDateTime`
-  - set `business_id` and the other foreign keys through relations, since they aren't fillable: `$business->customers()->createOrFirst()` for the customer, and `associate()` for the booking's parents
+  - set `business_id` and the other foreign keys through relations, since they aren't fillable: `$business->customers()->firstOrCreate()` for the customer (05 found `createOrFirst()` makes PostgreSQL log a returning customer's email), and `associate()` for the booking's parents
 - **06:** mirror `room_weight`'s default in `Service::$attributes`, and add it to the defaults `ServicesTableTest` compares.
 - **07:**
   - strictness may later vary by time of day, with fixed start times as an option (overview 5.4). The strictness filter asks what strictness applies at each time; in v1 the answer is always the business's. Those settings would go in a new column or table beside the hours, so the hours format here stays as it is

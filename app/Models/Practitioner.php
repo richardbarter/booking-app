@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, WorkingPattern> $workingPatterns
  * @property-read Collection<int, EditedDay> $editedDays
  * @property-read Collection<int, TimeOff> $timeOff
+ * @property-read Collection<int, Booking> $bookings
  */
 #[Fillable(['name'])]
 class Practitioner extends Model
@@ -53,5 +54,13 @@ class Practitioner extends Model
     public function timeOff(): HasMany
     {
         return $this->hasMany(TimeOff::class);
+    }
+
+    /**
+     * @return HasMany<Booking, $this>
+     */
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class);
     }
 }

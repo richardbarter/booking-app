@@ -190,9 +190,9 @@ class AvailabilityService
 
 It:
 1. **Checks its inputs:**
-   - It throws `LogicException` if the current business isn't `$business`. Entry points set the current business (03), and this makes a mismatch a clear error rather than an empty result. With no current business at all, `CurrentBusiness::get()` already throws `MissingCurrentBusiness`.
+   - It throws `LogicException` if the current business isn't `$business`, through `CurrentBusiness::ensureIs()`, where 05 moved the check so `CreateBooking` can make it before locking. Entry points set the current business (03), and this makes a mismatch a clear error rather than an empty result. With no current business at all, `CurrentBusiness::get()` already throws `MissingCurrentBusiness`.
    - It throws `InvalidArgumentException` if the service belongs to another business.
-   - It throws a new `App\Exceptions\ServiceNotBookable` (a `RuntimeException`) if the service is inactive. That's the rule 03 left to 04. 05's booking action and 11's pages can then catch this one case, such as a service switched off while a customer was choosing a time.
+   - It throws a new `App\Exceptions\ServiceNotBookable` (a `RuntimeException`) if the service is inactive. That's the rule 03 left to 04. 05's booking action lets it through, so `booking:create` and 11's pages can catch this one case, such as a service switched off while a customer was choosing a time.
    - Messages mention IDs, never names.
 2. **Builds the `DateRange`** before querying anything, so an invalid range fails without touching the database.
 3. **Loads, in four queries whatever the range:**
@@ -459,7 +459,7 @@ Other cases:
 - **05:**
   - `AvailabilityService` loads the practitioner's active bookings overlapping the range as blocked times, from `blocked_from` to `blocked_until`, binding the range with its offset as the time off query does
   - the booking action checks again inside its transaction, after locking the practitioner's row: it runs `forService()` for the booking's date and checks the requested start is one of the slots
-  - it catches `ServiceNotBookable`
+  - it lets `ServiceNotBookable` through, for `booking:create` and 11's pages to catch
   - the randomised checks already treat blocked time generally, so bookings need no new rule
 - **06:**
   - add the lengths of the services the practitioner offers (in v1, every active service) to what the engine is given

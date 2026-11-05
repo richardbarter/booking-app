@@ -5,6 +5,7 @@ namespace Tests\Feature\Tenancy;
 use App\Exceptions\MissingCurrentBusiness;
 use App\Models\Business;
 use App\Services\CurrentBusiness;
+use LogicException;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -40,6 +41,34 @@ class CurrentBusinessTest extends TestCase
         $currentBusiness->forget();
 
         $this->assertFalse($currentBusiness->has());
+    }
+
+    public function test_ensure_is_accepts_the_current_business_however_it_was_loaded(): void
+    {
+        $currentBusiness = new CurrentBusiness;
+        $currentBusiness->set(Business::factory()->make(['id' => 7]));
+
+        $currentBusiness->ensureIs(Business::factory()->make(['id' => 7]));
+
+        $this->assertSame(7, $currentBusiness->id());
+    }
+
+    public function test_ensure_is_throws_for_a_business_that_is_not_the_current_one(): void
+    {
+        $currentBusiness = new CurrentBusiness;
+        $currentBusiness->set(Business::factory()->make(['id' => 7]));
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('Work was asked for business 8, but the current business is 7.');
+
+        $currentBusiness->ensureIs(Business::factory()->make(['id' => 8]));
+    }
+
+    public function test_ensure_is_throws_when_no_business_is_set(): void
+    {
+        $this->expectException(MissingCurrentBusiness::class);
+
+        (new CurrentBusiness)->ensureIs(Business::factory()->make(['id' => 7]));
     }
 
     public function test_run_makes_the_business_current_for_the_callback_and_returns_its_result(): void
