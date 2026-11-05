@@ -338,7 +338,7 @@ Child tables reference their parents through composite foreign keys that include
 ## 10. Testing strategy
 
 - **Availability engine and waste score:** unit tests that take a timetable and check the expected slots. They cover clock-change days, buffers, gap edges, the booking window, strictness levels and the relaxation window.
-- **Randomised rule checks for the engine:** hundreds of random diaries, generated from a fixed seed so any failure can be reproduced, checked against rules that must always hold. They're written in plain PHPUnit, with no extra package. They start in 04, and new rules are added in 05 to 07:
+- **Randomised rule checks for the engine:** hundreds of random diaries, generated from a fixed seed so any failure can be reproduced, checked against rules that must always hold. They're written in plain PHPUnit, with no extra package. They start in 04, and new rules are added in 06 and 07. Bookings (05) are blocked time, which the first rule already covers:
   - every offered slot, plus its buffers, fits inside working hours, without overlapping time off or any booking's blocked time
   - every offered slot is inside the booking window
   - raising strictness only ever hides slots, never adds any, so strictness 100 offers a subset of strictness 0

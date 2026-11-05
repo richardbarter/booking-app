@@ -307,7 +307,7 @@ class BookSlot extends Command
 
 It's named `BookSlot` because `CreateBooking` is the action's name. It's the counterpart of 04's `availability:show`: book a time, then run `availability:show` for that date to see what changed. The command:
 - **Refuses to run in production,** with a clear message and exit code 1, before touching the database. It writes bookings, and nothing can cancel one until 12 and 13. To undo bookings made locally, start again with `php artisan migrate:fresh --seed`.
-- Finds the business, then works inside `CurrentBusiness::run($business, ...)`, as `availability:show` does.
+- Finds the business, then works inside `CurrentBusiness::run($business, ...)`, as `availability:show` does. Both commands find their business and service through one trait, `App\Console\Commands\Concerns\FindsBusinessAndService`, with `availability:show`'s messages.
 - Turns `start` into an instant with `LocalClock::startTimeOn()` (04), so it follows the engine's rule on the nights the clocks change: a repeated time means its first occurrence, where PHP's own parsing gives the second.
 - Checks the customer options, as every caller of the action must (see Notes): each is required and within its column's length, and the email is a valid address.
 - Calls `CreateBooking` with `BookingSource::Admin`, as the sample bookings do.
@@ -349,7 +349,7 @@ Feature tests on PostgreSQL. Names start with `test_`, and files mirror `app/`. 
 - `Customer` and `Booking` return only the current business's rows, through queries, relations and eager loading, including a booking's `customer` and a practitioner's `bookings`
 - route model binding doesn't find another business's booking or customer
 - with no current business, querying either throws `MissingCurrentBusiness`
-- `CreateBooking` for one business never uses or changes another business's customer with the same email
+- `CreateBooking` for one business never uses or changes another business's customer with the same email (in `CreateBookingTest`, beside the action's other tests)
 
 **Feature: database rules** (`tests/Feature/Database/`)
 - **Overlaps:**

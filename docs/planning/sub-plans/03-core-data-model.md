@@ -437,7 +437,7 @@ Read the `testing-best-practices` skill first. Unit tests need no database. The 
 - `run()` restores the previous business afterwards, including when the callback throws.
 - Creating a model inside `run()` fills `business_id`.
 - `resolveRouteBinding()` doesn't find another business's practitioner, service or pattern.
-- **Guard: every tenant-owned table.** For every table with a `business_id` column, the test reads PostgreSQL's catalogue and checks that the table has a foreign key to `businesses` with `ON DELETE CASCADE`. It also checks that every model in `app/Models` whose table has `business_id` uses `BelongsToBusiness`. Later sub-plans' tables are covered without new tests.
+- **Guard: every tenant-owned table.** For every table with a `business_id` column, the test reads PostgreSQL's catalogue and checks that the table has a foreign key to `businesses` with `ON DELETE CASCADE`. It also checks that every model in `app/Models` whose table has `business_id` uses `BelongsToBusiness`. Later sub-plans' tables are covered without new tests, once each plan adds its tables to the test's list of known tenant tables, which the number of tenant models is checked against (05 added `customers` and `bookings`).
 
 **Feature: database rules** (`tests/Feature/Database/`)
 - A second practitioner for the same business is rejected.
