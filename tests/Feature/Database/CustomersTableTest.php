@@ -16,16 +16,18 @@ class CustomersTableTest extends TestCase
     /**
      * @return array<string, array{string}>
      */
-    public static function emailsThatAreNotStoredForm(): array
+    public static function emailsNotInStoredForm(): array
     {
         return [
             'with capitals' => ['Sam@Example.com'],
+            'with a space before' => [' sam@example.com'],
+            'with a space after' => ['sam@example.com '],
             'empty' => [''],
         ];
     }
 
-    #[DataProvider('emailsThatAreNotStoredForm')]
-    public function test_rejects_an_email_that_is_not_lower_case_or_is_empty(string $email): void
+    #[DataProvider('emailsNotInStoredForm')]
+    public function test_rejects_an_email_that_is_not_trimmed_and_lower_case_or_is_empty(string $email): void
     {
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('"customers_email_check"');

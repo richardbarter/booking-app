@@ -23,6 +23,11 @@ use Tests\TestCase;
  * UPDATE but not the FOR KEY SHARE that the booking's foreign key check
  * takes on the same row. With FOR UPDATE, that check would wait too, and
  * the test would pass even if CreateBooking took no lock of its own.
+ *
+ * It also checks that none of AvailabilityService's diary queries ran
+ * before the lock timed out, so the lock comes before the check. Plain
+ * SELECTs aren't blocked by FOR SHARE, so a check made first would run and
+ * then time out at the lock, and the timeout alone wouldn't show the order.
  */
 class CreateBookingLockTest extends TestCase
 {
@@ -50,6 +55,10 @@ class CreateBookingLockTest extends TestCase
         $second->beginTransaction();
         $second->select('SELECT id FROM practitioners WHERE business_id = ? FOR SHARE', [$business->id]);
         DB::statement("SET lock_timeout = '500ms'");
+        $queries = [];
+        DB::beforeExecuting(function (string $query) use (&$queries): void {
+            $queries[] = $query;
+        });
 
         try {
             app(CreateBooking::class)->handle(
@@ -66,6 +75,7 @@ class CreateBookingLockTest extends TestCase
             $second->rollBack();
         }
 
+        $this->assertSame([], preg_grep('/"(working_patterns|edited_days|time_off|bookings)"/', $queries), 'The diary was read before the practitioner was locked.');
         $this->assertSame(0, DB::table('bookings')->count());
         $this->assertSame(0, DB::table('customers')->count());
     }

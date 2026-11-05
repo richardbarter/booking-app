@@ -106,7 +106,9 @@ Two layers stop a double booking (overview, 5.2):
 
 **Why lock the practitioner, rather than rely on the constraint alone?** Without the lock, the loser's insert fails at the constraint, which also works. But the lock makes the common case a clean check rather than a database error, and it's where later rules that the constraint can't express will live (07's strictness, if it's checked again). It costs one row lock for the length of a short transaction.
 
-**No deadlocks.** The action takes one lock, always the practitioner's, so two bookings can't each hold a lock the other needs. The customer row is found or created after the lock. Bookings for the same business are serialised by the practitioner's lock in v1. When there are staff, `firstOrCreate()` handles two bookings creating the same customer at once: it looks for the customer first, and only when there's none inserts through `createOrFirst()`, which Laravel 13 runs in a savepoint inside the transaction and which fetches the existing row after a unique violation (both checked in its source).
+**Deadlocks.** Two bookings can't deadlock: the action takes one lock, always the practitioner's, so neither can hold a lock the other needs. The customer row is found or created after the lock. Bookings for the same business are serialised by the practitioner's lock in v1. When there are staff, `firstOrCreate()` handles two bookings creating the same customer at once: it looks for the customer first, and only when there's none inserts through `createOrFirst()`, which Laravel 13 runs in a savepoint inside the transaction and which fetches the existing row after a unique violation (both checked in its source).
+
+One rare case can deadlock: deleting a business while a booking for it is part-way through. The delete locks the business row, and its cascade waits for the practitioner row, which the booking holds. The booking's foreign key check then waits for the business row. PostgreSQL notices after about a second (`deadlock_timeout`) and cancels one of them with SQLSTATE `40P01`. Reproduced locally with two sessions, which were rolled back: the booking's insert was cancelled with `deadlock detected`. Only 08's clean-up deletes businesses, and only sandboxes unused for 2 hours, so it's very unlikely, and 08 decides what the loser sees.
 
 ### Personal data
 
@@ -121,7 +123,9 @@ A customer's name, email and phone are personal data:
 - **07:**
   - strictness decides whether checking again refuses a time that still fits but that strictness would now hide
   - `booking:create` gains `availability:show`'s `--strictness=` option
-- **08:** the playground calls `CreateBooking` with `BookingSource::Playground`, and its "Fill randomly" makes many bookings through it.
+- **08:**
+  - the playground calls `CreateBooking` with `BookingSource::Playground`, and its "Fill randomly" makes many bookings through it
+  - deleting an expired sandbox can, very rarely, deadlock with a booking into it (Deadlocks, above). The booking that loses gets a `QueryException` with SQLSTATE `40P01`, not `SlotNotAvailable`, so 08 decides whether the playground retries it or shows a general error
 - **11:** the public booking page catches `SlotNotAvailable` and `ServiceNotBookable` and shows the customer a clear message with updated times.
 - **12:**
   - adds the hashed manage token, created with the booking and sent in the confirmation email
@@ -154,7 +158,7 @@ Both tables have a `business_id` that references `businesses` with `ON DELETE CA
 | `id` | bigint | primary key |
 | `business_id` | bigint | |
 | `name` | string(100) | as given with the first booking |
-| `email` | string(254) | lower case and trimmed; check: `email = lower(email)` and not empty |
+| `email` | string(254) | lower case and trimmed; check: `email = lower(email)`, `email = btrim(email)` and not empty, so a later write path that skips `CreateBooking`, such as 13's customer editing, can't store a second customer with spaces around the same email |
 | `phone` | string(30) | as given with the first booking |
 | timestamps | | |
 
@@ -203,7 +207,7 @@ Indexes: `(business_id, customer_id)` and `(business_id, service_id)`, so a cust
 - another business's bookings at the same times are allowed
 - the composite foreign key refuses another business's customer
 - a customer with bookings can't be deleted
-- the lower-case check refuses `Sam@Example.com`
+- the lower-case check refuses `Sam@Example.com`, and the trim check ` sam@example.com`
 - deleting a business removes its customers and bookings and leaves another business's alone
 
 The migrations' `down()` drops `bookings` and then `customers`.
@@ -362,7 +366,7 @@ Feature tests on PostgreSQL. Names start with `test_`, and files mirror `app/`. 
 - **Deletes:**
   - deleting a practitioner, service or customer with bookings is refused
   - deleting the business removes its customers and bookings, and leaves another business's alone
-- **Customers:** an email with capitals is refused, and so is a second customer with the same email in one business. The same email in two businesses is allowed.
+- **Customers:** an email with capitals or spaces around it is refused, and so is a second customer with the same email in one business. The same email in two businesses is allowed.
 - **Checks refuse:**
   - a booking that ends at or before its start
   - blocked time that doesn't cover the appointment

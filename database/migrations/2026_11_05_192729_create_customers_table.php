@@ -30,7 +30,7 @@ return new class extends Migration
         DB::statement(<<<'SQL'
             ALTER TABLE customers
                 ADD CONSTRAINT customers_email_check
-                    CHECK (email = lower(email) AND email <> '')
+                    CHECK (email = lower(email) AND email = btrim(email) AND email <> '')
             SQL);
     }
 

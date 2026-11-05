@@ -9,8 +9,9 @@ use Illuminate\Console\Command;
 /**
  * For commands that take a business ID and a service ID as their business
  * and service arguments. Each lookup prints an error and returns null when
- * there's no such row. The service is looked up within the current
- * business, so another business's service isn't found.
+ * there's no such row. The service is looked up through the business it
+ * belongs to, inside CurrentBusiness::run() for that business, so another
+ * business's service isn't found.
  *
  * @phpstan-require-extends Command
  */
@@ -31,7 +32,7 @@ trait FindsBusinessAndService
     private function findService(Business $business): ?Service
     {
         $serviceId = $this->parseId($this->argument('service'));
-        $service = $serviceId === null ? null : Service::query()->find($serviceId);
+        $service = $serviceId === null ? null : $business->services()->find($serviceId);
 
         if ($service === null) {
             $this->error(sprintf('Business %d has no service with ID %s.', $business->id, $this->argument('service')));
