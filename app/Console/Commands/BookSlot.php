@@ -137,7 +137,9 @@ class BookSlot extends Command
     /**
      * The customer options, checked as every caller of CreateBooking must:
      * each is required and fits its column, and the email is a valid
-     * address. Null, after printing the problems, when they aren't.
+     * address. They're trimmed first, as the web's TrimStrings middleware
+     * trims a request, so what's checked is what's stored. Null, after
+     * printing the problems, when they aren't.
      *
      * @return array{name: string, email: string, phone: string}|null
      */
@@ -166,13 +168,13 @@ class BookSlot extends Command
     }
 
     /**
-     * An option's value, or an empty string, which the validation refuses,
-     * when it has none.
+     * An option's value, trimmed, or an empty string, which the validation
+     * refuses, when it has none.
      */
     private function stringOption(string $name): string
     {
         $value = $this->option($name);
 
-        return is_string($value) ? $value : '';
+        return is_string($value) ? trim($value) : '';
     }
 }

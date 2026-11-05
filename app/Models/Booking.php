@@ -106,8 +106,8 @@ class Booking extends Model
     #[Scope]
     protected function attended(Builder $query, CarbonInterface $now): void
     {
-        $query->where('status', BookingStatus::Confirmed)
-            ->where('ends_at', '<=', $now->toImmutable()->utc()->format('Y-m-d H:i:sP'));
+        $query->where($query->qualifyColumn('status'), BookingStatus::Confirmed)
+            ->where($query->qualifyColumn('ends_at'), '<=', $now->toImmutable()->utc()->format('Y-m-d H:i:sP'));
     }
 
     /**

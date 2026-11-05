@@ -125,11 +125,16 @@ class CreateBooking
      * email isn't enough to change what the owner sees. The relation scopes
      * the lookup to the business and sets business_id, which isn't fillable.
      *
+     * firstOrCreate() looks first, so a returning customer never causes a
+     * failed insert, which PostgreSQL would log with their email. Only when
+     * there's no such customer does it insert, through createOrFirst(), which
+     * fetches the row instead if another booking created it just before.
+     *
      * @param  array{name: string, email: string, phone: string}  $details
      */
     private function findOrCreateCustomer(Business $business, array $details): Customer
     {
-        return $business->customers()->createOrFirst(
+        return $business->customers()->firstOrCreate(
             ['email' => $details['email']],
             ['name' => $details['name'], 'phone' => $details['phone']],
         );

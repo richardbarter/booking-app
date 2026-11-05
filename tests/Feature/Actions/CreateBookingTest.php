@@ -101,6 +101,20 @@ class CreateBookingTest extends TestCase
         $this->assertSame(['Samuel Taylor', '07700 900456'], [$second->customer_name, $second->customer_phone]);
     }
 
+    public function test_finds_a_returning_customer_without_trying_to_insert_them_again(): void
+    {
+        $business = $this->sampleBusiness();
+        $this->book($business, $this->service('Physio assessment'), '2026-11-09 10:00');
+        $customerInserts = 0;
+        DB::beforeExecuting(function (string $query) use (&$customerInserts): void {
+            $customerInserts += str_starts_with($query, 'insert into "customers"') ? 1 : 0;
+        });
+
+        $this->book($business, $this->service('Physio follow-up'), '2026-11-09 11:00', [...self::SAM, 'email' => 'SAM@example.com']);
+
+        $this->assertSame(0, $customerInserts);
+    }
+
     public function test_books_a_time_starting_as_another_booking_ends(): void
     {
         $business = $this->sampleBusiness();

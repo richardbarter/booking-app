@@ -106,7 +106,7 @@ Two layers stop a double booking (overview, 5.2):
 
 **Why lock the practitioner, rather than rely on the constraint alone?** Without the lock, the loser's insert fails at the constraint, which also works. But the lock makes the common case a clean check rather than a database error, and it's where later rules that the constraint can't express will live (07's strictness, if it's checked again). It costs one row lock for the length of a short transaction.
 
-**No deadlocks.** The action takes one lock, always the practitioner's, so two bookings can't each hold a lock the other needs. The customer row is found or created after the lock. Bookings for the same business are serialised by the practitioner's lock in v1, and `createOrFirst()` handles two bookings creating the same customer at once when there are staff: Laravel 13 runs its insert in a savepoint inside the transaction (checked in its source) and fetches the existing row after a unique violation.
+**No deadlocks.** The action takes one lock, always the practitioner's, so two bookings can't each hold a lock the other needs. The customer row is found or created after the lock. Bookings for the same business are serialised by the practitioner's lock in v1. When there are staff, `firstOrCreate()` handles two bookings creating the same customer at once: it looks for the customer first, and only when there's none inserts through `createOrFirst()`, which Laravel 13 runs in a savepoint inside the transaction and which fetches the existing row after a unique violation (both checked in its source).
 
 ### Personal data
 
@@ -220,7 +220,7 @@ A new `app/Enums` folder. `php artisan make:enum` puts enums there once the fold
 
 `Customer` and `Booking`, following 03's models: `#[Fillable]` with no foreign keys in it, `@property` docblocks, typed relations, a factory and `BelongsToBusiness`. As in 03, `business_id` and the other foreign keys aren't fillable, so code sets them through relations, and a request field can never move a row to another business.
 - `Customer`: `business`, `bookings`.
-- `Business` gains `customers` (has many), for `CreateBooking`'s `createOrFirst()`.
+- `Business` gains `customers` (has many), for `CreateBooking`'s `firstOrCreate()`.
 - `Booking`:
   - relations: `business`, `practitioner`, `service`, `customer`
   - casts: the four instants with `AsUtcDateTime`, `status` as `BookingStatus` and `source` as `BookingSource`
@@ -265,7 +265,7 @@ Then, inside one `DB::transaction()`:
    - find the slot whose `startsAt` is the same instant as `$startsAt`, whatever zone the caller gave it in. None means `SlotNotAvailable`, and so does a start with seconds, which is never on the slot interval
    - `forService()` also refuses an inactive service (`ServiceNotBookable`) and another business's service (`InvalidArgumentException`). `CreateBooking` lets both through, for its callers to catch (`booking:create` here, and 11's pages)
 3. Normalise the details: trim each one, and lower-case the email.
-4. Find or create the customer with `$business->customers()->createOrFirst(['email' => ...], ['name' => ..., 'phone' => ...])`. The relation sets `business_id`, which isn't fillable (03), and scopes the lookup to the business. An existing customer's details aren't changed.
+4. Find or create the customer with `$business->customers()->firstOrCreate(['email' => ...], ['name' => ..., 'phone' => ...])`. The relation sets `business_id`, which isn't fillable (03), and scopes the lookup to the business. An existing customer's details aren't changed. It's `firstOrCreate()` rather than `createOrFirst()`, which the plan first named, because `createOrFirst()` tries the insert first: every returning customer's booking would fail an insert, and PostgreSQL logs that failure with the email (found in the build's review, and seen in the local database's log). `firstOrCreate()` looks first, and falls back to `createOrFirst()` only for a new customer.
 5. Create the booking, with:
    - `business_id` and the other foreign keys set through relations (`associate()`), as the customer's is, so both work with model events off, as in `DatabaseSeeder` (03 does the same in `CreateSampleBusiness`)
    - the slot's four instants

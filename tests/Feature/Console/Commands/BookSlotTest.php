@@ -56,6 +56,24 @@ class BookSlotTest extends TestCase
         $this->assertSame(['Sam Taylor', 'sam@example.com', '07700 900123'], [$booking->customer_name, $booking->customer->email, $booking->customer_phone]);
     }
 
+    public function test_trims_the_customer_options_before_checking_them(): void
+    {
+        $business = $this->sampleBusiness();
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('booking:create', [
+            'business' => $business->id,
+            'service' => $assessment->id,
+            'start' => '2026-11-09 10:00',
+            '--name' => ' Sam Taylor ',
+            '--email' => ' Sam@Example.com ',
+            '--phone' => ' 07700 900123 ',
+        ])->assertSuccessful();
+
+        $booking = $this->bookingOf($business);
+        $this->assertSame(['Sam Taylor', 'sam@example.com', '07700 900123'], [$booking->customer_name, $booking->customer->email, $booking->customer_phone]);
+    }
+
     public function test_refuses_an_unknown_business(): void
     {
         $this->sampleBusiness();
