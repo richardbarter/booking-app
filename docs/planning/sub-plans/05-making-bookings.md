@@ -434,7 +434,7 @@ With the sample business at a fixed time (`travelTo()`, as in 04):
 
 ## Done when
 
-- [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection still at 90% or more
+- [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection still at 90% or more
 - [x] `php artisan migrate:fresh --seed` creates the sample bookings, and `php artisan migrate:rollback --step=2` removes both tables without errors
 - [x] `php artisan availability:show 1 <service> --date=<the sample bookings' date>` leaves out the booked times locally
 - [x] `php artisan booking:create 1 <follow-up's ID> "<date> <a time availability:show offers>"` books it locally, and `availability:show` for that date then leaves it out
