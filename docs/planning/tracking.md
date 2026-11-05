@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 
 ## Current status
 
@@ -28,7 +28,7 @@ Sub-plan 03 is done. Pull request #10 merged on 2026-11-03, and its run on `main
 - **Sample business:** `CreateSampleBusiness` makes Alex Morgan Physio & Sports Massage, and `DatabaseSeeder` calls it.
 - **Code:** PHPUnit has 268 tests, which take about 4.7s on the host and 6.3s in CI. Larastan at level 9 has no errors.
 
-Sub-plan 04 is built in pull request #14, which is open for review. Its CI run passed `checks` and `audit`. What 04 built:
+Sub-plan 04 is done. Pull request #14 merged on 2026-11-05, and its run on `main` passed `checks` (2m28s), `audit` and `deploy`. Fly's release v15 started the merge commit, and its release command printed `Nothing to migrate.`, as 04 has no migrations. Afterwards the Machine was on v15 with its health check passing, and `/up` and `/` returned 200. Every item in 04's **Done when** was checked before the merge. What 04 built:
 - **Engine:** `app/Scheduling` works out a practitioner's slots for a range of dates. `SlotFinder` takes the working hours, turns them into real times with `LocalClock`, takes away blocked time (`FreeGaps`), lists the start times on the slot interval where the service and its buffers fit in one free gap, and keeps those inside the `BookingWindow`. It's plain PHP, given everything it works on, the current time included.
 - **Clock changes:** `LocalClock` follows 04's rule from the zone's transitions (a skipped time is the moment of the change, a repeated time its first occurrence), and only accepts named zones. It's tested in London, Santiago (midnight skipped), Lord Howe Island (30 minutes) and Kathmandu (UTC+5:45).
 - **`AvailabilityService`** loads a business's practitioner, patterns, edited days and time off in four queries whatever the range, and refuses another business's or an inactive service (`ServiceNotBookable`).
@@ -48,10 +48,9 @@ Sub-plan 04 is built in pull request #14, which is open for review. Its CI run p
 
 ## Next up
 
-1. Merge #13 (Symfony 8.1.11), then Dependabot's #12. Until #13 is on `main`, CI's `audit` job fails on every run.
-2. Review and merge #14 (04), then check that its run on `main` passes `checks`, `audit` and `deploy`. 04 has no migrations.
-3. Build 05 to 07 in order, one pull request each. Each starts once the one before is merged and its deploy has been checked.
-4. Then draft 08 with the `draft-sub-plan` skill.
+1. Build 05 with the `build-sub-plan` skill, on `feature/05-making-bookings`. 04's **For later sub-plans** notes say what 05 adds to `AvailabilityService` and the booking action.
+2. Then build 06 and 07 in order, one pull request each. Each starts once the one before is merged and its deploy has been checked.
+3. Then draft 08 with the `draft-sub-plan` skill.
 
 ## Sub-plan status
 
@@ -65,7 +64,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 02 | CI and deployment | Done | #1 | Live at https://bookalive.fly.dev. Merges to `main` deploy automatically |
 | 03 | Core data model | Done | Plan #7, build #10 | Drafted 2026-10-30, revised 2026-11-02 and merged with 04 to 07. Built on 2026-11-02, with 268 PHPUnit tests in about 4.7s. Merged on 2026-11-03; release v12 ran its migrations on Neon, and every production check passed |
 | | **Phase 2: Scheduling engine** | | | |
-| 04 | Availability engine | Done | Plan #7, build #14 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests (16.6s in CI) and Infection at 100% (389 mutants, 52s in CI) |
+| 04 | Availability engine | Done | Plan #7, build #14 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests (16.6s in CI) and Infection at 100% (389 mutants, 52s in CI). Merged on 2026-11-05; release v15 deployed it, with no migrations, and every check passed |
 | 05 | Making bookings | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create` |
 | 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07 |
 | 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option |
