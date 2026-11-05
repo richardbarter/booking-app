@@ -1,6 +1,6 @@
 ---
 name: draft-sub-plan
-description: "Drafts or revises a Bookalive sub-plan in docs/planning/sub-plans/: the plan for a piece of work that the user reviews before any of it is built. Use this whenever asked to write, draft, outline, revise or extend a sub-plan or a set of them, such as \"draft 03\", \"write the plans for 04 to 07\", \"update the 05 plan\" or \"plan the next part\", even if the request only gives a sub-plan's number. It covers gathering context, the questions to ask first, design patterns, best practice and security, checking behaviour before relying on it, tests, and a review pass before the plan is handed over. Not for building a plan's code, which follows the plan, or for routine updates to tracking.md."
+description: "Drafts or revises a Bookalive sub-plan in docs/planning/sub-plans/: the plan for a piece of work that the user reviews before any of it is built. Use this whenever asked to write, draft, outline, revise or extend a sub-plan or a set of them, such as \"draft 03\", \"write the plans for 04 to 07\", \"update the 05 plan\" or \"plan the next part\", even if the request only gives a sub-plan's number. It covers gathering context, the questions to ask first, design patterns, best practice and security, checking behaviour before relying on it, tests, sizing the build into reviewable pull requests, and a review pass before the plan is handed over. Not for building a plan's code, which follows the plan, or for routine updates to tracking.md."
 ---
 
 # Drafting a sub-plan
@@ -89,7 +89,23 @@ Say what must be tested, and at which level: unit tests for the engine, feature 
 - Tests run on PostgreSQL, never SQLite.
 - Every item under **Done when** should be something a test or a check can prove.
 
-## 7. Write it
+## 7. Size the build for review
+
+The user reviews every pull request before it merges, and merging deploys. A big pull request gets a less careful review, so each plan says how its build will be split into pull requests. The builder checks that against the code before starting (the `build-sub-plan` skill).
+
+- **Estimate the build's size** once the design and tests are settled. Count roughly the lines each part adds, as app code (everything that isn't a test or a doc: migrations, models, classes, commands, pages) and tests. Earlier builds are the best guide: 05's pull request (#17) added about 1,100 lines of app code and 1,100 of tests, more than is comfortable to review in one go.
+- **Aim for pull requests of up to about 500 lines of app code,** and about 1,500 lines in all with tests and docs. These are guides, not limits. A pull request a little over that which only makes sense whole is better than a split for its own sake.
+- **Split a bigger build along its build order,** so each part builds on the one before: for example the data model first, then the backend, then the pages. Each part must:
+  - work on its own, with its tests, and pass `composer ci:check`
+  - be safe to deploy on its own, since merging deploys. Nothing a visitor can reach may depend on a later part, such as a route or link to a page that isn't built yet, and the part's migrations must work with the code in that part
+  - make sense to review alone, with a clear answer to "what does this part do?"
+- **Separate plans, or parts of one plan?** Work that could ship on its own and needs its own decisions becomes its own sub-plan, as 01b was split from 01. Layers of one feature that share one design stay in one plan, as parts.
+- **Write it down** under the plan's **Pull requests** heading, after **Done when**:
+  - the estimate, as app code and tests
+  - "One pull request", or the parts in order, each with what it contains, its branch (`feature/NN-short-name-part-1`, `-part-2` and so on) and the **Done when** items it ticks
+  - for a split, why it falls where it does
+
+## 8. Write it
 
 - **Use the template** in the overview (section 11). Plans with steps give each main step a heading like `### Step 3: Neon`, so it's easy to search for. The numbered items inside a step stay plain, and are referred to as step 3.2.
 - **Be specific where the builder would otherwise have to guess:** table columns, types and constraints; class names and where they go, following the code layout in `CLAUDE.md`; routes; and the signatures of anything other plans depend on, such as the engine's interfaces. Leave the rest of the implementation to the builder. A plan isn't the code.
@@ -98,9 +114,9 @@ Say what must be tested, and at which level: unit tests for the engine, feature 
 - **Write for the user,** who reviews every plan: British English, plain words and short sentences, with jargon explained the first time it appears. Code keeps the framework's spelling (`authorize`, `color`).
 - **Keep the docs consistent.** If the plan changes something in the overview or another sub-plan, change that document on the same branch, and add a row to the decisions log.
 - **Keep it about the product.** The repo is public, so no personal, account or billing details.
-- **Keep it reviewable.** If a plan grows too big to review in one sitting, or mixes work that could ship separately, suggest splitting it, as 01b was split from 01.
+- **Keep the plan itself reviewable.** If the plan grows too big to review in one sitting, or mixes work that could ship separately, suggest splitting it into sub-plans (section 7).
 
-## 8. Review it before handing it over
+## 9. Review it before handing it over
 
 Read the whole plan again as a sceptical reviewer would, and fix what you find:
 
@@ -109,10 +125,11 @@ Read the whole plan again as a sceptical reviewer would, and fix what you find:
 - Is any failure case or edge case missing?
 - Is anything over-engineered, or built for a later sub-plan without a clear need?
 - Does every **Done when** item have a test or check behind it?
+- Does the **Pull requests** section have an estimate, and does each part work, deploy safely and make sense on its own?
 - Is every claim about how something behaves backed by the docs or a local check? Mark anything still unverified as such.
 
 Then summarise for the user: what the plan decides, which answers and decisions it rests on, what you checked and how, and what's still open.
 
-## 9. Branch and pull request
+## 10. Branch and pull request
 
 Draft on a `docs/` branch, and open a pull request when the plan, or the set, is ready for review. Update `tracking.md` on the same branch: the plan's status becomes **Planned**, and **Next up** points to what follows. Nothing is built until the user has reviewed and merged the plan.

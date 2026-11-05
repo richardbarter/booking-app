@@ -364,7 +364,7 @@ Child tables reference their parents through composite foreign keys that include
 **For each sub-plan:**
 1. Read this overview and `tracking.md`.
 2. Draft the sub-plan with the `draft-sub-plan` skill on a `docs/` branch, and merge it once reviewed.
-3. Build it with the `build-sub-plan` skill, on a branch named `feature/NN-short-name` from an up-to-date `main`, once the plans it depends on are done.
+3. Build it with the `build-sub-plan` skill, on a branch named `feature/NN-short-name` from an up-to-date `main`, once the plans it depends on are done. A plan whose build is split into parts gets a branch and pull request for each part, `feature/NN-short-name-part-1` and so on, merged in order.
 4. Write the tests alongside the code, and get them and `composer ci:check` passing.
 5. Update `tracking.md` and open a pull request. The user reviews and merges it, and the merge deploys.
 6. Check the deploy, and anything else the plan can only check after the merge.
@@ -389,6 +389,7 @@ Child tables reference their parents through composite foreign keys that include
 ## Frontend          pages, components, composables
 ## Tests             what must be tested
 ## Done when         checklist
+## Pull requests     one, or the parts the build is split into, with a size estimate
 ## Notes             gotchas, open questions
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: build-sub-plan
-description: "Builds a merged Bookalive sub-plan from docs/planning/sub-plans/: the code, tests and docs it describes, on its own feature branch and pull request. Use this whenever asked to build, implement, start, continue or finish a sub-plan, such as \"build 03\", \"start on 04\", \"carry on with 05\" or \"build the next plan\", even if the request only gives a sub-plan's number. It covers gathering context, branching, building in the plan's order with checkpoints, when to stop and ask, recording deviations, tests, the project's rules, a security and personal data check, a review pass, finishing the pull request, the report, and the checks after the merge. Not for writing or revising a plan, which is the draft-sub-plan skill, or for changes that aren't part of a sub-plan."
+description: "Builds a merged Bookalive sub-plan from docs/planning/sub-plans/: the code, tests and docs it describes, on its own feature branch and pull request. Use this whenever asked to build, implement, start, continue or finish a sub-plan, such as \"build 03\", \"start on 04\", \"carry on with 05\" or \"build the next plan\", even if the request only gives a sub-plan's number. It covers gathering context, checking how the build is split into pull requests, branching, building in the plan's order with checkpoints, when to stop and ask, recording deviations, tests, the project's rules, a security and personal data check, a review pass, finishing the pull request, the report, and the checks after the merge. Not for writing or revising a plan, which is the draft-sub-plan skill, or for changes that aren't part of a sub-plan."
 ---
 
 # Building a sub-plan
@@ -14,6 +14,7 @@ Work through the sections below in order. Each one says why it matters, so use j
 Plans are often written before the code they build on, and the code is the truth, so read before writing anything:
 
 - **The plan, all of it:** its Decisions, Design and Notes as well as the parts that say what to build.
+- **Its Pull requests section:** whether the build is one pull request or split into parts, with a size estimate. Plans drafted before the section existed (06 and 07) have none, so section 2 covers estimating it yourself.
 - **The plans it depends on, and the later ones already drafted.** The earlier plans' **For later sub-plans** notes say what they left for this one. Later plans rely on what this one creates, such as the engine's signatures, so building something differently can break a later plan without anyone noticing.
 - **`docs/planning/tracking.md`:** check that every plan this one depends on is **Done**, and read the decisions log. Where a decision there differs from the plan, the decision wins, as it's newer. If it isn't clear which applies, ask (section 4).
 - **`docs/planning/00-overview.md`:** the core concepts (section 4), whose names the code uses, how scheduling works (section 5) and the testing strategy (section 10). **`docs/background.md`** for anything in the scheduling engine (04 onwards).
@@ -27,18 +28,24 @@ Only build a plan that's merged into `main`, since a plan still on a `docs/` bra
 
 ## 2. Branch
 
-- **Start from an up-to-date `main`:** `git switch main`, `git pull`, then `git switch -c feature/NN-short-name`, named after the plan's file (`feature/03-core-data-model` for `03-core-data-model.md`).
-- **Wait for the previous plan.** Start the next plan only once the previous plan's pull request is merged and its deploy has been checked (section 11). Each plan then builds on code the user has reviewed, and the history stays simple.
-- **One sub-plan, one branch, one pull request.** Everything the build changes goes on it, including fixes to the plan, other docs and `tracking.md`. Never push to `main`, which only accepts pull requests that pass CI.
+- **Check the split first.** Once you've read the code, estimate the build yourself, against the `draft-sub-plan` skill's guide of about 500 lines of app code, and about 1,500 in all, per pull request. A big pull request gets a less careful review. If you agree with the plan's split, follow it. Stop and ask (section 4), with a proposed split and why, when:
+  - the plan says one pull request, but the build looks clearly bigger than the guide
+  - a part looks much bigger than its estimate, or wouldn't work or be safe to deploy on its own
+  - the plan has no **Pull requests** section, and the build looks bigger than the guide
+
+  Write the agreed split into the plan's **Pull requests** section, as a deviation (section 4). If the build grows well past its estimate while you're building, say so at the next checkpoint and ask whether to split what's left.
+- **Start from an up-to-date `main`:** `git switch main`, `git pull`, then `git switch -c feature/NN-short-name`, named after the plan's file (`feature/03-core-data-model` for `03-core-data-model.md`). A part's branch adds its number, as the plan names it (`feature/05-making-bookings-part-1`).
+- **Wait for the previous part or plan.** Start the next part, or the next plan, only once the pull request before it is merged and its deploy has been checked (section 11). Each one then builds on code the user has reviewed, and the history stays simple.
+- **One part, one branch, one pull request.** A plan is one part unless its **Pull requests** section splits it. Everything a part changes goes on its branch, including fixes to the plan, other docs and `tracking.md`. Never push to `main`, which only accepts pull requests that pass CI.
 - **Make every commit count.** Pull requests are merged with a merge commit, so every commit on the branch stays in `main`'s history. Make each one a working step, with a message that says what changed and why, in the style of the existing history (`git log`). Once the branch is pushed, add commits rather than rewriting them, so review comments stay attached. If `main` moves on during the build, merge it into the branch rather than rebasing.
-- **Mark the plan as started.** In the first commit, set its status in `tracking.md` to **In progress**.
+- **Mark the plan as started.** In the first part's first commit, set its status in `tracking.md` to **In progress**.
 
 ## 3. Build in the plan's order
 
 - **Follow the plan's order:** its `### Step N` headings in a setup plan; otherwise the data model, then the backend in the order of its parts, then the frontend. Later parts build on earlier ones, and it's the order the user reviewed.
 - **Follow the plan closely where it's specific:** table and column names, types and constraints, class names and where they go, routes, and the signatures that other plans rely on. Where it leaves the detail to the builder, match the code beside it and the conventions in `CLAUDE.md`. Those details are the builder's to decide, and aren't deviations.
 - **Create files with `php artisan make:`**, passing `--no-interaction`, then shape them like their neighbours.
-- **Build only what the plan covers.** Anything it leaves to a later plan stays out, even if it would be quick to add now. If a good idea comes up, note it for later in the pull request or `tracking.md` rather than building it.
+- **Build only what the plan covers,** and for a part, only what that part covers. Anything left to a later part or plan stays out, even if it would be quick to add now. If a good idea comes up, note it for later in the pull request or `tracking.md` rather than building it.
 - **Hand over the commands only the user can run,** such as one that needs `sudo` (04's PCOV install) or the user's own accounts, at the step that needs them. In Claude Code they can run one in the session with `! <command>`.
 
 **Checkpoints.** After each part (a step, the data model, or one part of the backend or frontend):
@@ -128,15 +135,15 @@ The user reviews the pull request too, but a bug found now is cheaper to fix tha
 The pull request is what the user reviews, and merging it deploys, so it has to show what was built and the evidence that it works, without the user rerunning anything.
 
 1. **Run the checks CI runs,** after the review's fixes: `composer ci:check`, and `npm run build` too if the frontend changed (CI's `checks` job runs both). They must pass. If one fails, fix the cause, not the check.
-2. **Tick each "Done when" item** in the plan, and give its evidence in the pull request description: the test, the command and what it printed, or the measurement. An item that can only be checked after the merge, such as a migration running on Neon, stays unticked, under **After the merge**.
+2. **Tick each "Done when" item** that this pull request covers, and give its evidence in the pull request description: the test, the command and what it printed, or the measurement. An item that can only be checked after the merge, such as a migration running on Neon, stays unticked, under **After the merge**.
 3. **Update `tracking.md`:**
-   - the plan's status becomes **Done**. Its PR column adds the build's pull request to the plan's (`Plan #7, build #9`), and its notes give what's worth knowing, such as measurements the plan asked for
+   - the plan's status becomes **Done**, or for a part before the last, stays **In progress**, with the notes saying which parts are merged. Its PR column adds the build's pull request to the plan's (`Plan #7, build #9`, or `build #17, #18` for parts), and its notes give what's worth knowing, such as measurements the plan asked for
    - **Current status** says what the plan delivered, and **Next up** what follows
    - the decisions log has a row for each deviation
    - the development environment list includes any tool the build installed
 4. **Push the branch and open the pull request** against `main`. Its number is only known once it's open, so add it to `tracking.md` in a last commit, as #7 did.
 5. **Write the description** in the style of the earlier ones (`gh pr view 1`):
-   - a first line naming the sub-plan and its file
+   - a first line naming the sub-plan and its file, and for a part, which part it is (part 1 of 2)
    - **What's in it:** what was built, by area
    - **Checked:** `composer ci:check`, each "Done when" item with its evidence, the security check and the review pass
    - **Deviations from the plan:** each one, why, and where it's recorded, or "None"
@@ -151,15 +158,15 @@ Once the pull request is open, tell the user, briefly:
 - what was built, in a few lines
 - what was checked, and anything that failed or was skipped, said plainly
 - the deviations, and the answers they rest on
-- what's left: the checks after the merge, any command the user still has to run, and anything noted for later plans
+- what's left: the checks after the merge, the next part if there is one, any command the user still has to run, and anything noted for later plans
 
 The pull request holds the detail. The report tells the user what to look at first.
 
 ## 11. After the merge
 
-The merge is the first time the build runs in production, on Neon, so some of the plan's checks can only happen now, and the next plan shouldn't start until they pass. When the user says the pull request is merged:
+The merge is the first time the build runs in production, on Neon, so some of the plan's checks can only happen now, and the next part or plan shouldn't start until they pass. When the user says the pull request is merged:
 
 1. Watch the merge commit's run on `main` (`gh run list --branch main`, then `gh run watch <run-id> --exit-status`): `checks`, `audit` and `deploy`.
 2. Check that Fly's release command ran the migrations (`fly releases`, and `fly logs --no-tail` for its output), then run the plan's checks that waited for the merge.
-3. Report the results. Record them in `tracking.md`, and tick those items in the plan, on the next branch: the next plan's, or a `docs/` branch if nothing is being built next.
+3. Report the results. Record them in `tracking.md`, and tick those items in the plan, on the next branch: the next part's or plan's, or a `docs/` branch if nothing is being built next.
 4. If a check fails, say so, and fix it straight away in a pull request of its own. Never change production by hand to make a check pass.
