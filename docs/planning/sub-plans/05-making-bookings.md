@@ -343,7 +343,7 @@ None.
 
 ## Tests
 
-Feature tests on PostgreSQL. Names start with `test_`, and files mirror `app/`. 03's guard test covers both new tables without changes.
+Feature tests on PostgreSQL. Names start with `test_`, and files mirror `app/`. 03's guard test covers both new tables once they're added to its list of known tenant tables, which it checks the tenant models against.
 
 **Feature: tenancy** (`tests/Feature/Tenancy/`, beside 03's). A booking or customer from one business must never reach another business's diary, so with two businesses that have bookings and customers at the same times:
 - `Customer` and `Booking` return only the current business's rows, through queries, relations and eager loading, including a booking's `customer` and a practitioner's `bookings`

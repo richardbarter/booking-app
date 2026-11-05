@@ -34,7 +34,7 @@ class TenantTablesTest extends TestCase
      *
      * @var list<string>
      */
-    private const array KNOWN_TENANT_TABLES = ['practitioners', 'services', 'working_patterns', 'edited_days', 'time_off'];
+    private const array KNOWN_TENANT_TABLES = ['practitioners', 'services', 'working_patterns', 'edited_days', 'time_off', 'customers', 'bookings'];
 
     public function test_finds_every_known_tenant_table(): void
     {

@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  * @property-read Collection<int, Practitioner> $practitioners
  * @property-read Collection<int, Service> $services
+ * @property-read Collection<int, Customer> $customers
  */
 #[Fillable(['name', 'timezone', 'slot_interval_minutes', 'min_notice_minutes', 'max_advance_days'])]
 class Business extends Model
@@ -61,6 +62,14 @@ class Business extends Model
     public function services(): HasMany
     {
         return $this->hasMany(Service::class);
+    }
+
+    /**
+     * @return HasMany<Customer, $this>
+     */
+    public function customers(): HasMany
+    {
+        return $this->hasMany(Customer::class);
     }
 
     /**
