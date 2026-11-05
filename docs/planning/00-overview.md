@@ -364,7 +364,7 @@ Child tables reference their parents through composite foreign keys that include
 **For each sub-plan:**
 1. Read this overview and `tracking.md`.
 2. Draft the sub-plan with the `draft-sub-plan` skill on a `docs/` branch, and merge it once reviewed.
-3. Build it with the `build-sub-plan` skill, on a branch named `feature/NN-short-name` from an up-to-date `main`, once the plans it depends on are done.
+3. Build it with the `build-sub-plan` skill, on a branch named `feature/NN-short-name` from an up-to-date `main`, once the plans it depends on are done. A plan whose build is split into parts gets a branch and pull request for each part, `feature/NN-short-name-part-1` and so on, merged in order.
 4. Write the tests alongside the code, and get them and `composer ci:check` passing.
 5. Update `tracking.md` and open a pull request. The user reviews and merges it, and the merge deploys.
 6. Check the deploy, and anything else the plan can only check after the merge.
@@ -389,6 +389,7 @@ Child tables reference their parents through composite foreign keys that include
 ## Frontend          pages, components, composables
 ## Tests             what must be tested
 ## Done when         checklist
+## Pull requests     one, or the parts the build is split into, with a size estimate
 ## Notes             gotchas, open questions
 ```
 
@@ -470,6 +471,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | When to add the custom domain: before links are shared at the playground milestone, or in 22 as planned (`bookalive.io` was unregistered on 2026-10-27) | 08 / 22 |
 | Tune the first versions once the playground shows them working: the default strictness (50) and relaxation window (48 hours) from 07, the 120-minute strictness scale, and 06's waste score constants (5 minutes for splitting a gap, stranded minutes and lost room counting equally) | 08 |
 | Bookalive's colours: the primary, secondary, accent and other theme colours, in light and dark mode (today they're the starter kit's greys). v1 probably has one fixed theme that we choose, rather than colours each business can set. A session of its own, once there are basic pages to see the colours on while choosing them, perhaps starting from a palette generator such as Coolors. It covers the playground timeline's colours for offered, hidden, booked and stranded time, which must be clear in both modes without relying on colour alone, and whether the data model's per-business brand colour (10 or 11) stays in v1 | 08, once its first pages exist |
+| Whether to turn on Laravel's lazy-loading guard, `Model::preventLazyLoading(! $this->app->isProduction())` in `AppServiceProvider`, once pages list rows with their related data. It throws when code loads a relation row by row (an N+1 query), in development and tests only, so production is unchanged. Laravel's docs show it under "Configuring Eloquent Strictness", but it's off by default and the starter kit leaves it off. Its siblings, `preventSilentlyDiscardingAttributes()` and `preventAccessingMissingAttributes()` (`shouldBeStrict()` turns on all three), add less here, since Larastan already catches undefined model properties. Raised while reviewing 05 | 08 |
 | A second sample business: the original six services with 15-minute clean-ups after each and a rehab session with setup before, kept in sub-plan 03's notes. It would show buffers and services that share a length in the playground. When to add it, and whether visitors choose between sample businesses | After 08 |
 | Strictness by time of day and fixed start times (5.4). Where the settings are stored: with the working pattern, so they follow its cycle, or in a weekly schedule of their own, so they survive a change of hours (fixed times may suit the pattern, and busy and quiet times a schedule of their own). Which period a slot belongs to when it crosses a boundary (its start time is simplest). Whether the relaxation window opens up other times in a fixed period, or the fixed times are final. How the randomised checks treat fixed periods, which can leave a free gap with no time offered. Whether they come in 10 or after v1 | 07 / 10 |
 | Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
