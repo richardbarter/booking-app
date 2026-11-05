@@ -435,11 +435,11 @@ With the sample business at a fixed time (`travelTo()`, as in 04):
 ## Done when
 
 - [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection still at 90% or more
-- [ ] `php artisan migrate:fresh --seed` creates the sample bookings, and `php artisan migrate:rollback` removes both tables without errors
-- [ ] `php artisan availability:show 1 <service> --date=<the sample bookings' date>` leaves out the booked times locally
-- [ ] `php artisan booking:create 1 <follow-up's ID> "<date> <a time availability:show offers>"` books it locally, and `availability:show` for that date then leaves it out
+- [x] `php artisan migrate:fresh --seed` creates the sample bookings, and `php artisan migrate:rollback --step=2` removes both tables without errors
+- [x] `php artisan availability:show 1 <service> --date=<the sample bookings' date>` leaves out the booked times locally
+- [x] `php artisan booking:create 1 <follow-up's ID> "<date> <a time availability:show offers>"` books it locally, and `availability:show` for that date then leaves it out
 - [ ] The deploy after merging runs the new migrations on Neon (Fly's release command succeeds)
-- [ ] `tracking.md` marks 05 as done
+- [x] `tracking.md` marks 05 as done
 
 ## Notes
 
