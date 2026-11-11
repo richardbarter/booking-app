@@ -9,6 +9,7 @@ use App\Scheduling\Hours\LocalTimeRange;
 use App\Scheduling\Hours\PatternWeeks;
 use App\Scheduling\Hours\RepeatingPattern;
 use App\Scheduling\Hours\WeekHours;
+use App\Scheduling\OfferedService;
 use App\Scheduling\ServiceTimes;
 use App\Scheduling\TimeRange;
 use Carbon\CarbonImmutable;
@@ -49,26 +50,29 @@ final readonly class ScenarioGenerator
         $dateCount = $random->getInt(1, 21);
         [$first, $changeDate] = $this->firstDate($random, $zone, $dateCount);
         $last = $first->addDays($dateCount - 1);
+        $patterns = $this->patterns($random, $first, $dateCount, $changeDate !== null);
+        $editedDays = $this->editedDays($random, $first, $dateCount, $changeDate);
+        $blockedTimes = $this->blockedTimes($random, $first, $dateCount);
+        $service = $this->serviceTimes($random);
+        $settings = new BookingSettings(
+            $zone,
+            BookingSettings::SLOT_INTERVALS[$random->getInt(0, count(BookingSettings::SLOT_INTERVALS) - 1)],
+            $random->getInt(0, 1) === 0 ? $random->getInt(0, 180) : $random->getInt(0, 3 * self::MINUTES_IN_DAY),
+            $random->getInt(1, 120),
+        );
+        $now = $this->now($random, $first, $dateCount);
 
         return new Scenario(
             seed: $this->seed,
             number: $number,
-            patterns: $this->patterns($random, $first, $dateCount, $changeDate !== null),
-            editedDays: $this->editedDays($random, $first, $dateCount, $changeDate),
-            blockedTimes: $this->blockedTimes($random, $first, $dateCount),
-            service: new ServiceTimes(
-                5 * $random->getInt(1, 48),
-                $this->buffer($random),
-                $this->buffer($random),
-            ),
-            settings: new BookingSettings(
-                $zone,
-                BookingSettings::SLOT_INTERVALS[$random->getInt(0, count(BookingSettings::SLOT_INTERVALS) - 1)],
-                $random->getInt(0, 1) === 0 ? $random->getInt(0, 180) : $random->getInt(0, 3 * self::MINUTES_IN_DAY),
-                $random->getInt(1, 120),
-            ),
+            patterns: $patterns,
+            editedDays: $editedDays,
+            blockedTimes: $blockedTimes,
+            service: $service,
+            settings: $settings,
             dates: DateRange::between($first, $last),
-            now: $this->now($random, $first, $dateCount),
+            now: $now,
+            offeredServices: $this->offeredServices($random, $service),
         );
     }
 
@@ -225,6 +229,40 @@ final readonly class ScenarioGenerator
         }
 
         return new DayHours($ranges);
+    }
+
+    /**
+     * 1 to 6 offered services in random order, one of them the service
+     * searched for. A quarter of the room weights are 0, and the rest 1 to
+     * 10. One in six of the others has the searched-for service's times,
+     * so some kinds of appointment are merged. These are drawn last, so the
+     * scenarios' diaries and searches are the ones 04 checked.
+     *
+     * @return list<OfferedService>
+     */
+    private function offeredServices(Randomizer $random, ServiceTimes $searched): array
+    {
+        $services = [new OfferedService($searched, $this->roomWeight($random))];
+
+        for ($index = $random->getInt(0, 5); $index > 0; $index--) {
+            $times = $random->getInt(0, 5) === 0 ? $searched : $this->serviceTimes($random);
+            $services[] = new OfferedService($times, $this->roomWeight($random));
+        }
+
+        return $random->shuffleArray($services);
+    }
+
+    /**
+     * 5 minutes to 4 hours, in 5-minute steps, with random buffers.
+     */
+    private function serviceTimes(Randomizer $random): ServiceTimes
+    {
+        return new ServiceTimes(5 * $random->getInt(1, 48), $this->buffer($random), $this->buffer($random));
+    }
+
+    private function roomWeight(Randomizer $random): int
+    {
+        return $random->getInt(0, 3) === 0 ? 0 : $random->getInt(1, OfferedService::MAX_ROOM_WEIGHT);
     }
 
     /**

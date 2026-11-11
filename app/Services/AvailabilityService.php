@@ -16,6 +16,7 @@ use App\Scheduling\DateRange;
 use App\Scheduling\Diary;
 use App\Scheduling\Hours\WorkingHours;
 use App\Scheduling\LocalClock;
+use App\Scheduling\OfferedService;
 use App\Scheduling\ServiceTimes;
 use App\Scheduling\SlotFinder;
 use App\Scheduling\TimeRange;
@@ -28,12 +29,12 @@ use LogicException;
 
 /**
  * Loads what the engine needs for a business's practitioner and runs it.
- * It's the only part of the engine that reads the database: five queries
+ * It's the only part of the engine that reads the database: six queries
  * whatever the range.
  *
  * In v1 the practitioner offers every active service, at the service's
- * own length and buffers. That rule lives here, so the practitioner's own
- * services can replace it when there are staff.
+ * own length, buffers and room weight. That rule lives here, so the
+ * practitioner's own services can replace it when there are staff.
  */
 class AvailabilityService
 {
@@ -49,7 +50,7 @@ class AvailabilityService
      * @throws MissingCurrentBusiness when no current business is set
      * @throws LogicException when the current business is another one
      * @throws InvalidArgumentException when the service is another business's, or the dates are invalid
-     * @throws ServiceNotBookable when the service isn't active
+     * @throws ServiceNotBookable when the service isn't active, including when it was made inactive after it was loaded
      */
     public function forService(Business $business, Service $service, CarbonInterface $from, CarbonInterface $to): Availability
     {
@@ -62,18 +63,20 @@ class AvailabilityService
             $business->min_notice_minutes,
             $business->max_advance_days,
         );
+        [$offeredServices, $searchedFor] = $this->offeredServices($business, $service);
         $practitioner = $business->practitioners()->sole();
         [$rangeStart, $rangeEnd] = $this->range(new LocalClock($settings->timezone), $dates);
 
         return $this->slotFinder->find(
             new Diary(
                 $this->workingHours($practitioner, $dates),
+                $offeredServices,
                 [
                     ...$this->timeOff($practitioner, $rangeStart, $rangeEnd),
                     ...$this->bookings($practitioner, $rangeStart, $rangeEnd),
                 ],
             ),
-            new ServiceTimes($service->duration_minutes, $service->buffer_before_minutes, $service->buffer_after_minutes),
+            $searchedFor,
             $settings,
             $dates,
             now(),
@@ -95,6 +98,40 @@ class AvailabilityService
         if (! $service->is_active) {
             throw new ServiceNotBookable($service->id);
         }
+    }
+
+    /**
+     * The active services, which in v1 the practitioner offers, and the
+     * times of the one searched for, taken from the same rows so the engine
+     * always finds it among them. Only their times and room weights are
+     * read.
+     *
+     * @return array{list<OfferedService>, ServiceTimes}
+     *
+     * @throws ServiceNotBookable when the service isn't among them, because it was made inactive after it was loaded
+     */
+    private function offeredServices(Business $business, Service $searched): array
+    {
+        $services = $business->services()
+            ->active()
+            ->get(['id', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'room_weight']);
+        $offered = [];
+        $searchedFor = null;
+
+        foreach ($services as $service) {
+            $times = new ServiceTimes($service->duration_minutes, $service->buffer_before_minutes, $service->buffer_after_minutes);
+            $offered[] = new OfferedService($times, $service->room_weight);
+
+            if ($service->id === $searched->id) {
+                $searchedFor = $times;
+            }
+        }
+
+        if ($searchedFor === null) {
+            throw new ServiceNotBookable($searched->id);
+        }
+
+        return [$offered, $searchedFor];
     }
 
     /**

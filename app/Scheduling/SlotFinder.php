@@ -4,6 +4,7 @@ namespace App\Scheduling;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use InvalidArgumentException;
 
 /**
  * The availability engine. For each date, it:
@@ -13,6 +14,8 @@ use Carbon\CarbonInterface;
  * 4. lists the start times on the slot interval where the service, with
  *    its buffers, fits inside one free gap
  * 5. keeps the start times inside the booking window
+ * 6. scores each one by how much room it would cost the bookings still to
+ *    come, and finds the day's stranded and fragmented gaps (WasteScorer)
  *
  * It's given everything it works on, the current time included, and reads
  * no database or clock.
@@ -21,6 +24,9 @@ final readonly class SlotFinder
 {
     private const int SECONDS_IN_MINUTE = 60;
 
+    /**
+     * @throws InvalidArgumentException when the service isn't one of the diary's offered services, since slots are scored against them
+     */
     public function find(
         Diary $diary,
         ServiceTimes $service,
@@ -28,47 +34,85 @@ final readonly class SlotFinder
         DateRange $dates,
         CarbonInterface $now,
     ): Availability {
+        self::ensureOffered($diary, $service);
+
         $clock = new LocalClock($settings->timezone);
         $window = new BookingWindow($settings, $now);
+        $scorer = new WasteScorer($diary->offeredServices);
         $days = [];
 
         foreach ($dates->dates() as $date) {
             $day = CarbonImmutable::parse($date, 'UTC');
             $workingTimes = $clock->workingTimes($day, $diary->workingHours->on($day));
             $freeGaps = FreeGaps::between($workingTimes, $diary->blockedTimes);
-            $slots = $freeGaps === []
-                ? []
-                : self::slots($clock->startTimesOn($day, $settings->slotIntervalMinutes), $freeGaps, $service, $window);
+            $startTimes = $freeGaps === [] ? [] : $clock->startTimesOn($day, $settings->slotIntervalMinutes);
+            $fit = new ServiceFit($startTimes);
 
-            $days[] = new DayAvailability($date, $workingTimes, $freeGaps, $slots);
+            $days[] = new DayAvailability(
+                $date,
+                $workingTimes,
+                $freeGaps,
+                self::slots($startTimes, $freeGaps, $service, $window, $scorer, $fit),
+                $scorer->gapSummary($freeGaps, $fit),
+            );
         }
 
         return new Availability($days);
     }
 
+    private static function ensureOffered(Diary $diary, ServiceTimes $service): void
+    {
+        foreach ($diary->offeredServices as $offered) {
+            if ($offered->times->equals($service)) {
+                return;
+            }
+        }
+
+        throw new InvalidArgumentException(sprintf(
+            'The service searched for (%d minutes, with %d before and %d after) must be one of the diary\'s offered services.',
+            $service->durationMinutes,
+            $service->bufferBeforeMinutes,
+            $service->bufferAfterMinutes,
+        ));
+    }
+
     /**
      * Start times are checked in whole seconds, since a day has up to 144
      * of them, and the slots' other times are only worked out with Carbon
-     * for the ones that fit.
+     * for the ones that fit. Each gap's offered slots are scored together,
+     * so extra waste compares the offered slots in the same gap.
      *
      * @param  list<CarbonImmutable>  $startTimes
      * @param  list<TimeRange>  $freeGaps
      * @return list<Slot>
      */
-    private static function slots(array $startTimes, array $freeGaps, ServiceTimes $service, BookingWindow $window): array
-    {
-        $gaps = self::inWholeSeconds($freeGaps);
+    private static function slots(
+        array $startTimes,
+        array $freeGaps,
+        ServiceTimes $service,
+        BookingWindow $window,
+        WasteScorer $scorer,
+        ServiceFit $fit,
+    ): array {
         $slots = [];
 
-        foreach ($startTimes as $startsAt) {
-            $start = $startsAt->getTimestamp();
-            $gap = self::gapContaining(
-                $gaps,
-                $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE,
-                $start + ($service->durationMinutes + $service->bufferAfterMinutes) * self::SECONDS_IN_MINUTE,
-            );
+        foreach ($freeGaps as $gap) {
+            [$gapStart, $gapEnd] = $gap->wholeSecondsInside();
+            $offered = [];
 
-            if ($gap !== null && $window->allows($startsAt)) {
+            foreach ($startTimes as $startsAt) {
+                $start = $startsAt->getTimestamp();
+                $blockedFrom = $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE;
+                $blockedUntil = $start + ($service->durationMinutes + $service->bufferAfterMinutes) * self::SECONDS_IN_MINUTE;
+
+                if ($gapStart <= $blockedFrom && $blockedUntil <= $gapEnd && $window->allows($startsAt)) {
+                    $offered[] = [$startsAt, [$blockedFrom, $blockedUntil]];
+                }
+            }
+
+            $scores = $scorer->scores(array_column($offered, 1), $gapStart, $gapEnd, $fit);
+
+            foreach ($offered as $index => [$startsAt]) {
                 $endsAt = $startsAt->addMinutes($service->durationMinutes);
                 $slots[] = new Slot(
                     $startsAt,
@@ -76,42 +120,11 @@ final readonly class SlotFinder
                     $startsAt->subMinutes($service->bufferBeforeMinutes),
                     $endsAt->addMinutes($service->bufferAfterMinutes),
                     $gap,
+                    $scores[$index],
                 );
             }
         }
 
         return $slots;
-    }
-
-    /**
-     * Each free gap with its start and end in whole seconds, rounded
-     * inwards, so a range of whole seconds fits inside the rounded gap
-     * exactly when it fits inside the real one. Blocked time can end
-     * part-way through a second.
-     *
-     * @param  list<TimeRange>  $freeGaps
-     * @return list<array{TimeRange, int, int}>
-     */
-    private static function inWholeSeconds(array $freeGaps): array
-    {
-        return array_map(fn (TimeRange $gap): array => [
-            $gap,
-            $gap->start->ceilSecond()->getTimestamp(),
-            $gap->end->floorSecond()->getTimestamp(),
-        ], $freeGaps);
-    }
-
-    /**
-     * @param  list<array{TimeRange, int, int}>  $gaps
-     */
-    private static function gapContaining(array $gaps, int $from, int $until): ?TimeRange
-    {
-        foreach ($gaps as [$gap, $start, $end]) {
-            if ($start <= $from && $until <= $end) {
-                return $gap;
-            }
-        }
-
-        return null;
     }
 }

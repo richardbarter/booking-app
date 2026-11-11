@@ -75,7 +75,7 @@ class CreateBookingLockTest extends TestCase
             $second->rollBack();
         }
 
-        $this->assertSame([], preg_grep('/"(working_patterns|edited_days|time_off|bookings)"/', $queries), 'The diary was read before the practitioner was locked.');
+        $this->assertSame([], preg_grep('/"(services|working_patterns|edited_days|time_off|bookings)"/', $queries), 'The diary was read before the practitioner was locked.');
         $this->assertSame(0, DB::table('bookings')->count());
         $this->assertSame(0, DB::table('customers')->count());
     }

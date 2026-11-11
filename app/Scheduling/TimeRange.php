@@ -41,4 +41,17 @@ final readonly class TimeRange
     {
         return $this->start <= $other->start && $other->end <= $this->end;
     }
+
+    /**
+     * Its start and end as Unix timestamps, rounded inwards to whole
+     * seconds, so a range of whole seconds fits inside them exactly when it
+     * fits inside this range. Blocked time can end part-way through a
+     * second.
+     *
+     * @return array{int, int}
+     */
+    public function wholeSecondsInside(): array
+    {
+        return [$this->start->ceilSecond()->getTimestamp(), $this->end->floorSecond()->getTimestamp()];
+    }
 }

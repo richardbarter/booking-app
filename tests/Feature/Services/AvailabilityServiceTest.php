@@ -232,7 +232,7 @@ class AvailabilityServiceTest extends TestCase
         ], $this->workingTimesByDate($availability));
     }
 
-    public function test_runs_the_same_five_queries_for_one_date_and_for_sixty(): void
+    public function test_runs_the_same_six_queries_for_one_date_and_for_sixty(): void
     {
         $business = $this->sampleBusiness();
         $service = $this->service('Physio assessment');
@@ -245,8 +245,53 @@ class AvailabilityServiceTest extends TestCase
         $availability->forService($business, $service, CarbonImmutable::parse('2026-11-02'), CarbonImmutable::parse('2026-12-31'));
         $forSixtyDates = count(DB::getQueryLog());
 
-        $this->assertSame(5, $forOneDate);
-        $this->assertSame(5, $forSixtyDates);
+        $this->assertSame(6, $forOneDate);
+        $this->assertSame(6, $forSixtyDates);
+    }
+
+    public function test_scores_mondays_follow_up_times_as_06s_sample_morning(): void
+    {
+        $business = $this->sampleBusiness();
+
+        $extraWaste = $this->morningExtraWaste($business, 'Physio follow-up', '2026-11-09');
+
+        $this->assertSame([
+            '09:00' => 0, '09:15' => 32, '09:30' => 5, '09:45' => 59, '10:00' => 23, '10:15' => 35, '10:30' => 5, '10:45' => 41,
+            '11:00' => 5, '11:15' => 35, '11:30' => 23, '11:45' => 59, '12:00' => 5, '12:15' => 32, '12:30' => 0,
+        ], $extraWaste);
+    }
+
+    public function test_reads_each_services_room_weight(): void
+    {
+        $business = $this->sampleBusiness();
+        $before = $this->morningExtraWaste($business, 'Physio follow-up', '2026-11-09')['10:00'];
+        $this->service('Sports massage, 90 minutes')->update(['room_weight' => 10]);
+
+        $after = $this->morningExtraWaste($business, 'Physio follow-up', '2026-11-09')['10:00'];
+
+        $this->assertSame([23, 35], [$before, $after]);
+    }
+
+    public function test_an_inactive_service_does_not_count_when_scoring(): void
+    {
+        $business = $this->sampleBusiness();
+        $this->service('Sports massage, 90 minutes')->update(['is_active' => false]);
+
+        $extraWaste = $this->morningExtraWaste($business, 'Physio follow-up', '2026-11-09');
+
+        $this->assertSame(5, $extraWaste['10:00']);
+    }
+
+    public function test_rejects_a_service_made_inactive_after_it_was_loaded(): void
+    {
+        $business = $this->sampleBusiness();
+        $service = $this->service('Physio assessment');
+        Service::query()->whereKey($service->id)->update(['is_active' => false]);
+
+        $this->expectException(ServiceNotBookable::class);
+        $this->expectExceptionMessage("Service {$service->id} isn't active");
+
+        app(AvailabilityService::class)->forService($business, $service, CarbonImmutable::parse('2026-11-09'), CarbonImmutable::parse('2026-11-09'));
     }
 
     public function test_another_business_time_off_at_the_same_times_changes_nothing(): void
@@ -363,6 +408,29 @@ class AvailabilityServiceTest extends TestCase
         $this->assertNotNull($day);
 
         return array_map(fn (Slot $slot): string => $slot->startsAt->setTimezone('Europe/London')->format('H:i'), $day->slots);
+    }
+
+    /**
+     * The extra waste of each of the date's offered times before 13:00, by
+     * its time in London.
+     *
+     * @return array<string, int>
+     */
+    private function morningExtraWaste(Business $business, string $serviceName, string $date): array
+    {
+        $day = $this->availability($business, $serviceName, $date, $date)->day($date);
+        $this->assertNotNull($day);
+        $extraWaste = [];
+
+        foreach ($day->slots as $slot) {
+            $time = $slot->startsAt->setTimezone('Europe/London')->format('H:i');
+
+            if ($time < '13:00') {
+                $extraWaste[$time] = $slot->waste->extraMinutes;
+            }
+        }
+
+        return $extraWaste;
     }
 
     /**
