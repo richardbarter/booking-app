@@ -66,4 +66,32 @@ class ServiceTimesTest extends TestCase
 
         new ServiceTimes(30, $before, $after);
     }
+
+    public function test_its_diary_time_adds_both_buffers_to_the_length(): void
+    {
+        $service = new ServiceTimes(50, 5, 10);
+
+        $this->assertSame(65, $service->diaryMinutes());
+    }
+
+    /**
+     * @return array<string, array{ServiceTimes, bool}>
+     */
+    public static function otherTimes(): array
+    {
+        return [
+            'the same length and buffers' => [new ServiceTimes(30, 5, 10), true],
+            'another length' => [new ServiceTimes(35, 5, 10), false],
+            'another buffer before' => [new ServiceTimes(30, 0, 10), false],
+            'another buffer after' => [new ServiceTimes(30, 5, 15), false],
+        ];
+    }
+
+    #[DataProvider('otherTimes')]
+    public function test_equals_only_the_same_length_and_buffers(ServiceTimes $other, bool $expected): void
+    {
+        $service = new ServiceTimes(30, 5, 10);
+
+        $this->assertSame($expected, $service->equals($other));
+    }
 }

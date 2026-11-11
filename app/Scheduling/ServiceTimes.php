@@ -27,4 +27,23 @@ final readonly class ServiceTimes
             ));
         }
     }
+
+    /**
+     * The diary time one appointment takes: its length and both buffers.
+     */
+    public function diaryMinutes(): int
+    {
+        return $this->bufferBeforeMinutes + $this->durationMinutes + $this->bufferAfterMinutes;
+    }
+
+    /**
+     * Whether the two take the same diary time in the same way, with the
+     * same length and buffers.
+     */
+    public function equals(self $other): bool
+    {
+        return $this->durationMinutes === $other->durationMinutes
+            && $this->bufferBeforeMinutes === $other->bufferBeforeMinutes
+            && $this->bufferAfterMinutes === $other->bufferAfterMinutes;
+    }
 }
