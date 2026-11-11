@@ -22,8 +22,6 @@ use InvalidArgumentException;
  */
 final readonly class SlotFinder
 {
-    private const int SECONDS_IN_MINUTE = 60;
-
     /**
      * @throws InvalidArgumentException when the service isn't one of the diary's offered services, since slots are scored against them
      */
@@ -94,19 +92,18 @@ final readonly class SlotFinder
         WasteScorer $scorer,
         ServiceFit $fit,
     ): array {
+        $blockedTimes = array_map(fn (CarbonImmutable $startsAt): array => $service->blockedAround($startsAt->getTimestamp()), $startTimes);
         $slots = [];
 
         foreach ($freeGaps as $gap) {
             [$gapStart, $gapEnd] = $gap->wholeSecondsInside();
             $offered = [];
 
-            foreach ($startTimes as $startsAt) {
-                $start = $startsAt->getTimestamp();
-                $blockedFrom = $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE;
-                $blockedUntil = $start + ($service->durationMinutes + $service->bufferAfterMinutes) * self::SECONDS_IN_MINUTE;
+            foreach ($startTimes as $index => $startsAt) {
+                [$blockedFrom, $blockedUntil] = $blockedTimes[$index];
 
                 if ($gapStart <= $blockedFrom && $blockedUntil <= $gapEnd && $window->allows($startsAt)) {
-                    $offered[] = [$startsAt, [$blockedFrom, $blockedUntil]];
+                    $offered[] = [$startsAt, $blockedTimes[$index]];
                 }
             }
 

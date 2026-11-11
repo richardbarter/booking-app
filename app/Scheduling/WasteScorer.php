@@ -117,11 +117,13 @@ final readonly class WasteScorer
             fn (array $slot): array => $this->parts($fit, $gapCounts, [$gapStart, $slot[0]], [$slot[1], $gapEnd]),
             $slots,
         );
-        $lowest = min(array_map(fn (array $part): int => $part[0] + $part[1] + $part[2], $parts));
+        $minutes = array_map(fn (array $part): int => $part[0] + $part[1] + $part[2], $parts);
+        $lowest = min($minutes);
 
         return array_map(
-            fn (array $part): WasteScore => new WasteScore($part[0], $part[1], $part[2], $part[0] + $part[1] + $part[2] - $lowest, $part[3]),
+            fn (array $part, int $total): WasteScore => new WasteScore($part[0], $part[1], $part[2], $total - $lowest, $part[3]),
             $parts,
+            $minutes,
         );
     }
 

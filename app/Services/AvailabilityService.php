@@ -50,7 +50,7 @@ class AvailabilityService
      * @throws MissingCurrentBusiness when no current business is set
      * @throws LogicException when the current business is another one
      * @throws InvalidArgumentException when the service is another business's, or the dates are invalid
-     * @throws ServiceNotBookable when the service isn't active, including when it was made inactive after it was loaded
+     * @throws ServiceNotBookable when the service isn't active, even if the model passed in says it is
      */
     public function forService(Business $business, Service $service, CarbonInterface $from, CarbonInterface $to): Availability
     {
@@ -83,6 +83,10 @@ class AvailabilityService
         );
     }
 
+    /**
+     * Whether the service is active is checked against the services query
+     * instead, since the model passed in may be out of date.
+     */
     private function ensureBookable(Business $business, Service $service): void
     {
         $this->currentBusiness->ensureIs($business);
@@ -94,10 +98,6 @@ class AvailabilityService
                 $business->id,
             ));
         }
-
-        if (! $service->is_active) {
-            throw new ServiceNotBookable($service->id);
-        }
     }
 
     /**
@@ -108,7 +108,7 @@ class AvailabilityService
      *
      * @return array{list<OfferedService>, ServiceTimes}
      *
-     * @throws ServiceNotBookable when the service isn't among them, because it was made inactive after it was loaded
+     * @throws ServiceNotBookable when the service isn't among them, because it isn't active
      */
     private function offeredServices(Business $business, Service $searched): array
     {

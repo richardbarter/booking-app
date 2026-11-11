@@ -67,6 +67,13 @@ class ServiceTimesTest extends TestCase
         new ServiceTimes(30, $before, $after);
     }
 
+    public function test_blocks_its_buffers_either_side_of_the_appointment(): void
+    {
+        $service = new ServiceTimes(50, 5, 10);
+
+        $this->assertSame([10_000 - 300, 10_000 + 3600], $service->blockedAround(10_000));
+    }
+
     public function test_its_diary_time_adds_both_buffers_to_the_length(): void
     {
         $service = new ServiceTimes(50, 5, 10);

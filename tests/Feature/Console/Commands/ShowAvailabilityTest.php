@@ -189,10 +189,10 @@ class ShowAvailabilityTest extends TestCase
         });
 
         $this->artisan('availability:show', ['business' => $business->id])
-            ->expectsTable(['ID', 'Name', 'Length', 'Buffer before', 'Buffer after', 'Active'], [
-                [$ids[0], 'Physio follow-up', '30 min', '0 min', '0 min', 'Yes'],
-                [$ids[1], 'Physio assessment', '60 min', '0 min', '0 min', 'Yes'],
-                [$ids[2], 'Sports massage, 90 minutes', '90 min', '0 min', '0 min', 'No'],
+            ->expectsTable(['ID', 'Name', 'Length', 'Buffer before', 'Buffer after', 'Room weight', 'Active'], [
+                [$ids[0], 'Physio follow-up', '30 min', '0 min', '0 min', 10, 'Yes'],
+                [$ids[1], 'Physio assessment', '60 min', '0 min', '0 min', 10, 'Yes'],
+                [$ids[2], 'Sports massage, 90 minutes', '90 min', '0 min', '0 min', 5, 'No'],
             ])
             ->assertSuccessful();
     }

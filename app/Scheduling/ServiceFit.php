@@ -71,7 +71,7 @@ final readonly class ServiceFit
             return null;
         }
 
-        $blockedUntil = $startsAt + ($kind->durationMinutes + $kind->bufferAfterMinutes) * self::SECONDS_IN_MINUTE;
+        [, $blockedUntil] = $kind->blockedAround($startsAt);
 
         return $blockedUntil <= $until ? $blockedUntil : null;
     }

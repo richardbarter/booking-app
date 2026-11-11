@@ -59,13 +59,14 @@ class ShowAvailability extends Command
     {
         $this->line("{$business->name}, business {$business->id}");
         $this->table(
-            ['ID', 'Name', 'Length', 'Buffer before', 'Buffer after', 'Active'],
+            ['ID', 'Name', 'Length', 'Buffer before', 'Buffer after', 'Room weight', 'Active'],
             Service::query()->orderBy('id')->get()->map(fn (Service $service): array => [
                 $service->id,
                 $service->name,
                 "{$service->duration_minutes} min",
                 "{$service->buffer_before_minutes} min",
                 "{$service->buffer_after_minutes} min",
+                $service->room_weight,
                 $service->is_active ? 'Yes' : 'No',
             ])->all(),
         );

@@ -4,8 +4,9 @@ namespace App\Scheduling;
 
 /**
  * How much room booking a slot would cost the bookings still to come, in
- * whole minutes, worked out from the diary alone, so the same slot always
- * gets the same score. It adds up:
+ * whole minutes. Its minutes are worked out from the diary alone, so the
+ * same slot always gets the same score, whenever someone looks. They add
+ * up:
  * - stranded: the time it would leave before or after it, in pieces that
  *   no offered service fits, whatever its room weight
  * - lost room: for each kind of appointment, how many fewer its free gap
@@ -14,8 +15,10 @@ namespace App\Scheduling;
  * - split: a small cost when it would leave free time on both sides
  *
  * Extra waste is how much more it is than the lowest score among the slots
- * offered in the same free gap, so the best there has 0. Strictness (07)
- * compares extra waste, since some of every score can't be avoided.
+ * offered in the same free gap, so the best there has 0. It depends on
+ * which slots the booking window offers, so it can change as today's
+ * earliest times pass the minimum notice. Strictness (07) compares extra
+ * waste, since some of every score can't be avoided.
  */
 final readonly class WasteScore
 {
