@@ -179,13 +179,14 @@ As in 04 and 06: engine tests extend `PHPUnit\Framework\TestCase`, method names 
   - across the night the clocks go forward, 48 hours means 48 real hours
 - **Hidden slots:** `hiddenSlots` holds exactly the slots removed, in time order, each with its waste score.
 
-**Unit: randomised rules**, added to `SlotFinderRulesTest`. The generator also picks a random strictness and relaxation window.
-1. **Raising strictness only hides times.** For two random strictness values, the higher one's offered times are among the lower one's.
-2. At strictness 0, nothing is hidden.
-3. Each day's offered and hidden slots don't overlap, and together they're every slot that fits inside the booking window.
-4. **Every free gap that offers a time at strictness 0 offers at least one at any strictness.**
-5. **Within the relaxation window, strictness has no effect.** Slots starting within it are the same at every strictness.
-6. Every hidden slot starts after the relaxation window and has extra waste above its threshold. Every offered slot after the window has extra waste at or below it.
+**Unit: randomised rules**, added to `SlotFinderRulesTest` and numbered 14 to 19, after 04's rules 1 to 7 and 06's 8 to 13. The generator also picks a random strictness and relaxation window.
+
+14. **Raising strictness only hides times.** For two random strictness values, the higher one's offered times are among the lower one's.
+15. At strictness 0, nothing is hidden.
+16. Each day's offered and hidden slots don't overlap, and together they're every slot that fits inside the booking window.
+17. **Every free gap that offers a time at strictness 0 offers at least one at any strictness.**
+18. **Within the relaxation window, strictness has no effect.** Slots starting within it are the same at every strictness.
+19. Every hidden slot starts after the relaxation window and has extra waste above its threshold. Every offered slot after the window has extra waste at or below it.
 
 These are the overview's last three rules (section 10), plus the checks that the step splits slots correctly.
 

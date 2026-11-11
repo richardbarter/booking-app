@@ -35,6 +35,14 @@ The user's answers to this plan's questions (2026-11-02):
 
 The user's idea (2026-11-02): weights should reflect how often each service is wanted, as in "90% of bookings are 30-minute ones, so a 90-minute service shouldn't block so much".
 
+The user's answers after the plan was checked against 04's and 05's code (2026-11-11):
+
+| Question | Answer |
+|---|---|
+| Does lost room count an appointment's buffers? | **Yes.** Each kind of appointment is valued at its diary time, buffers included. Buffers are part of how long an appointment takes, whether the owner sets them or leaves the time in the length, so a 50-minute session with 10 minutes after it scores the same as a 60-minute one with none |
+| Can the service being searched for be missing from the offered services? | **No.** It must be one of them, and the engine refuses a search where it isn't. Stranded time and lost room are worked out from the offered services, so a service outside them would be scored against the wrong ones |
+| One pull request, or two parts? | **One**, although the estimate is over the guide (see **Pull requests**) |
+
 ## Design
 
 ### What the score measures
@@ -42,7 +50,7 @@ The user's idea (2026-11-02): weights should reflect how often each service is w
 When a customer books a time, the free gap it sits in (its **free stretch**) is split into what's left before it and what's left after. Here a "free gap" is the engine's free gap from 04: time the practitioner is working and not blocked. The score adds up three parts, all in minutes:
 
 1. **Stranded minutes.** The minutes left before or after the time, in pieces too short for any active service (whatever its room weight). Nobody could ever book them. A 30-minute booking at 09:15, in a gap from 09:00, strands 15 minutes.
-2. **Lost room.** For each kind of appointment the practitioner offers, how many fewer of them the gap can still take, valued at their length. This is averaged over the kinds, weighted by each one's room weight (see the formula below). It's what makes splitting a 90-minute gap into two 30-minute pieces worse than taking 30 minutes from one end: the first leaves no room for a 60 or a 90, and the second leaves room for a 60.
+2. **Lost room.** For each kind of appointment the practitioner offers, how many fewer of them the gap can still take, valued at the diary time each takes, buffers included. This is averaged over the kinds, weighted by each one's room weight (see the formula below). It's what makes splitting a 90-minute gap into two 30-minute pieces worse than taking 30 minutes from one end: the first leaves no room for a 60 or a 90, and the second leaves room for a 60.
 3. **Splitting a gap.** 5 minutes when the time leaves free time on both sides, rather than sitting against an edge of its gap. An edge is the start or end of working hours, a booking, or time off. This is the small preference for the edges. Two pieces can't hold the same mixes of appointments as one piece of the same total, which the counts per kind of appointment don't see. For example, after a follow-up at 09:00, the stretch 09:30–13:00 holds a 90-minute massage and two assessments. After one at 09:30, the pieces 09:00–09:30 and 10:00–13:00 don't.
 
 **The waste score** is the sum of the three, rounded to whole minutes. **Extra waste** is how much more a time's score is than the lowest score among the times offered in the same gap. The best time in each gap has extra waste 0. Strictness (07) compares extra waste, because part of every booking's score can't be avoided: a booking always takes room, wherever it goes.
@@ -56,17 +64,18 @@ When a customer books a time, the free gap it sits in (its **free stretch**) is 
 For a slot whose blocked time is `B`, in free gap `G`, let `L` be the part of `G` before `B` and `R` the part after. For each kind of appointment `k`:
 - `fits(k, P)` means some start time on the slot interval puts `k`'s blocked time entirely inside piece `P` (the same test the engine uses for slots).
 - `count(k, P)` is the most appointments of kind `k` that fit in `P` without overlapping, on the slot interval, with buffers adding up back to back.
+- `diary(k)` is the diary time one appointment of kind `k` takes, in minutes: its length plus its buffers before and after.
 
 Then:
 - `stranded = minutes(L) if no kind fits in L, plus minutes(R) if no kind fits in R`
 - `lost(k) = count(k, G) − count(k, L) − count(k, R)`
-- `lost room = Σ weight(k) × length(k) × lost(k) / Σ weight(k)`, over kinds with a weight above 0, and 0 if there are none
+- `lost room = Σ weight(k) × diary(k) × lost(k) / Σ weight(k)`, over kinds with a weight above 0, and 0 if there are none
 - `split = 5 if L and R are both non-empty, else 0`
 - `waste = stranded + round(lost room) + split`, rounding halves up with integer arithmetic (`intdiv(2 × numerator + denominator, 2 × denominator)`), so there are no floating-point surprises
 
 `count(k, P)` takes the earliest start that fits, then the earliest after that one's blocked time ends, and so on. For appointments that are all the same length, taking the earliest each time always finds the most that fit. That's the standard result for scheduling equal-length intervals, and a randomised rule checks it against trying every combination.
 
-**In words:** `Σ` means "add up over every kind of appointment", so lost room is a weighted average. For each kind, multiply how many fewer fit by the appointment's length and by its room weight. Add those up, then divide by the total of the room weights. Dividing keeps the result in minutes however many services a business has. For example, in a gap from 09:00 to 10:30 with 30, 60 and 90-minute services all weighted 10, a booking at 09:30 leaves room for one fewer of each. Its lost room is (10 × 30 × 1 + 10 × 60 × 1 + 10 × 90 × 1) ÷ (10 + 10 + 10) = 60.
+**In words:** `Σ` means "add up over every kind of appointment", so lost room is a weighted average. For each kind, multiply how many fewer fit by the diary time the appointment takes, buffers included, and by its room weight. Add those up, then divide by the total of the room weights. Dividing keeps the result in minutes however many services a business has. For example, in a gap from 09:00 to 10:30 with 30, 60 and 90-minute services, no buffers, all weighted 10, a booking at 09:30 leaves room for one fewer of each. Its lost room is (10 × 30 × 1 + 10 × 60 × 1 + 10 × 90 × 1) ÷ (10 + 10 + 10) = 60.
 
 `lost(k)` is never negative: `L` and `R` are disjoint parts of `G`, so anything that fits in them fits in `G`.
 
@@ -145,7 +154,7 @@ New value objects, `final readonly` like 04's:
 - `Diary` gains `offeredServices`, a non-empty `list<OfferedService>`. In v1 that's every active service. With staff, it's the services the practitioner offers.
 - `Slot` gains `waste`, a `WasteScore`.
 - `DayAvailability` gains `gapSummary`, a `GapSummary`.
-- `SlotFinder::find()` keeps its signature. Scoring is a new step after the booking window, as 04's diagram showed.
+- `SlotFinder::find()` keeps its signature. Scoring is a new step after the booking window, as 04's diagram showed. It throws `InvalidArgumentException` when the `ServiceTimes` it's given aren't those of any offered service, since the score is worked out from the offered services.
 
 **New classes:**
 - `ServiceFit` does the fitting and counting: whether a kind of appointment fits in a piece, and how many fit. It uses the date's start times on the slot interval, from `LocalClock::startTimesOn()`, as `SlotFinder` does. So clock changes and 30-minute time zones work the same way as for slots.
@@ -155,7 +164,9 @@ Minutes are whole minutes of each piece (`intdiv` of its seconds by 60). The cou
 
 ### `AvailabilityService` (04 and 05)
 
-A sixth query loads the business's active services, reading only their length, buffers and room weight, and builds the `Diary`'s offered services. In v1 the practitioner offers every active service; this is the rule 04 asked to keep in one place, so `practitioner_service` can replace it when there are staff. The query count stays the same for any range (now six).
+A sixth query loads the business's active services, reading only their ID, length, buffers and room weight, and builds the `Diary`'s offered services. In v1 the practitioner offers every active service; this is the rule 04 asked to keep in one place, so `practitioner_service` can replace it when there are staff. The query count stays the same for any range (now six).
+
+The `ServiceTimes` for the service being searched for come from the same rows, so they always match one of the offered services. If the service isn't among them, because it was made inactive after the caller loaded it, `forService()` throws `ServiceNotBookable`, as it does for an inactive service, rather than letting the engine refuse the search.
 
 ### `availability:show` (04)
 
@@ -185,6 +196,7 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
   - with the 90-minute massage weighted 10 instead of 5, 10:00's extra waste is 35 rather than 23
   - with every weight 0, lost room is 0 and nothing is fragmented
   - services with the same times count as one kind, with their weights added together
+- **Buffers count in lost room:** two diaries that differ only in one service, a 60-minute service with no buffers in one and a 50-minute service with 10 minutes after it in the other, give every slot the same waste and extra waste, since both take an hour of the diary.
 - **The split:** a slot that fills its gap exactly has no stranded minutes, no split and no leftover pieces; one against one edge has no split; one with free time on both sides has a split of 5.
 - **Rounding:** halves round up, using integer arithmetic.
 - **Extra waste** is measured against the offered times only. With today's earlier times inside the minimum notice, the best remaining time in the gap has extra waste 0.
@@ -194,13 +206,17 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
   - a 2-hour gap is usable
   - a gap that only a weight-0 service fits isn't stranded, and the longest weight-0 kind doesn't count as the longest
 
-**Unit: randomised rules**, added to 04's `SlotFinderRulesTest`. The generator also makes 1 to 6 offered services, including the requested one, with random room weights, some 0.
-1. Every slot's waste parts are 0 or more, and its `minutes` is their sum.
-2. In every free gap that has slots, at least one slot has extra waste 0, and none is below 0.
-3. A slot's waste doesn't depend on now. Running the same scenario with now three days earlier gives the same `minutes` for every slot offered both times.
-4. **Stranded minutes match a brute-force check.** For each piece left by a slot, it tries every clock time on the interval and every active service, using `LocalClock`, and the piece is stranded exactly when nothing fits.
-5. **Counts match a brute-force check.** On pieces of up to 4 hours, `count(k, P)` equals the most that fit, found by trying every combination, and `count(k, L) + count(k, R)` is never more than `count(k, G)`.
-6. **Each day's summary matches the definitions:**
+**Unit: `SlotFinder`**
+- It throws `InvalidArgumentException` when the service it's given has different times from every offered service, such as a 45-minute service when only 30 and 60-minute ones are offered.
+
+**Unit: randomised rules**, added to 04's `SlotFinderRulesTest` and numbered 8 to 13, after its rules 1 to 7. The generator also makes 1 to 6 offered services, including the requested one, with random room weights, some 0.
+
+8. Every slot's waste parts are 0 or more, and its `minutes` is their sum.
+9. In every free gap that has slots, at least one slot has extra waste 0, and none is below 0.
+10. A slot's waste doesn't depend on now. Running the same scenario with now three days earlier gives the same `minutes` for every slot offered both times.
+11. **Stranded minutes match a brute-force check.** For each piece left by a slot, it tries every clock time on the interval and every active service, using `LocalClock`, and the piece is stranded exactly when nothing fits.
+12. **Counts match a brute-force check.** On pieces of up to 4 hours, `count(k, P)` equals the most that fit, found by trying every combination, and `count(k, L) + count(k, R)` is never more than `count(k, G)`.
+13. **Each day's summary matches the definitions:**
    - every free gap is in at most one of `stranded` and `fragmented`
    - the minutes are the totals of those gaps
    - a gap is stranded exactly when the brute-force check finds no active service that fits
@@ -209,6 +225,7 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
 - With the sample business at 04's fixed time, Monday 9 November's follow-up times have the sample morning's extra waste.
 - Setting the 90-minute massage's `room_weight` to 10 changes 10:00's extra waste from 23 to 35.
 - An inactive service doesn't count when scoring.
+- A service made inactive in the database after it was loaded, so the model passed in still says it's active, throws `ServiceNotBookable`.
 - The query count is the same for 1 date and 60 (six).
 
 **Feature: database rules**
@@ -219,9 +236,15 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
 ## Done when
 
 - [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
-- [ ] `php artisan availability:show 1 <follow-up's ID> --date=<a Monday next week>` shows the sample morning's extra waste locally
+- [ ] After `php artisan migrate:fresh --seed`, `php artisan availability:show 1 <follow-up's ID> --date=<the Monday after next>` shows the sample morning's extra waste locally. 05's seeder books three times next Monday, and the Monday after next has its morning free
 - [ ] Measured locally: `AvailabilityService` for 31 days of the sample business takes under 200 ms, recorded in `tracking.md`
 - [ ] `tracking.md` marks 06 as done
+
+## Pull requests
+
+**Estimate:** about 700 lines of app code and 1,150 of tests, so about 1,900 in all with the docs. `ServiceFit` and `WasteScorer`, with their value objects, are most of the app code. The worked examples and the randomised rules are most of the tests.
+
+**One pull request,** on `feature/06-waste-score`, ticking every item in **Done when**. That's over the guide of about 500 lines of app code and 1,500 in all. A split into two parts was considered: first the scoring classes and their unit tests, with nothing calling them yet, then connecting them to the engine, the database and `availability:show`. The user chose one pull request (2026-11-11).
 
 ## Notes
 
@@ -235,7 +258,7 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
   - the default strictness (07) won't be the tightest
   - the relaxation window (07) releases protected room near the date
   - room weights stop a rarely booked long service from restricting everyone else's times
-- **Clean-up time belongs in buffers, not in the length.** A "therapy hour" is a 50-minute session with a 10-minute buffer after it, so the customer sees the real length ("50 minutes, ends 10:50") while the diary keeps the full hour. An owner can still set a 60-minute service with no buffer if they prefer; both work, since buffers default to 0 (03). 10's service screen should explain this.
+- **Clean-up time belongs in buffers, not in the length.** A "therapy hour" is a 50-minute session with a 10-minute buffer after it, so the customer sees the real length ("50 minutes, ends 10:50") while the diary keeps the full hour. An owner can still set a 60-minute service with no buffer if they prefer; both work, since buffers default to 0 (03). Lost room values each appointment at its diary time, buffers included, so the two set-ups get the same scores. 10's service screen should explain this.
 
 **What the score can't see.** It looks at one gap at a time and counts each kind of appointment separately. So it doesn't value keeping a whole day open for a long appointment, or prefer one gap over another. Strictness (07) works within each gap, so customers still choose between gaps and days freely.
 
