@@ -55,7 +55,7 @@ Sub-plan 06 is built, in one pull request waiting for review. It's built on #23'
 - **Tests:** rules 8 to 13 join `SlotFinderRulesTest`, over the same 300 scenarios. 04's 129,114 checks are unchanged, and the 13 rules make 282,477. They also passed on seeds 7, 2027 and 31337 at 1,000 scenarios each. PHPUnit has 583 tests, which take about 25s on the host. Infection kills all 552 mutants in `app/Scheduling`, 7 of them by timing out, all endless loops.
 - **Found while building:** the new rules take the rules test from about 5s to 12s, so Infection's timeout went from 10s to 20s (see the decisions log). The first version had six mutants that changed nothing, such as a cache of each gap's counts. Scoring one gap at a time removed them. One mutant showed `lostRoom` had no test for leaving out kinds that lose nothing, so it gained one.
 - **Found in the review:** nothing gave a wrong result. `ServiceTimes::blockedAround()` replaced two copies of the blocked-time sums, `AvailabilityService` checks that a service is active only against the services query, and `availability:show` lists each service's room weight.
-- **Size:** about 670 lines of app code and 1,320 of tests, against the plan's estimate of 700 and 1,150.
+- **Size:** about 690 lines of app code and 1,330 of tests, against the plan's estimate of 700 and 1,150.
 
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
