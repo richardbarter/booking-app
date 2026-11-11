@@ -237,7 +237,7 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
 
 ## Done when
 
-- [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
+- [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
 - [x] After `php artisan migrate:fresh --seed`, `php artisan availability:show 1 <follow-up's ID> --date=<the Monday after next>` shows the sample morning's extra waste locally. 05's seeder books three times next Monday, and the Monday after next has its morning free
 - [x] Measured locally: `AvailabilityService` for 31 days of the sample business takes under 200 ms, recorded in `tracking.md`
 - [x] `tracking.md` marks 06 as done
