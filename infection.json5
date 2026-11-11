@@ -4,6 +4,11 @@
         directories: ['app/Scheduling'],
     },
     testFrameworkExtraArgs: '--testsuite=Scheduling',
+    // The randomised rules (SlotFinderRulesTest) take about 12s on the
+    // host and longer in CI. A mutant that only they can catch must be
+    // given time to finish them, or it would count as caught by timing
+    // out, and one that escapes would be hidden the same way.
+    timeout: 20,
     mutators: {
         '@default': true,
         // Equivalent mutants: the regex has already checked that both parts
