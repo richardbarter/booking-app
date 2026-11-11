@@ -46,6 +46,17 @@ Sub-plan 05 is done. Pull request #17 merged on 2026-11-05, and its run on `main
 - **Found while building:** the lock test holds `FOR SHARE`, since the booking's foreign key check also waits on a `FOR UPDATE`. `createOrFirst()` made PostgreSQL log a returning customer's email, so `CreateBooking` uses `firstOrCreate()`.
 - **Found in the pull request's second review:** the lock test also checks that the diary isn't read before the lock is taken, the database refuses untrimmed emails, and factory phone numbers come from Ofcom's drama range. Deleting a business while a booking for it is part-way through can deadlock (reproduced locally, then rolled back). Only 08's sandbox clean-up deletes businesses, so 05's notes for 08 cover it.
 
+Sub-plan 06 is built, in one pull request waiting for review. It's built on #23's update to the plan, which merged on 2026-11-11. What 06 built:
+- **Room weights:** `services.room_weight`, from 0 to 10 with a check and a default of 10, and the sample business's 90-minute massage at 5.
+- **The score:** `WasteScorer` gives each offered slot a `WasteScore`. Its parts are the minutes it would strand, the room it would take from each kind of appointment, and 5 minutes for splitting a gap. Room is valued at the diary time each kind takes, buffers included, and averaged by room weight. Extra waste compares each slot with the best offered slot in its gap. `ServiceFit` does the fitting and counting in whole seconds, on the date's start times. Each day also has a `GapSummary` of its stranded and fragmented gaps.
+- **`AvailabilityService`** loads the active services in a sixth query, and takes the searched service's times from the same rows, so one made inactive after it was loaded is refused with `ServiceNotBookable`. `SlotFinder` refuses a search for a service the diary doesn't offer.
+- **`availability:show`** prints the day's stranded and fragmented time and each offered time's waste. After `migrate:fresh --seed`, the follow-up on Monday 23 November showed 06's sample morning exactly.
+- **Speed:** locally, `AvailabilityService` for 31 days of the sample business took a median of 48.5ms for the follow-up (563 slots), 44.9ms for the assessment and 41.9ms for the massage (20 runs each), against the plan's 200ms.
+- **Tests:** rules 8 to 13 join `SlotFinderRulesTest`, over the same 300 scenarios. 04's 129,114 checks are unchanged, and the 13 rules make 282,477. They also passed on seeds 7, 2027 and 31337 at 1,000 scenarios each. PHPUnit has 583 tests, which take about 25s on the host. Infection kills all 552 mutants in `app/Scheduling`, 7 of them by timing out, all endless loops.
+- **Found while building:** the new rules take the rules test from about 5s to 12s, so Infection's timeout went from 10s to 20s (see the decisions log). The first version had six mutants that changed nothing, such as a cache of each gap's counts. Scoring one gap at a time removed them. One mutant showed `lostRoom` had no test for leaving out kinds that lose nothing, so it gained one.
+- **Found in the review:** nothing gave a wrong result. `ServiceTimes::blockedAround()` replaced two copies of the blocked-time sums, `AvailabilityService` checks that a service is active only against the services query, and `availability:show` lists each service's room weight.
+- **Size:** about 670 lines of app code and 1,320 of tests, against the plan's estimate of 700 and 1,150.
+
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
 - Docker 29.9.2 and Compose v5.6.1, through Docker Desktop's WSL integration
@@ -57,9 +68,9 @@ Sub-plan 05 is done. Pull request #17 merged on 2026-11-05, and its run on `main
 
 ## Next up
 
-1. Review and merge #23, which brings 06's plan in line with 04's and 05's code.
-2. Build 06 with the `build-sub-plan` skill, in one pull request, as its plan now says.
-3. Then build 07 the same way. 07 predates the plans' **Pull requests** section, so its build starts by estimating its size and, if it's big, proposing a split. Each starts once the one before is merged and its deploy has been checked.
+1. Review and merge 06's build.
+2. After the build merges, check its deploy: Fly's release command runs `add_room_weight_to_services_table` on Neon, and any existing services get the default weight of 10.
+3. Then build 07 with the `build-sub-plan` skill. 07 predates the plans' **Pull requests** section, so its build starts by estimating its size and, if it's big, proposing a split. It starts once 06 is merged and its deploy has been checked.
 4. Then draft 08 with the `draft-sub-plan` skill, which asks the open questions waiting for it, such as Bookalive's colours and the lazy-loading guard.
 
 ## Sub-plan status
@@ -76,7 +87,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Done | Plan #7, build #14 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests (16.6s in CI) and Infection at 100% (389 mutants, 52s in CI). Merged on 2026-11-05; release v15 deployed it, with no migrations, and every check passed |
 | 05 | Making bookings | Done | Plan #7, build #17 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create`. Built on 2026-11-05, with 516 PHPUnit tests (17.5s in CI). Merged on 2026-11-05; release v18 ran its two migrations on Neon, and every check passed |
-| 06 | Waste score | In progress | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised in #23 on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request |
+| 06 | Waste score | Done | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised in #23 on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request. Built on 2026-11-11, with 583 PHPUnit tests and Infection at 100% (552 mutants). `AvailabilityService` for 31 days of the sample business: 48.5ms |
 | 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option. Its randomised rules renumbered 14 to 19 in #23 on 2026-11-11, after 06's |
 | | **Phase 3: Playground** | | | |
 | 08 | Scheduling playground | Not started | | |
@@ -203,6 +214,8 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-11 | Lost room values each kind of appointment at its diary time, buffers included, rather than its length alone | The user's decision, after checking 06 against 04's and 05's code. Buffers are part of how long an appointment takes, so a 50-minute session with 10 minutes after it scores the same as a 60-minute one with none, as 06's notes on buffers expect. It also matches fragmented time, where the longest service is the one taking the most diary time. None of the worked examples change, as they have no buffers |
 | 2026-11-11 | The service searched for must be one of the diary's offered services. `SlotFinder` refuses one that isn't, and `AvailabilityService` takes its times from the same query as the offered services, throwing `ServiceNotBookable` if it was made inactive after being loaded | The user's decision. Stranded time and lost room are worked out from the offered services, so a service outside them would be scored against the wrong ones. Taking its times from the same rows means a service made inactive part-way through a search gets the usual refusal, not an error from the engine |
 | 2026-11-11 | 06 is built in one pull request, although its estimate (about 700 lines of app code, and 1,900 in all) is over the guide | The user's choice. A split was considered: the scoring classes and their unit tests first, then connecting them to the engine, the database and `availability:show` |
+| 2026-11-11 | When several weighted kinds of appointment take the most diary time, a free gap is usable if any one of them fits | Found while building 06, whose plan spoke of "the longest kind". Two services can take the same diary time with their buffers placed differently, such as 60 minutes, or 50 with 10 minutes before, and they fit different gaps. A gap that can take one of the longest appointments the owner keeps room for isn't fragmented |
+| 2026-11-11 | Infection's timeout is 20 seconds, up from its default of 10, and rule 12 checks the pieces of every third slot | Found while building 06. Its rules took the rules test from about 5s to 12s. With a 10-second timeout, a mutant that only the rules could catch would count as caught by timing out, and one that escaped would be hidden the same way. Checking every slot took 4s of the 12, and every third slot still covers pieces of every length |
 
 ## Notes for the next session
 
