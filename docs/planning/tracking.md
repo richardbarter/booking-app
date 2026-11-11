@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-11-05
+Last updated: 2026-11-11
 
 ## Current status
 
@@ -57,9 +57,9 @@ Sub-plan 05 is done. Pull request #17 merged on 2026-11-05, and its run on `main
 
 ## Next up
 
-1. Review and merge #18, which adds sizing builds into reviewable pull requests to the `draft-sub-plan` and `build-sub-plan` skills, and the lazy-loading guard to the open questions for 08.
-2. Build 06 with the `build-sub-plan` skill. 06 predates the plans' **Pull requests** section, so the build starts by estimating its size and, if it's big, proposing a split.
-3. Then build 07 the same way. Each starts once the one before is merged and its deploy has been checked.
+1. Review and merge #23, which brings 06's plan in line with 04's and 05's code.
+2. Build 06 with the `build-sub-plan` skill, in one pull request, as its plan now says.
+3. Then build 07 the same way. 07 predates the plans' **Pull requests** section, so its build starts by estimating its size and, if it's big, proposing a split. Each starts once the one before is merged and its deploy has been checked.
 4. Then draft 08 with the `draft-sub-plan` skill, which asks the open questions waiting for it, such as Bookalive's colours and the lazy-loading guard.
 
 ## Sub-plan status
@@ -76,8 +76,8 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Done | Plan #7, build #14 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests (16.6s in CI) and Infection at 100% (389 mutants, 52s in CI). Merged on 2026-11-05; release v15 deployed it, with no migrations, and every check passed |
 | 05 | Making bookings | Done | Plan #7, build #17 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create`. Built on 2026-11-05, with 516 PHPUnit tests (17.5s in CI). Merged on 2026-11-05; release v18 ran its two migrations on Neon, and every check passed |
-| 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07 |
-| 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option |
+| 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised in #23 on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request |
+| 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option. Its randomised rules renumbered 14 to 19 in #23 on 2026-11-11, after 06's |
 | | **Phase 3: Playground** | | | |
 | 08 | Scheduling playground | Not started | | |
 | ★ | **Playground milestone** | | | |
@@ -200,6 +200,9 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 2026-11-05 | `AvailabilityService`'s bookings query uses time off's range, bound with its offset | Found checking 05 against 04's code before the build, and agreed by the user. 04's review found that binding a Carbon made the time off query depend on the connection's time zone; 05's plan predated that fix |
 | 2026-11-05 | 05's lock test holds `FOR SHARE` on the practitioner's row, not `FOR UPDATE`, and empties the tables again after it runs | Found while building. Saving a booking checks its foreign key to the practitioner, which takes `FOR KEY SHARE` on that row, so with `FOR UPDATE` the test passed even with `CreateBooking`'s own lock removed. `FOR SHARE` blocks only the action's `FOR UPDATE`. `DatabaseTruncation` empties tables only before each test, so without the clean-up its committed rows would reach later tests |
 | 2026-11-05 | `CreateBooking` finds or creates the customer with `firstOrCreate()`, not the plan's `createOrFirst()` | Found in the build's review. `createOrFirst()` tries the insert first, so every returning customer's booking failed an insert, and PostgreSQL's log recorded each failure with the customer's email (seen in the local database's log). `firstOrCreate()` looks first, and for a new customer falls back to `createOrFirst()`, so two first bookings with one email still can't both insert |
+| 2026-11-11 | Lost room values each kind of appointment at its diary time, buffers included, rather than its length alone | The user's decision, after checking 06 against 04's and 05's code. Buffers are part of how long an appointment takes, so a 50-minute session with 10 minutes after it scores the same as a 60-minute one with none, as 06's notes on buffers expect. It also matches fragmented time, where the longest service is the one taking the most diary time. None of the worked examples change, as they have no buffers |
+| 2026-11-11 | The service searched for must be one of the diary's offered services. `SlotFinder` refuses one that isn't, and `AvailabilityService` takes its times from the same query as the offered services, throwing `ServiceNotBookable` if it was made inactive after being loaded | The user's decision. Stranded time and lost room are worked out from the offered services, so a service outside them would be scored against the wrong ones. Taking its times from the same rows means a service made inactive part-way through a search gets the usual refusal, not an error from the engine |
+| 2026-11-11 | 06 is built in one pull request, although its estimate (about 700 lines of app code, and 1,900 in all) is over the guide | The user's choice. A split was considered: the scoring classes and their unit tests first, then connecting them to the engine, the database and `availability:show` |
 
 ## Notes for the next session
 
