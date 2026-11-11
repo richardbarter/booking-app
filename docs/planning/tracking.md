@@ -57,7 +57,7 @@ Sub-plan 05 is done. Pull request #17 merged on 2026-11-05, and its run on `main
 
 ## Next up
 
-1. Review and merge the update to 06's plan, which brings it in line with 04's and 05's code.
+1. Review and merge #23, which brings 06's plan in line with 04's and 05's code.
 2. Build 06 with the `build-sub-plan` skill, in one pull request, as its plan now says.
 3. Then build 07 the same way. 07 predates the plans' **Pull requests** section, so its build starts by estimating its size and, if it's big, proposing a split. Each starts once the one before is merged and its deploy has been checked.
 4. Then draft 08 with the `draft-sub-plan` skill, which asks the open questions waiting for it, such as Bookalive's colours and the lazy-loading guard.
@@ -76,8 +76,8 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Done | Plan #7, build #14 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests (16.6s in CI) and Infection at 100% (389 mutants, 52s in CI). Merged on 2026-11-05; release v15 deployed it, with no migrations, and every check passed |
 | 05 | Making bookings | Done | Plan #7, build #17 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create`. Built on 2026-11-05, with 516 PHPUnit tests (17.5s in CI). Merged on 2026-11-05; release v18 ran its two migrations on Neon, and every check passed |
-| 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request |
-| 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option. Its randomised rules renumbered 14 to 19 on 2026-11-11, after 06's |
+| 06 | Waste score | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised in #23 on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request |
+| 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option. Its randomised rules renumbered 14 to 19 in #23 on 2026-11-11, after 06's |
 | | **Phase 3: Playground** | | | |
 | 08 | Scheduling playground | Not started | | |
 | ★ | **Playground milestone** | | | |
