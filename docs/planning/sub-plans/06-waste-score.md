@@ -272,6 +272,7 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
   - the randomised rules take about 12 seconds after 06, against Infection's timeout of 20 seconds. 07's rules 14 to 19 add to that, so check the rules test's time again, and keep it well under the timeout
 - **08:**
   - the playground explains a hidden time from its `WasteScore`: "leaves 15 minutes nobody can book" from the stranded minutes, and "leaves room for one fewer 90-minute massage" from the lost room, compared with the best time in the gap
+  - `lostRoom` names each kind by its `ServiceTimes`, not by a service, and services with the same times are one kind. So 08 decides how an explanation names it: for example by matching the times to the business's services, or by giving `OfferedService` a label. Its kinds are in the order the services were added
   - its timeline highlights the day's stranded gaps
   - the sample business has no buffers (03), so the timeline is easy to read. A second sample business with buffers is noted in 03 for later
 - **10:**

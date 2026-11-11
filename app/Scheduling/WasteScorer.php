@@ -117,11 +117,17 @@ final readonly class WasteScorer
             fn (array $slot): array => $this->parts($fit, $gapCounts, [$gapStart, $slot[0]], [$slot[1], $gapEnd]),
             $slots,
         );
-        $minutes = array_map(fn (array $part): int => $part[0] + $part[1] + $part[2], $parts);
+        $minutes = array_map(fn (array $part): int => $part['strandedMinutes'] + $part['lostRoomMinutes'] + $part['splitMinutes'], $parts);
         $lowest = min($minutes);
 
         return array_map(
-            fn (array $part, int $total): WasteScore => new WasteScore($part[0], $part[1], $part[2], $total - $lowest, $part[3]),
+            fn (array $part, int $total): WasteScore => new WasteScore(
+                $part['strandedMinutes'],
+                $part['lostRoomMinutes'],
+                $part['splitMinutes'],
+                $total - $lowest,
+                $part['lostRoom'],
+            ),
             $parts,
             $minutes,
         );
@@ -152,12 +158,12 @@ final readonly class WasteScorer
 
     /**
      * A slot's stranded minutes, lost room in whole minutes, split cost and
-     * the kinds it takes room from.
+     * the kinds it takes room from, named as WasteScore names them.
      *
      * @param  list<int>  $gapCounts  how many of each weighted kind fit in the gap
      * @param  array{int, int}  $before  the piece left before the slot
      * @param  array{int, int}  $after  the piece left after it
-     * @return array{int, int, int, list<array{times: ServiceTimes, fewer: int}>}
+     * @return array{strandedMinutes: int, lostRoomMinutes: int, splitMinutes: int, lostRoom: list<array{times: ServiceTimes, fewer: int}>}
      */
     private function parts(ServiceFit $fit, array $gapCounts, array $before, array $after): array
     {
@@ -174,10 +180,12 @@ final readonly class WasteScorer
             }
         }
 
-        $lostRoomMinutes = $this->totalWeight === 0 ? 0 : intdiv(2 * $lostMinutes + $this->totalWeight, 2 * $this->totalWeight);
-        $split = $before[0] < $before[1] && $after[0] < $after[1] ? self::SPLIT_MINUTES : 0;
-
-        return [$stranded, $lostRoomMinutes, $split, $lostRoom];
+        return [
+            'strandedMinutes' => $stranded,
+            'lostRoomMinutes' => $this->totalWeight === 0 ? 0 : intdiv(2 * $lostMinutes + $this->totalWeight, 2 * $this->totalWeight),
+            'splitMinutes' => $before[0] < $before[1] && $after[0] < $after[1] ? self::SPLIT_MINUTES : 0,
+            'lostRoom' => $lostRoom,
+        ];
     }
 
     /**

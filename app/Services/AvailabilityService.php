@@ -104,7 +104,8 @@ class AvailabilityService
      * The active services, which in v1 the practitioner offers, and the
      * times of the one searched for, taken from the same rows so the engine
      * always finds it among them. Only their times and room weights are
-     * read.
+     * read. They're in the order they were added, so a slot's lostRoom
+     * lists its kinds in the same order every time.
      *
      * @return array{list<OfferedService>, ServiceTimes}
      *
@@ -114,6 +115,7 @@ class AvailabilityService
     {
         $services = $business->services()
             ->active()
+            ->orderBy('id')
             ->get(['id', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'room_weight']);
         $offered = [];
         $searchedFor = null;

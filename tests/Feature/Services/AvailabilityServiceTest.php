@@ -272,6 +272,25 @@ class AvailabilityServiceTest extends TestCase
         $this->assertSame([23, 35], [$before, $after]);
     }
 
+    /**
+     * The query plan is set to read the table in its stored order, as
+     * PostgreSQL may for a business with more services. An update moves the
+     * row to the end, so without an ORDER BY the follow-up would come last.
+     */
+    public function test_lists_the_kinds_a_slot_takes_room_from_in_the_order_of_the_services(): void
+    {
+        $business = $this->sampleBusiness();
+        $this->service('Physio follow-up')->update(['room_weight' => 9]);
+        DB::statement('SET LOCAL enable_indexscan = off');
+        DB::statement('SET LOCAL enable_bitmapscan = off');
+
+        $day = $this->availability($business, 'Physio follow-up', '2026-11-09', '2026-11-09')->day('2026-11-09');
+
+        $this->assertNotNull($day);
+        $slot = $day->slots[array_search('10:00', array_map(fn (Slot $slot): string => $slot->startsAt->setTimezone('Europe/London')->format('H:i'), $day->slots), true)];
+        $this->assertSame([30, 60, 90], array_map(fn (array $kind): int => $kind['times']->durationMinutes, $slot->waste->lostRoom));
+    }
+
     public function test_an_inactive_service_does_not_count_when_scoring(): void
     {
         $business = $this->sampleBusiness();
