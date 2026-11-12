@@ -280,12 +280,15 @@ class CreateBookingTest extends TestCase
     }
 
     /**
-     * The sample business, made the current business.
+     * The sample business, made the current business. It's at strictness 0
+     * unless a test gives another, since most of these tests are about what
+     * fits and what's booked, not what strictness hides (07).
      */
-    private function sampleBusiness(): Business
+    private function sampleBusiness(int $strictness = 0): Business
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-02 08:00', 'Europe/London'));
         $business = app(CreateSampleBusiness::class)->handle();
+        $business->update(['strictness' => $strictness]);
         app(CurrentBusiness::class)->set($business);
 
         return $business;

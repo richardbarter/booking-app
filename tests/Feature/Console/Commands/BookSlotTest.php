@@ -190,11 +190,18 @@ class BookSlotTest extends TestCase
         $this->assertSame([], DB::getQueryLog());
     }
 
-    private function sampleBusiness(): Business
+    /**
+     * The sample business, at strictness 0 unless a test gives another,
+     * since most of these tests are about booking what fits, not what
+     * strictness hides (07).
+     */
+    private function sampleBusiness(int $strictness = 0): Business
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-02 08:00', 'Europe/London'));
+        $business = app(CreateSampleBusiness::class)->handle();
+        $business->update(['strictness' => $strictness]);
 
-        return app(CreateSampleBusiness::class)->handle();
+        return $business;
     }
 
     private function service(Business $business, string $name): Service

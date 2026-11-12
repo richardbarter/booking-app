@@ -15,7 +15,9 @@ use Carbon\CarbonImmutable;
 
 /**
  * One random diary and search for the randomised rule checks, with the
- * seed and number that recreate it.
+ * seed and number that recreate it. The compared strictness is a second
+ * strictness to search the same diary at, for the rules that compare two
+ * (07).
  */
 final readonly class Scenario
 {
@@ -36,6 +38,7 @@ final readonly class Scenario
         public DateRange $dates,
         public CarbonImmutable $now,
         public array $offeredServices,
+        public int $comparedStrictness,
     ) {}
 
     public function diary(): Diary
@@ -58,6 +61,9 @@ final readonly class Scenario
             'slot_interval_minutes' => $this->settings->slotIntervalMinutes,
             'min_notice_minutes' => $this->settings->minNoticeMinutes,
             'max_advance_days' => $this->settings->maxAdvanceDays,
+            'strictness' => $this->settings->strictness,
+            'compared_strictness' => $this->comparedStrictness,
+            'relaxation_hours' => $this->settings->relaxationHours,
             'service' => [
                 'duration_minutes' => $this->service->durationMinutes,
                 'buffer_before_minutes' => $this->service->bufferBeforeMinutes,

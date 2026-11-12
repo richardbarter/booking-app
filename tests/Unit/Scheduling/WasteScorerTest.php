@@ -311,7 +311,7 @@ class WasteScorerTest extends TestCase
         $availability = (new SlotFinder)->find(
             new Diary(new WorkingHours([], [self::MONDAY => DayHours::fromArray($hours)]), $offered, $blockedTimes),
             $searched,
-            new BookingSettings(new DateTimeZone('Europe/London'), 15, $minNoticeMinutes, 90),
+            new BookingSettings(new DateTimeZone('Europe/London'), 15, $minNoticeMinutes, 90, strictness: 0, relaxationHours: 48),
             DateRange::between(CarbonImmutable::parse(self::MONDAY), CarbonImmutable::parse(self::MONDAY)),
             CarbonImmutable::parse($now, 'Europe/London'),
         );
