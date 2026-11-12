@@ -233,7 +233,7 @@ class SlotFinderRulesTest extends TestCase
                     continue;
                 }
 
-                $checkRule($scenario, $availability, function (bool $holds, string $detail) use (&$outcomes, $rule, $description, $scenario): void {
+                $checkRule($scenario, $availability, function (bool $holds, Closure $detail) use (&$outcomes, $rule, $description, $scenario): void {
                     if ($outcomes[$rule]['failure'] !== null) {
                         return;
                     }
@@ -250,7 +250,7 @@ class SlotFinderRulesTest extends TestCase
                         $description,
                         $scenario->seed,
                         $scenario->number,
-                        $detail,
+                        $detail(),
                         $scenario->toJson(),
                     );
                 });
@@ -263,9 +263,11 @@ class SlotFinderRulesTest extends TestCase
     /**
      * Each rule's description and its check. A check is given a scenario,
      * the engine's result, and a function to call with whether each part of
-     * the rule holds.
+     * the rule holds and a function that describes it. The description is
+     * only worked out when the part fails, since formatting times for every
+     * check would slow the rules down.
      *
-     * @return array<int, array{string, Closure(Scenario, Availability, Closure(bool, string): void): void}>
+     * @return array<int, array{string, Closure(Scenario, Availability, Closure(bool, Closure(): string): void): void}>
      */
     private function rules(): array
     {
@@ -293,7 +295,7 @@ class SlotFinderRulesTest extends TestCase
     }
 
     /**
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function slotTimesAgree(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -307,13 +309,13 @@ class SlotFinderRulesTest extends TestCase
                 $end === $start + $service->durationMinutes * self::SECONDS_IN_MINUTE
                     && $slot->blockedFrom->getTimestamp() === $start - $service->bufferBeforeMinutes * self::SECONDS_IN_MINUTE
                     && $slot->blockedUntil->getTimestamp() === $end + $service->bufferAfterMinutes * self::SECONDS_IN_MINUTE,
-                "{$day->date}: {$this->describe($slot)}",
+                fn (): string => "{$day->date}: {$this->describe($slot)}",
             );
         }
     }
 
     /**
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function slotsFit(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -325,13 +327,13 @@ class SlotFinderRulesTest extends TestCase
 
             $check(
                 $this->insideOne($from, $until, $this->timestamps($day->workingTimes)) && ! $this->overlapsAny($from, $until, $blocked),
-                "{$day->date}: {$this->describe($slot)}",
+                fn (): string => "{$day->date}: {$this->describe($slot)}",
             );
         }
     }
 
     /**
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function slotsOnTheInterval(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -342,20 +344,20 @@ class SlotFinderRulesTest extends TestCase
                 $local->format('Y-m-d') === $day->date
                     && $local->second === 0
                     && ($local->hour * 60 + $local->minute) % $scenario->settings->slotIntervalMinutes === 0,
-                "{$day->date}: {$this->describe($slot)}",
+                fn (): string => "{$day->date}: {$this->describe($slot)}",
             );
         }
     }
 
     /**
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function slotsInsideTheWindow(Scenario $scenario, Availability $availability, Closure $check): void
     {
         foreach ($this->slotsOf($availability) as [$day, $slot]) {
             $check(
                 $this->insideWindow($scenario, $slot->startsAt->getTimestamp(), $day->date),
-                "{$day->date}: {$this->describe($slot)}",
+                fn (): string => "{$day->date}: {$this->describe($slot)}",
             );
         }
     }
@@ -366,7 +368,7 @@ class SlotFinderRulesTest extends TestCase
      * without free gaps. This catches times that are missed as well as
      * times that shouldn't be there.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function slotsMatchBruteForce(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -374,7 +376,7 @@ class SlotFinderRulesTest extends TestCase
             $expected = $this->fittingStartsOn($scenario, $day->date);
             $actual = $this->startsOf($this->everySlot($day));
 
-            $check($actual === $expected, sprintf(
+            $check($actual === $expected, fn (): string => sprintf(
                 '%s: expected %s, got %s',
                 $day->date,
                 $this->localTimes($expected, $scenario->settings->timezone),
@@ -390,7 +392,7 @@ class SlotFinderRulesTest extends TestCase
      * lists are in time order, and each slot's gap is one of the day's
      * gaps and contains it.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function freeGapsMatch(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -428,10 +430,10 @@ class SlotFinderRulesTest extends TestCase
                 }
             }
 
-            $check($gaps === $expected, "{$day->date}: free gaps expected ".json_encode($expected).', got '.json_encode($gaps));
+            $check($gaps === $expected, fn (): string => "{$day->date}: free gaps expected ".json_encode($expected).', got '.json_encode($gaps));
             $check(
                 $this->inOrderWithoutTouching($workingTimes) && $this->inOrderWithoutTouching($gaps),
-                "{$day->date}: working times and free gaps out of order, or touching",
+                fn (): string => "{$day->date}: working times and free gaps out of order, or touching",
             );
 
             $previousStart = null;
@@ -445,7 +447,7 @@ class SlotFinderRulesTest extends TestCase
                         && $gap[0] <= $slot->blockedFrom->getTimestamp()
                         && $slot->blockedUntil->getTimestamp() <= $gap[1]
                         && ($previousStart === null || $previousStart < $start),
-                    "{$day->date}: {$this->describe($slot)}",
+                    fn (): string => "{$day->date}: {$this->describe($slot)}",
                 );
 
                 $previousStart = $start;
@@ -454,7 +456,7 @@ class SlotFinderRulesTest extends TestCase
     }
 
     /**
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function oneDayForEachDate(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -470,11 +472,11 @@ class SlotFinderRulesTest extends TestCase
 
         $actual = array_map(fn (DayAvailability $day): string => $day->date, $availability->days);
 
-        $check($actual === $expected, 'days: '.implode(', ', $actual));
+        $check($actual === $expected, fn (): string => 'days: '.implode(', ', $actual));
     }
 
     /**
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function wastePartsAddUp(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -486,13 +488,13 @@ class SlotFinderRulesTest extends TestCase
                     && $waste->lostRoomMinutes >= 0
                     && $waste->splitMinutes >= 0
                     && $waste->minutes === $waste->strandedMinutes + $waste->lostRoomMinutes + $waste->splitMinutes,
-                "{$day->date}: {$this->describe($slot)}",
+                fn (): string => "{$day->date}: {$this->describe($slot)}",
             );
         }
     }
 
     /**
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function bestInEachGap(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -509,7 +511,7 @@ class SlotFinderRulesTest extends TestCase
                 foreach ($slots as $slot) {
                     $check(
                         $slot->waste->extraMinutes === $slot->waste->minutes - $lowest,
-                        "{$day->date}: lowest waste in the gap {$lowest}, {$this->describe($slot)}",
+                        fn (): string => "{$day->date}: lowest waste in the gap {$lowest}, {$this->describe($slot)}",
                     );
                 }
             }
@@ -520,7 +522,7 @@ class SlotFinderRulesTest extends TestCase
      * Runs the same search with now three days earlier, which moves the
      * booking window, and compares the slots offered both times.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function wasteIgnoresNow(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -543,7 +545,7 @@ class SlotFinderRulesTest extends TestCase
             if (isset($earlierWaste[$start])) {
                 $check(
                     $earlierWaste[$start] === $slot->waste->minutes,
-                    "{$day->date}: waste {$slot->waste->minutes}, but {$earlierWaste[$start]} three days earlier, {$this->describe($slot)}",
+                    fn (): string => "{$day->date}: waste {$slot->waste->minutes}, but {$earlierWaste[$start]} three days earlier, {$this->describe($slot)}",
                 );
             }
         }
@@ -554,7 +556,7 @@ class SlotFinderRulesTest extends TestCase
      * and every offered service, whatever its weight. The piece is stranded
      * exactly when none fits.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function strandedMatchesBruteForce(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -570,7 +572,7 @@ class SlotFinderRulesTest extends TestCase
 
             $check(
                 $slot->waste->strandedMinutes === $expected,
-                "{$day->date}: expected {$expected} stranded minutes, got {$slot->waste->strandedMinutes}, {$this->describe($slot)}",
+                fn (): string => "{$day->date}: expected {$expected} stranded minutes, got {$slot->waste->strandedMinutes}, {$this->describe($slot)}",
             );
         }
     }
@@ -581,7 +583,7 @@ class SlotFinderRulesTest extends TestCase
      * choice of start times. Its counts in the two pieces never add up to
      * more than in the gap.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function countsMatchBruteForce(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -615,12 +617,12 @@ class SlotFinderRulesTest extends TestCase
 
                         if ($until - $from <= self::LONGEST_PIECE_TO_COUNT_SECONDS) {
                             $most = $this->mostThatFit($kind, $times, $from, $until);
-                            $check($count === $most, "{$day->date}: counted {$count} of {$this->describeKind($kind)}, but {$most} fit in {$this->describeRange($from, $until)}");
+                            $check($count === $most, fn (): string => "{$day->date}: counted {$count} of {$this->describeKind($kind)}, but {$most} fit in {$this->describeRange($from, $until)}");
                         }
                     }
 
                     $inGap = $fit->count($kind, $gapStart, $gapEnd);
-                    $check($inPieces <= $inGap, "{$day->date}: {$inPieces} of {$this->describeKind($kind)} in the pieces, but {$inGap} in the gap, {$this->describe($slot)}");
+                    $check($inPieces <= $inGap, fn (): string => "{$day->date}: {$inPieces} of {$this->describeKind($kind)} in the pieces, but {$inGap} in the gap, {$this->describe($slot)}");
                 }
             }
         }
@@ -630,7 +632,7 @@ class SlotFinderRulesTest extends TestCase
      * Works out which free gaps are stranded and fragmented by trying every
      * clock time on the interval, with the kinds' weights added up here.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function gapSummaryMatches(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -667,13 +669,13 @@ class SlotFinderRulesTest extends TestCase
             $check(
                 $this->timestamps($summary->stranded) === $this->timestamps($expectedStranded)
                     && $this->timestamps($summary->fragmented) === $this->timestamps($expectedFragmented),
-                "{$day->date}: stranded ".json_encode($this->timestamps($summary->stranded)).', fragmented '.json_encode($this->timestamps($summary->fragmented))
+                fn (): string => "{$day->date}: stranded ".json_encode($this->timestamps($summary->stranded)).', fragmented '.json_encode($this->timestamps($summary->fragmented))
                     .', expected '.json_encode($this->timestamps($expectedStranded)).' and '.json_encode($this->timestamps($expectedFragmented)),
             );
             $check(
                 $summary->strandedMinutes() === $this->wholeMinutes($expectedStranded)
                     && $summary->fragmentedMinutes() === $this->wholeMinutes($expectedFragmented),
-                "{$day->date}: {$summary->strandedMinutes()} stranded and {$summary->fragmentedMinutes()} fragmented minutes",
+                fn (): string => "{$day->date}: {$summary->strandedMinutes()} stranded and {$summary->fragmentedMinutes()} fragmented minutes",
             );
         }
     }
@@ -682,7 +684,7 @@ class SlotFinderRulesTest extends TestCase
      * Compares the scenario's search with the same search at its compared
      * strictness.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function higherStrictnessOffersASubset(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -694,7 +696,7 @@ class SlotFinderRulesTest extends TestCase
             $offered = $this->startsOf($day->slots);
             $offeredWhenLower = $this->startsOf($lower->days[$index]->slots);
 
-            $check(array_diff($offered, $offeredWhenLower) === [], sprintf(
+            $check(array_diff($offered, $offeredWhenLower) === [], fn (): string => sprintf(
                 '%s: strictness %d offers %s, but %d offers only %s',
                 $day->date,
                 $higherStrictness,
@@ -709,7 +711,7 @@ class SlotFinderRulesTest extends TestCase
      * Checked on each of the two searches that's at strictness 0. A sixth of
      * each are.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function strictness0HidesNothing(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -719,7 +721,7 @@ class SlotFinderRulesTest extends TestCase
             }
 
             foreach ($run->days as $day) {
-                $check($day->hiddenSlots === [], "{$day->date}: hid {$this->localTimes($this->startsOf($day->hiddenSlots), $scenario->settings->timezone)}");
+                $check($day->hiddenSlots === [], fn (): string => "{$day->date}: hid {$this->localTimes($this->startsOf($day->hiddenSlots), $scenario->settings->timezone)}");
             }
         }
     }
@@ -730,7 +732,7 @@ class SlotFinderRulesTest extends TestCase
      * must be the brute-force slots, so a slot that's both offered and
      * hidden would appear twice and fail.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function offeredAndHiddenAreEverySlot(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -745,7 +747,7 @@ class SlotFinderRulesTest extends TestCase
 
                 $check(
                     $this->inTimeOrder($offered) && $this->inTimeOrder($hidden) && $together === $this->fittingStartsOn($scenario, $day->date),
-                    "{$day->date}: at strictness {$strictness}, offered {$this->localTimes($offered, $zone)} and hidden {$this->localTimes($hidden, $zone)}, but "
+                    fn (): string => "{$day->date}: at strictness {$strictness}, offered {$this->localTimes($offered, $zone)} and hidden {$this->localTimes($hidden, $zone)}, but "
                         .$this->localTimes($this->fittingStartsOn($scenario, $day->date), $zone).' fit',
                 );
             }
@@ -757,7 +759,7 @@ class SlotFinderRulesTest extends TestCase
      * the gaps that offer a time at 0 are those of every slot, offered or
      * hidden.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function everyGapKeepsATime(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -767,7 +769,7 @@ class SlotFinderRulesTest extends TestCase
                 $gapsOffering = array_flip(array_map(fn (Slot $slot): int => $slot->gap->start->getTimestamp(), $day->slots));
 
                 foreach (array_unique($gapsWithATime) as $gapStart) {
-                    $check(isset($gapsOffering[$gapStart]), sprintf(
+                    $check(isset($gapsOffering[$gapStart]), fn (): string => sprintf(
                         '%s: at strictness %d, the free gap from %s offers no time',
                         $day->date,
                         $strictness,
@@ -782,7 +784,7 @@ class SlotFinderRulesTest extends TestCase
      * Both searches offer every slot that fits and starts inside the
      * window, as strictness 0 does.
      *
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function relaxationWindowIgnoresStrictness(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -794,7 +796,7 @@ class SlotFinderRulesTest extends TestCase
                 $offered = array_values(array_filter($this->startsOf($day->slots), $inside));
                 $fitting = array_values(array_filter($this->fittingStartsOn($scenario, $day->date), $inside));
 
-                $check($offered === $fitting, sprintf(
+                $check($offered === $fitting, fn (): string => sprintf(
                     '%s: at strictness %d, offered %s inside the relaxation window, but %s fit',
                     $day->date,
                     $strictness,
@@ -806,7 +808,7 @@ class SlotFinderRulesTest extends TestCase
     }
 
     /**
-     * @param  Closure(bool, string): void  $check
+     * @param  Closure(bool, Closure(): string): void  $check
      */
     private function hiddenSlotsAreAboveTheThreshold(Scenario $scenario, Availability $availability, Closure $check): void
     {
@@ -817,7 +819,7 @@ class SlotFinderRulesTest extends TestCase
                 foreach ($day->hiddenSlots as $slot) {
                     $check(
                         $slot->startsAt->getTimestamp() > $windowEnds && $this->aboveThreshold($slot, $strictness),
-                        "{$day->date}: at strictness {$strictness}, hid a slot with extra waste {$slot->waste->extraMinutes}, {$this->describe($slot)}",
+                        fn (): string => "{$day->date}: at strictness {$strictness}, hid a slot with extra waste {$slot->waste->extraMinutes}, {$this->describe($slot)}",
                     );
                 }
 
@@ -825,7 +827,7 @@ class SlotFinderRulesTest extends TestCase
                     if ($slot->startsAt->getTimestamp() > $windowEnds) {
                         $check(
                             ! $this->aboveThreshold($slot, $strictness),
-                            "{$day->date}: at strictness {$strictness}, offered a slot with extra waste {$slot->waste->extraMinutes}, {$this->describe($slot)}",
+                            fn (): string => "{$day->date}: at strictness {$strictness}, offered a slot with extra waste {$slot->waste->extraMinutes}, {$this->describe($slot)}",
                         );
                     }
                 }
