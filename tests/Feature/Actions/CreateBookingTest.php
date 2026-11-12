@@ -174,6 +174,24 @@ class CreateBookingTest extends TestCase
         $this->assertRefusedWithNothingWritten(fn () => $this->book($business, $this->service('Physio assessment'), $startsAt));
     }
 
+    public function test_refuses_a_time_that_strictness_hides_and_writes_nothing(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+
+        $this->assertRefusedWithNothingWritten(fn () => $this->book($business, $this->service('Physio assessment'), '2026-11-09 09:15'));
+    }
+
+    public function test_books_a_time_that_strictness_would_hide_once_it_is_inside_the_relaxation_window(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $this->travelTo(CarbonImmutable::parse('2026-11-08 12:00', 'Europe/London'));
+
+        $booking = $this->book($business, $this->service('Physio assessment'), '2026-11-09 09:15');
+
+        $this->assertTrue(Booking::query()->sole()->is($booking));
+        $this->assertSame('2026-11-09T09:15:00+00:00', $booking->starts_at->toIso8601String());
+    }
+
     public function test_a_cancelled_bookings_time_can_be_booked_again(): void
     {
         $business = $this->sampleBusiness();
