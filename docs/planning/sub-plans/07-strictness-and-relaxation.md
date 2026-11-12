@@ -218,7 +218,7 @@ These are the overview's last three rules (section 10), plus the checks that the
 
 ## Done when
 
-- [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
+- [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
 - [x] `php artisan availability:show 1 <assessment's ID> --date=<a Monday at least 3 days ahead>` shows offered and hidden times locally, and `--strictness=0` shows them all
 - [x] `php artisan booking:create 1 <assessment's ID> "<that Monday> <a hidden time>" --strictness=0` books a time that `availability:show` lists as hidden, locally
 - [ ] The deploy after merging runs the migration on Neon (Fly's release command succeeds)
