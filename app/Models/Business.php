@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * The tenant: everything else belongs to a business. It isn't scoped itself.
+ * Strictness, from 0 to 100, says how tightly its diary is packed, and the
+ * relaxation window is how many hours before each time strictness stops
+ * applying (07).
  *
  * @property int $id
  * @property string $name
@@ -19,13 +22,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $slot_interval_minutes
  * @property int $min_notice_minutes
  * @property int $max_advance_days
+ * @property int $strictness
+ * @property int $relaxation_hours
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read Collection<int, Practitioner> $practitioners
  * @property-read Collection<int, Service> $services
  * @property-read Collection<int, Customer> $customers
  */
-#[Fillable(['name', 'timezone', 'slot_interval_minutes', 'min_notice_minutes', 'max_advance_days'])]
+#[Fillable(['name', 'timezone', 'slot_interval_minutes', 'min_notice_minutes', 'max_advance_days', 'strictness', 'relaxation_hours'])]
 class Business extends Model
 {
     /** @use HasFactory<BusinessFactory> */
@@ -42,6 +47,8 @@ class Business extends Model
         'slot_interval_minutes' => 15,
         'min_notice_minutes' => 120,
         'max_advance_days' => 90,
+        'strictness' => 50,
+        'relaxation_hours' => 48,
     ];
 
     /**
@@ -83,6 +90,8 @@ class Business extends Model
             'slot_interval_minutes' => 'integer',
             'min_notice_minutes' => 'integer',
             'max_advance_days' => 'integer',
+            'strictness' => 'integer',
+            'relaxation_hours' => 'integer',
         ];
     }
 }
