@@ -1,6 +1,6 @@
 # Tracking
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
 
 ## Current status
 
@@ -46,7 +46,7 @@ Sub-plan 05 is done. Pull request #17 merged on 2026-11-05, and its run on `main
 - **Found while building:** the lock test holds `FOR SHARE`, since the booking's foreign key check also waits on a `FOR UPDATE`. `createOrFirst()` made PostgreSQL log a returning customer's email, so `CreateBooking` uses `firstOrCreate()`.
 - **Found in the pull request's second review:** the lock test also checks that the diary isn't read before the lock is taken, the database refuses untrimmed emails, and factory phone numbers come from Ofcom's drama range. Deleting a business while a booking for it is part-way through can deadlock (reproduced locally, then rolled back). Only 08's sandbox clean-up deletes businesses, so 05's notes for 08 cover it.
 
-Sub-plan 06 is built, in pull request #24, which waits for review. It's built on #23's update to the plan, which merged on 2026-11-11. What 06 built:
+Sub-plan 06 is done. Pull request #24 merged on 2026-11-12, and its run on `main` passed `checks` (3m14s), `audit` and `deploy`. Fly's release v23 ran `add_room_weight_to_services_table` on Neon. Afterwards `/`, `/login` and `/up` returned 200. It's built on #23's update to the plan, which merged on 2026-11-11. What 06 built:
 - **Room weights:** `services.room_weight`, from 0 to 10 with a check and a default of 10, and the sample business's 90-minute massage at 5.
 - **The score:** `WasteScorer` gives each offered slot a `WasteScore`. Its parts are the minutes it would strand, the room it would take from each kind of appointment, and 5 minutes for splitting a gap. Room is valued at the diary time each kind takes, buffers included, and averaged by room weight. Extra waste compares each slot with the best offered slot in its gap. `ServiceFit` does the fitting and counting in whole seconds, on the date's start times. Each day also has a `GapSummary` of its stranded and fragmented gaps.
 - **`AvailabilityService`** loads the active services in a sixth query, and takes the searched service's times from the same rows, so one made inactive after it was loaded is refused with `ServiceNotBookable`. `SlotFinder` refuses a search for a service the diary doesn't offer.
@@ -68,10 +68,9 @@ Sub-plan 06 is built, in pull request #24, which waits for review. It's built on
 
 ## Next up
 
-1. Review and merge #24, 06's build.
-2. After the build merges, check its deploy: Fly's release command runs `add_room_weight_to_services_table` on Neon, and any existing services get the default weight of 10.
-3. Then build 07 with the `build-sub-plan` skill. 07 predates the plans' **Pull requests** section, so its build starts by estimating its size and, if it's big, proposing a split. It starts once 06 is merged and its deploy has been checked.
-4. Then draft 08 with the `draft-sub-plan` skill, which asks the open questions waiting for it, such as Bookalive's colours and the lazy-loading guard.
+1. Build 07 with the `build-sub-plan` skill, on `feature/07-strictness-and-relaxation`. 07 predates the plans' **Pull requests** section, so its build starts by checking the plan against 06's code and estimating its size.
+2. After 07's build merges, check its deploy: Fly's release command adds `strictness` and `relaxation_hours` to `businesses` on Neon, and existing businesses get the defaults of 50 and 48.
+3. Then draft 08 with the `draft-sub-plan` skill, which asks the open questions waiting for it, such as Bookalive's colours and the lazy-loading guard.
 
 ## Sub-plan status
 
@@ -87,8 +86,8 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | | **Phase 2: Scheduling engine** | | | |
 | 04 | Availability engine | Done | Plan #7, build #14 | Drafted 2026-11-02 and merged with 03 and 05 to 07. Built on 2026-11-04, with 435 PHPUnit tests (16.6s in CI) and Infection at 100% (389 mutants, 52s in CI). Merged on 2026-11-05; release v15 deployed it, with no migrations, and every check passed |
 | 05 | Making bookings | Done | Plan #7, build #17 | Drafted 2026-11-02 and merged with 03, 04, 06 and 07. Revised in #9 on 2026-11-02 to add `booking:create`. Built on 2026-11-05, with 516 PHPUnit tests (17.5s in CI). Merged on 2026-11-05; release v18 ran its two migrations on Neon, and every check passed |
-| 06 | Waste score | Done | Plan #7, revised #23, build #24 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised in #23 on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request. Built on 2026-11-11, with 584 PHPUnit tests and Infection at 100% (540 mutants). `AvailabilityService` for 31 days of the sample business: 48.5ms |
-| 07 | Strictness and relaxation | Planned | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option. Its randomised rules renumbered 14 to 19 in #23 on 2026-11-11, after 06's |
+| 06 | Waste score | Done | Plan #7, revised #23, build #24 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised in #23 on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request. Built on 2026-11-11, with 584 PHPUnit tests and Infection at 100% (540 mutants). `AvailabilityService` for 31 days of the sample business: 48.5ms. Merged on 2026-11-12; release v23 ran its migration on Neon, and every check passed |
+| 07 | Strictness and relaxation | In progress | Plan #7 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option. Its randomised rules renumbered 14 to 19 in #23 on 2026-11-11, after 06's |
 | | **Phase 3: Playground** | | | |
 | 08 | Scheduling playground | Not started | | |
 | ★ | **Playground milestone** | | | |
