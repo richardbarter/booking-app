@@ -4,8 +4,8 @@ namespace App\Scheduling;
 
 /**
  * One date's diary as the engine sees it. Only the slots are limited by
- * the booking window, so any date's working times and free gaps can be
- * drawn. Each list is in time order.
+ * the booking window, so any date's working times, free gaps and gap
+ * summary can be drawn. Each list is in time order.
  */
 final readonly class DayAvailability
 {
@@ -20,5 +20,6 @@ final readonly class DayAvailability
         public array $workingTimes,
         public array $freeGaps,
         public array $slots,
+        public GapSummary $gapSummary,
     ) {}
 }

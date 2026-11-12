@@ -31,9 +31,54 @@ class ShowAvailabilityTest extends TestCase
             ->expectsOutput('Monday 9 November 2026, Europe/London')
             ->expectsOutput('Working hours  09:00–13:00, 14:00–17:30')
             ->expectsOutput('Free gaps      09:00–13:00, 14:00–17:30')
+            ->expectsOutput('Stranded       none')
+            ->expectsOutput('Fragmented     none')
             ->expectsOutput('Offered times  24')
             ->expectsOutput('  09:00 09:15 09:30 09:45 10:00 10:15 10:30 10:45 11:00 11:15 11:30 11:45')
             ->expectsOutput('  12:00 14:00 14:15 14:30 14:45 15:00 15:15 15:30 15:45 16:00 16:15 16:30')
+            ->assertSuccessful();
+    }
+
+    public function test_prints_each_offered_times_waste_score(): void
+    {
+        $business = $this->sampleBusiness();
+        $followUp = $this->service($business, 'Physio follow-up');
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $followUp->id, '--date' => '2026-11-14'])
+            ->expectsOutput('Saturday 14 November 2026, Europe/London')
+            ->expectsTable(['Time', 'Extra waste', 'Waste', 'Stranded', 'Lost room', 'Split'], [
+                ['09:00', 0, 36, 0, 36, 0],
+                ['09:15', 32, 68, 15, 48, 5],
+                ['09:30', 5, 41, 0, 36, 5],
+                ['09:45', 59, 95, 0, 90, 5],
+                ['10:00', 23, 59, 0, 54, 5],
+                ['10:15', 35, 71, 0, 66, 5],
+                ['10:30', 5, 41, 0, 36, 5],
+                ['10:45', 41, 77, 0, 72, 5],
+                ['11:00', 5, 41, 0, 36, 5],
+                ['11:15', 35, 71, 0, 66, 5],
+                ['11:30', 23, 59, 0, 54, 5],
+                ['11:45', 59, 95, 0, 90, 5],
+                ['12:00', 5, 41, 0, 36, 5],
+                ['12:15', 32, 68, 15, 48, 5],
+                ['12:30', 0, 36, 0, 36, 0],
+            ])
+            ->assertSuccessful();
+    }
+
+    public function test_prints_the_days_stranded_and_fragmented_time(): void
+    {
+        $business = $this->sampleBusiness();
+        $followUp = $this->service($business, 'Physio follow-up');
+        app(CurrentBusiness::class)->run($business, fn () => $business->practitioners()->sole()->timeOff()->create([
+            'starts_at' => CarbonImmutable::parse('2026-11-09 09:15', 'Europe/London'),
+            'ends_at' => CarbonImmutable::parse('2026-11-09 12:00', 'Europe/London'),
+        ]));
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $followUp->id, '--date' => '2026-11-09'])
+            ->expectsOutput('Free gaps      09:00–09:15, 12:00–13:00, 14:00–17:30')
+            ->expectsOutput('Stranded       15 min: 09:00–09:15')
+            ->expectsOutput('Fragmented     60 min: 12:00–13:00')
             ->assertSuccessful();
     }
 
@@ -104,7 +149,9 @@ class ShowAvailabilityTest extends TestCase
         $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => '2026-11-08'])
             ->expectsOutput('Working hours  none')
             ->expectsOutput('Free gaps      none')
+            ->expectsOutput('Stranded       none')
             ->expectsOutput('Offered times  0')
+            ->doesntExpectOutputToContain('Extra waste')
             ->assertSuccessful();
     }
 
@@ -142,10 +189,10 @@ class ShowAvailabilityTest extends TestCase
         });
 
         $this->artisan('availability:show', ['business' => $business->id])
-            ->expectsTable(['ID', 'Name', 'Length', 'Buffer before', 'Buffer after', 'Active'], [
-                [$ids[0], 'Physio follow-up', '30 min', '0 min', '0 min', 'Yes'],
-                [$ids[1], 'Physio assessment', '60 min', '0 min', '0 min', 'Yes'],
-                [$ids[2], 'Sports massage, 90 minutes', '90 min', '0 min', '0 min', 'No'],
+            ->expectsTable(['ID', 'Name', 'Length', 'Buffer before', 'Buffer after', 'Room weight', 'Active'], [
+                [$ids[0], 'Physio follow-up', '30 min', '0 min', '0 min', 10, 'Yes'],
+                [$ids[1], 'Physio assessment', '60 min', '0 min', '0 min', 10, 'Yes'],
+                [$ids[2], 'Sports massage, 90 minutes', '90 min', '0 min', '0 min', 5, 'No'],
             ])
             ->assertSuccessful();
     }

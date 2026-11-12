@@ -25,12 +25,15 @@ class CreateSampleBusiness
     private const array SPLIT_DAY = [['09:00', '13:00'], ['14:00', '17:30']];
 
     /**
-     * @var list<array{name: string, duration_minutes: int, price_pence: int}>
+     * The massage has a room weight of 5, as it's booked less often, so the
+     * waste score doesn't keep as much room for it (06).
+     *
+     * @var list<array{name: string, duration_minutes: int, price_pence: int, room_weight: int}>
      */
     private const array SERVICES = [
-        ['name' => 'Physio follow-up', 'duration_minutes' => 30, 'price_pence' => 5000],
-        ['name' => 'Physio assessment', 'duration_minutes' => 60, 'price_pence' => 7000],
-        ['name' => 'Sports massage, 90 minutes', 'duration_minutes' => 90, 'price_pence' => 7500],
+        ['name' => 'Physio follow-up', 'duration_minutes' => 30, 'price_pence' => 5000, 'room_weight' => 10],
+        ['name' => 'Physio assessment', 'duration_minutes' => 60, 'price_pence' => 7000, 'room_weight' => 10],
+        ['name' => 'Sports massage, 90 minutes', 'duration_minutes' => 90, 'price_pence' => 7500, 'room_weight' => 5],
     ];
 
     public function handle(): Business

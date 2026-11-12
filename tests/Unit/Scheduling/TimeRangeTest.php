@@ -103,6 +103,26 @@ class TimeRangeTest extends TestCase
         $this->assertFalse($gap->contains($this->range('11:00', '12:01')));
     }
 
+    public function test_whole_seconds_inside_round_a_part_second_start_up_and_end_down(): void
+    {
+        $range = new TimeRange(
+            CarbonImmutable::parse('2026-11-09 09:00:00.25', 'UTC'),
+            CarbonImmutable::parse('2026-11-09 10:00:00.75', 'UTC'),
+        );
+
+        $this->assertSame([
+            CarbonImmutable::parse('2026-11-09 09:00:01', 'UTC')->getTimestamp(),
+            CarbonImmutable::parse('2026-11-09 10:00:00', 'UTC')->getTimestamp(),
+        ], $range->wholeSecondsInside());
+    }
+
+    public function test_whole_seconds_inside_keep_whole_seconds_as_they_are(): void
+    {
+        $range = $this->range('09:00', '10:00');
+
+        $this->assertSame([$range->start->getTimestamp(), $range->end->getTimestamp()], $range->wholeSecondsInside());
+    }
+
     private function range(string $start, string $end): TimeRange
     {
         return new TimeRange(

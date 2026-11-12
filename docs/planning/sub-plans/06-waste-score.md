@@ -114,7 +114,7 @@ With the 90-minute massage at the full weight of 10 instead of 5, 10:00 and 11:3
 For each date, each free gap is one of:
 - **Stranded:** no active service fits, whatever its weight.
 - **Fragmented:** some service fits, but not the longest kind with a room weight above 0, where the longest is the one taking the most diary time. A gap is never fragmented if every weight is 0.
-- **Usable:** the longest such kind fits.
+- **Usable:** the longest such kind fits. When several kinds take that much diary time, such as a 60-minute service and a 50-minute one with 10 minutes before it, the gap is usable when any one of them fits.
 
 The day's stranded and fragmented minutes are the totals of those gaps. This is the overview's definition (sections 4 and 5.6), with the longest service now meaning the longest one the owner wants room kept for. Buffers are planned time, not waste: they're blocked, so they're never part of a free gap.
 
@@ -147,24 +147,26 @@ New value objects, `final readonly` like 04's:
 | Class | Holds |
 |---|---|
 | `OfferedService` | a `ServiceTimes` and a `roomWeight` from 0 to 10 |
-| `WasteScore` | `strandedMinutes`, `lostRoomMinutes`, `splitMinutes`, `minutes` (their sum), `extraMinutes`, and `lostRoom`: for each kind of appointment, its `ServiceTimes` and how many fewer fit, for explanations |
+| `WasteScore` | `strandedMinutes`, `lostRoomMinutes`, `splitMinutes`, `minutes` (their sum), `extraMinutes`, and `lostRoom`: each kind of appointment with a room weight above 0 that the gap could take fewer of, with its `ServiceTimes` and how many fewer, for explanations |
 | `GapSummary` | the day's `stranded` and `fragmented` free gaps (`list<TimeRange>`), with `strandedMinutes()` and `fragmentedMinutes()` |
 
 **Changes to 04's classes:**
-- `Diary` gains `offeredServices`, a non-empty `list<OfferedService>`. In v1 that's every active service. With staff, it's the services the practitioner offers.
+- `Diary` gains `offeredServices`, a `list<OfferedService>`, as its second parameter: `new Diary($workingHours, $offeredServices, $blockedTimes)`. In v1 that's every active service. With staff, it's the services the practitioner offers. `SlotFinder` refuses a search for any other service, so the list always holds at least the one searched for.
 - `Slot` gains `waste`, a `WasteScore`.
 - `DayAvailability` gains `gapSummary`, a `GapSummary`.
-- `SlotFinder::find()` keeps its signature. Scoring is a new step after the booking window, as 04's diagram showed. It throws `InvalidArgumentException` when the `ServiceTimes` it's given aren't those of any offered service, since the score is worked out from the offered services.
+- `SlotFinder::find()` keeps its signature. Scoring is a new step after the booking window, as 04's diagram showed, and each free gap's offered slots are scored together. It throws `InvalidArgumentException` when the `ServiceTimes` it's given aren't those of any offered service, since the score is worked out from the offered services.
+- `ServiceTimes` gains `diaryMinutes()`, its length and both buffers, and `equals()`.
+- `TimeRange` gains `wholeSecondsInside()`: its start and end rounded inwards to whole seconds, the rounding `SlotFinder` already used for gaps, now shared with the score and `GapSummary`.
 
 **New classes:**
 - `ServiceFit` does the fitting and counting: whether a kind of appointment fits in a piece, and how many fit. It uses the date's start times on the slot interval, from `LocalClock::startTimesOn()`, as `SlotFinder` does. So clock changes and 30-minute time zones work the same way as for slots.
-- `WasteScorer` scores a day's slots and builds its `GapSummary`. It holds the constants (`SPLIT_MINUTES = 5`), merges kinds with the same times by adding their weights, and works out each gap's counts once rather than for every slot.
+- `WasteScorer` scores the offered slots of one free gap at a time, and builds the day's `GapSummary`. It holds the constant `SPLIT_MINUTES = 5`, merges kinds with the same times by adding their weights, and works out each gap's counts once rather than for every slot. Scoring a gap at a time keeps extra waste within the gap, with no grouping of the slots afterwards.
 
 Minutes are whole minutes of each piece (`intdiv` of its seconds by 60). The counting works in integer seconds internally, for speed. A month for the sample business means about 30 days × 2 gaps × 15 slots × 3 kinds × 3 pieces, which is small, but Carbon objects in the inner loop would make it slow.
 
 ### `AvailabilityService` (04 and 05)
 
-A sixth query loads the business's active services, reading only their ID, length, buffers and room weight, and builds the `Diary`'s offered services. In v1 the practitioner offers every active service; this is the rule 04 asked to keep in one place, so `practitioner_service` can replace it when there are staff. The query count stays the same for any range (now six).
+A sixth query loads the business's active services, through a new `active()` scope on `Service`, reading only their ID, length, buffers and room weight, and builds the `Diary`'s offered services. In v1 the practitioner offers every active service; this is the rule 04 asked to keep in one place, so `practitioner_service` can replace it when there are staff. The query count stays the same for any range (now six).
 
 The `ServiceTimes` for the service being searched for come from the same rows, so they always match one of the offered services. If the service isn't among them, because it was made inactive after the caller loaded it, `forService()` throws `ServiceNotBookable`, as it does for an inactive service, rather than letting the engine refuse the search.
 
@@ -212,14 +214,14 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
 **Unit: randomised rules**, added to 04's `SlotFinderRulesTest` and numbered 8 to 13, after its rules 1 to 7. The generator also makes 1 to 6 offered services, including the requested one, with random room weights, some 0.
 
 8. Every slot's waste parts are 0 or more, and its `minutes` is their sum.
-9. In every free gap that has slots, at least one slot has extra waste 0, and none is below 0.
+9. In every free gap that has slots, at least one slot has extra waste 0, and each slot's extra waste is its waste minus the lowest in the gap, so none is below 0.
 10. A slot's waste doesn't depend on now. Running the same scenario with now three days earlier gives the same `minutes` for every slot offered both times.
 11. **Stranded minutes match a brute-force check.** For each piece left by a slot, it tries every clock time on the interval and every active service, using `LocalClock`, and the piece is stranded exactly when nothing fits.
-12. **Counts match a brute-force check.** On pieces of up to 4 hours, `count(k, P)` equals the most that fit, found by trying every combination, and `count(k, L) + count(k, R)` is never more than `count(k, G)`.
+12. **Counts match a brute-force check.** On the pieces of up to 4 hours that every third slot leaves, `count(k, P)` equals the most that fit, found by trying every combination, and `count(k, L) + count(k, R)` is never more than `count(k, G)`. Neighbouring slots leave pieces one start time apart, so every third still covers pieces of every length, and the rule stays quick.
 13. **Each day's summary matches the definitions:**
    - every free gap is in at most one of `stranded` and `fragmented`
    - the minutes are the totals of those gaps
-   - a gap is stranded exactly when the brute-force check finds no active service that fits
+   - a gap is stranded exactly when the brute-force check finds no active service that fits, and fragmented exactly when it finds one that fits but none of the longest weighted kinds
 
 **Feature: `AvailabilityService`**
 - With the sample business at 04's fixed time, Monday 9 November's follow-up times have the sample morning's extra waste.
@@ -231,14 +233,14 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
 **Feature: database rules**
 - `room_weight` defaults to 10 and refuses values outside 0 to 10.
 
-**Mutation testing:** the new code is in `app/Scheduling`, so Infection covers it, and the score stays at 90% or more.
+**Mutation testing:** the new code is in `app/Scheduling`, so Infection covers it, and the score stays at 90% or more. The randomised rules take about 12 seconds with rules 8 to 13, so Infection's timeout is 20 seconds rather than its default of 10. A mutant that only the rules can catch then finishes them, rather than counting as caught by timing out.
 
 ## Done when
 
-- [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
-- [ ] After `php artisan migrate:fresh --seed`, `php artisan availability:show 1 <follow-up's ID> --date=<the Monday after next>` shows the sample morning's extra waste locally. 05's seeder books three times next Monday, and the Monday after next has its morning free
-- [ ] Measured locally: `AvailabilityService` for 31 days of the sample business takes under 200 ms, recorded in `tracking.md`
-- [ ] `tracking.md` marks 06 as done
+- [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
+- [x] After `php artisan migrate:fresh --seed`, `php artisan availability:show 1 <follow-up's ID> --date=<the Monday after next>` shows the sample morning's extra waste locally. 05's seeder books three times next Monday, and the Monday after next has its morning free
+- [x] Measured locally: `AvailabilityService` for 31 days of the sample business takes under 200 ms, recorded in `tracking.md`
+- [x] `tracking.md` marks 06 as done
 
 ## Pull requests
 
@@ -267,8 +269,10 @@ As 04: engine tests extend `PHPUnit\Framework\TestCase`, method names start with
   - strictness hides times whose extra waste is above a threshold that falls as strictness rises. At 100 the threshold is 0, so only the best times in each gap stay, and every gap with room keeps at least one
   - the relaxation window turns this off near the date
   - strictness by time of day (overview, 5.4) changes which threshold applies, not the score
+  - the randomised rules take about 12 seconds after 06, against Infection's timeout of 20 seconds. 07's rules 14 to 19 add to that, so check the rules test's time again, and keep it well under the timeout
 - **08:**
   - the playground explains a hidden time from its `WasteScore`: "leaves 15 minutes nobody can book" from the stranded minutes, and "leaves room for one fewer 90-minute massage" from the lost room, compared with the best time in the gap
+  - `lostRoom` names each kind by its `ServiceTimes`, not by a service, and services with the same times are one kind. So 08 decides how an explanation names it: for example by matching the times to the business's services, or by giving `OfferedService` a label. Its kinds are in the order the services were added
   - its timeline highlights the day's stranded gaps
   - the sample business has no buffers (03), so the timeline is easy to read. A second sample business with buffers is noted in 03 for later
 - **10:**

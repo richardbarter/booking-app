@@ -6,12 +6,16 @@ use App\Models\Concerns\BelongsToBusiness;
 use Carbon\CarbonImmutable;
 use Database\Factories\ServiceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * Something a customer can book. In v1 the practitioner offers every active
- * service, at the service's length, buffers and price.
+ * service, at the service's length, buffers and price. Its room weight says
+ * how much the waste score protects room for it, from 0 (not at all) to 10
+ * (fully, the default), for services booked more or less often.
  *
  * @property int $id
  * @property int $business_id
@@ -21,11 +25,12 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $buffer_after_minutes
  * @property int $price_pence
  * @property bool $is_active
+ * @property int $room_weight
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read Business $business
  */
-#[Fillable(['name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_pence', 'is_active'])]
+#[Fillable(['name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_pence', 'is_active', 'room_weight'])]
 class Service extends Model
 {
     /** @use HasFactory<ServiceFactory> */
@@ -41,6 +46,7 @@ class Service extends Model
         'buffer_before_minutes' => 0,
         'buffer_after_minutes' => 0,
         'is_active' => true,
+        'room_weight' => 10,
     ];
 
     /**
@@ -56,6 +62,18 @@ class Service extends Model
             'buffer_after_minutes' => 'integer',
             'price_pence' => 'integer',
             'is_active' => 'boolean',
+            'room_weight' => 'integer',
         ];
+    }
+
+    /**
+     * Services that can be booked.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function active(Builder $query): void
+    {
+        $query->where($query->qualifyColumn('is_active'), true);
     }
 }

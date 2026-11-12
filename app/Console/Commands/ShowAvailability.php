@@ -18,11 +18,12 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 /**
- * Prints a day's working hours, free gaps and offered times, to try the
- * engine before the playground and to debug it later. It only reads, and
- * prints no customer details or time off reasons, so it's safe to run in
- * production over fly ssh console. It uses the real time, so times today
- * inside the minimum notice aren't shown.
+ * Prints a day's working hours, free gaps and offered times, with each
+ * time's waste score and the day's stranded and fragmented time (06), to
+ * try the engine before the playground and to debug it later. It only
+ * reads, and prints no customer details or time off reasons, so it's safe
+ * to run in production over fly ssh console. It uses the real time, so
+ * times today inside the minimum notice aren't shown.
  */
 #[Signature('availability:show
     {business : The business ID}
@@ -58,13 +59,14 @@ class ShowAvailability extends Command
     {
         $this->line("{$business->name}, business {$business->id}");
         $this->table(
-            ['ID', 'Name', 'Length', 'Buffer before', 'Buffer after', 'Active'],
+            ['ID', 'Name', 'Length', 'Buffer before', 'Buffer after', 'Room weight', 'Active'],
             Service::query()->orderBy('id')->get()->map(fn (Service $service): array => [
                 $service->id,
                 $service->name,
                 "{$service->duration_minutes} min",
                 "{$service->buffer_before_minutes} min",
                 "{$service->buffer_after_minutes} min",
+                $service->room_weight,
                 $service->is_active ? 'Yes' : 'No',
             ])->all(),
         );
@@ -110,6 +112,8 @@ class ShowAvailability extends Command
         $this->newLine();
         $this->line('Working hours  '.$this->formatRanges($day->workingTimes, $day->date, $timezone));
         $this->line('Free gaps      '.$this->formatRanges($day->freeGaps, $day->date, $timezone));
+        $this->line('Stranded       '.$this->formatGaps($day->gapSummary->stranded, $day->gapSummary->strandedMinutes(), $day->date, $timezone));
+        $this->line('Fragmented     '.$this->formatGaps($day->gapSummary->fragmented, $day->gapSummary->fragmentedMinutes(), $day->date, $timezone));
         $this->line('Offered times  '.count($day->slots));
 
         $times = array_map(fn (Slot $slot): string => $slot->startsAt->setTimezone($timezone)->format('H:i'), $day->slots);
@@ -117,6 +121,31 @@ class ShowAvailability extends Command
         foreach (array_chunk($times, self::TIMES_PER_LINE) as $line) {
             $this->line('  '.implode(' ', $line));
         }
+
+        if ($day->slots !== []) {
+            $this->newLine();
+            $this->table(
+                ['Time', 'Extra waste', 'Waste', 'Stranded', 'Lost room', 'Split'],
+                array_map(fn (Slot $slot): array => [
+                    $slot->startsAt->setTimezone($timezone)->format('H:i'),
+                    $slot->waste->extraMinutes,
+                    $slot->waste->minutes,
+                    $slot->waste->strandedMinutes,
+                    $slot->waste->lostRoomMinutes,
+                    $slot->waste->splitMinutes,
+                ], $day->slots),
+            );
+        }
+    }
+
+    /**
+     * The day's stranded or fragmented gaps, such as "15 min: 09:00–09:15".
+     *
+     * @param  list<TimeRange>  $gaps
+     */
+    private function formatGaps(array $gaps, int $minutes, string $date, string $timezone): string
+    {
+        return $gaps === [] ? 'none' : "{$minutes} min: {$this->formatRanges($gaps, $date, $timezone)}";
     }
 
     private function describeTimes(Service $service): string

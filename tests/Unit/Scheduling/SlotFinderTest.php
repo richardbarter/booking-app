@@ -11,12 +11,14 @@ use App\Scheduling\Hours\DayHours;
 use App\Scheduling\Hours\PatternWeeks;
 use App\Scheduling\Hours\RepeatingPattern;
 use App\Scheduling\Hours\WorkingHours;
+use App\Scheduling\OfferedService;
 use App\Scheduling\ServiceTimes;
 use App\Scheduling\Slot;
 use App\Scheduling\SlotFinder;
 use App\Scheduling\TimeRange;
 use Carbon\CarbonImmutable;
 use DateTimeZone;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -33,6 +35,17 @@ class SlotFinderTest extends TestCase
         $availability = $this->findOn([['09:00', '12:00']], new ServiceTimes(60), blocked: [['10:00', '10:30']]);
 
         $this->assertSame(['09:00', '10:30', '10:45', '11:00'], $this->offered($availability));
+    }
+
+    public function test_rejects_a_service_that_is_not_one_of_the_offered_services(): void
+    {
+        $hours = new WorkingHours([], [self::MONDAY => DayHours::fromArray([['09:00', '12:00']])]);
+        $offered = [new OfferedService(new ServiceTimes(30)), new OfferedService(new ServiceTimes(60))];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The service searched for (45 minutes, with 0 before and 0 after) must be one of the diary\'s offered services.');
+
+        (new SlotFinder)->find(new Diary($hours, $offered), new ServiceTimes(45), $this->settings(), $this->dates(self::MONDAY, self::MONDAY), $this->now());
     }
 
     public function test_a_buffer_before_moves_the_first_time_after_the_start_of_the_hours(): void
@@ -84,7 +97,7 @@ class SlotFinderTest extends TestCase
         $blocked = new TimeRange(CarbonImmutable::parse('2026-11-09 09:00', 'UTC'), CarbonImmutable::parse('2026-11-09 10:00:00.5', 'UTC'));
 
         $availability = (new SlotFinder)->find(
-            new Diary(new WorkingHours([], [self::MONDAY => DayHours::fromArray([['09:00', '11:00']])]), [$blocked]),
+            new Diary(new WorkingHours([], [self::MONDAY => DayHours::fromArray([['09:00', '11:00']])]), $this->offering(new ServiceTimes(30)), [$blocked]),
             new ServiceTimes(30),
             $this->settings(),
             $this->dates(self::MONDAY, self::MONDAY),
@@ -131,7 +144,7 @@ class SlotFinderTest extends TestCase
     public function test_a_date_with_no_pattern_in_force_has_no_working_times_free_gaps_or_slots(): void
     {
         $availability = (new SlotFinder)->find(
-            new Diary(new WorkingHours([], [])),
+            new Diary(new WorkingHours([], []), $this->offering(new ServiceTimes(30))),
             new ServiceTimes(30),
             $this->settings(),
             $this->dates(self::MONDAY, self::MONDAY),
@@ -146,7 +159,7 @@ class SlotFinderTest extends TestCase
     {
         $hours = new WorkingHours([$this->everyDay([['09:00', '17:00']])], [self::MONDAY => new DayHours]);
 
-        $availability = (new SlotFinder)->find(new Diary($hours), new ServiceTimes(30), $this->settings(), $this->dates(self::MONDAY, self::MONDAY), $this->now());
+        $availability = (new SlotFinder)->find(new Diary($hours, $this->offering(new ServiceTimes(30))), new ServiceTimes(30), $this->settings(), $this->dates(self::MONDAY, self::MONDAY), $this->now());
 
         $day = $this->day($availability);
         $this->assertSame([[], [], []], [$day->workingTimes, $day->freeGaps, $day->slots]);
@@ -171,7 +184,7 @@ class SlotFinderTest extends TestCase
     public function test_dates_after_the_last_date_have_no_slots_but_keep_their_working_times_and_gaps(): void
     {
         $availability = (new SlotFinder)->find(
-            new Diary(new WorkingHours([$this->everyDay([['09:00', '12:00']])], [])),
+            new Diary(new WorkingHours([$this->everyDay([['09:00', '12:00']])], []), $this->offering(new ServiceTimes(30))),
             new ServiceTimes(30),
             $this->settings(maxAdvanceDays: 1),
             $this->dates('2026-11-03', '2026-11-04'),
@@ -210,7 +223,7 @@ class SlotFinderTest extends TestCase
     public function test_a_normal_day_offers_the_same_local_times_either_side_of_a_clock_change(string $from, string $to, string $now): void
     {
         $availability = (new SlotFinder)->find(
-            new Diary(new WorkingHours([$this->everyDay([['09:00', '17:00']])], [])),
+            new Diary(new WorkingHours([$this->everyDay([['09:00', '17:00']])], []), $this->offering(new ServiceTimes(60))),
             new ServiceTimes(60),
             $this->settings(),
             $this->dates($from, $to),
@@ -267,7 +280,7 @@ class SlotFinderTest extends TestCase
     public function test_gives_one_day_for_each_date_in_order(): void
     {
         $availability = (new SlotFinder)->find(
-            new Diary(new WorkingHours([], [self::MONDAY => DayHours::fromArray([['09:00', '10:00']])])),
+            new Diary(new WorkingHours([], [self::MONDAY => DayHours::fromArray([['09:00', '10:00']])]), $this->offering(new ServiceTimes(30))),
             new ServiceTimes(30),
             $this->settings(),
             $this->dates('2026-11-08', '2026-11-10'),
@@ -300,12 +313,23 @@ class SlotFinderTest extends TestCase
         ), $blocked);
 
         return (new SlotFinder)->find(
-            new Diary(new WorkingHours([], [$date => DayHours::fromArray($hours)]), $blockedTimes),
+            new Diary(new WorkingHours([], [$date => DayHours::fromArray($hours)]), $this->offering($service), $blockedTimes),
             $service,
             $this->settings($intervalMinutes, $minNoticeMinutes, zone: $zone),
             $this->dates($date, $date),
             $this->now($now, $zone),
         );
+    }
+
+    /**
+     * A diary that offers only the service searched for, since these tests
+     * are about which times fit, not their waste scores.
+     *
+     * @return list<OfferedService>
+     */
+    private function offering(ServiceTimes $service): array
+    {
+        return [new OfferedService($service)];
     }
 
     private function settings(int $intervalMinutes = 15, int $minNoticeMinutes = 0, int $maxAdvanceDays = 90, string $zone = 'Europe/London'): BookingSettings

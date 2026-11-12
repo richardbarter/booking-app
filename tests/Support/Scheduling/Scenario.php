@@ -8,6 +8,7 @@ use App\Scheduling\Diary;
 use App\Scheduling\Hours\DayHours;
 use App\Scheduling\Hours\RepeatingPattern;
 use App\Scheduling\Hours\WorkingHours;
+use App\Scheduling\OfferedService;
 use App\Scheduling\ServiceTimes;
 use App\Scheduling\TimeRange;
 use Carbon\CarbonImmutable;
@@ -22,6 +23,7 @@ final readonly class Scenario
      * @param  list<RepeatingPattern>  $patterns
      * @param  array<string, DayHours>  $editedDays
      * @param  list<TimeRange>  $blockedTimes
+     * @param  list<OfferedService>  $offeredServices  including the service searched for
      */
     public function __construct(
         public int $seed,
@@ -33,11 +35,12 @@ final readonly class Scenario
         public BookingSettings $settings,
         public DateRange $dates,
         public CarbonImmutable $now,
+        public array $offeredServices,
     ) {}
 
     public function diary(): Diary
     {
-        return new Diary(new WorkingHours($this->patterns, $this->editedDays), $this->blockedTimes);
+        return new Diary(new WorkingHours($this->patterns, $this->editedDays), $this->offeredServices, $this->blockedTimes);
     }
 
     /**
@@ -71,6 +74,12 @@ final readonly class Scenario
                 $range->start->toIso8601String(),
                 $range->end->toIso8601String(),
             ], $this->blockedTimes),
+            'offered_services' => array_map(fn (OfferedService $offered): array => [
+                'duration_minutes' => $offered->times->durationMinutes,
+                'buffer_before_minutes' => $offered->times->bufferBeforeMinutes,
+                'buffer_after_minutes' => $offered->times->bufferAfterMinutes,
+                'room_weight' => $offered->roomWeight,
+            ], $this->offeredServices),
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
     }
 }

@@ -10,6 +10,8 @@ use InvalidArgumentException;
  */
 final readonly class ServiceTimes
 {
+    private const int SECONDS_IN_MINUTE = 60;
+
     public function __construct(
         public int $durationMinutes,
         public int $bufferBeforeMinutes = 0,
@@ -26,5 +28,38 @@ final readonly class ServiceTimes
                 $bufferAfterMinutes,
             ));
         }
+    }
+
+    /**
+     * The time an appointment starting at a moment blocks, buffers
+     * included, as Unix timestamps from and until.
+     *
+     * @return array{int, int}
+     */
+    public function blockedAround(int $startsAt): array
+    {
+        return [
+            $startsAt - $this->bufferBeforeMinutes * self::SECONDS_IN_MINUTE,
+            $startsAt + ($this->durationMinutes + $this->bufferAfterMinutes) * self::SECONDS_IN_MINUTE,
+        ];
+    }
+
+    /**
+     * The diary time one appointment takes: its length and both buffers.
+     */
+    public function diaryMinutes(): int
+    {
+        return $this->bufferBeforeMinutes + $this->durationMinutes + $this->bufferAfterMinutes;
+    }
+
+    /**
+     * Whether the two take the same diary time in the same way, with the
+     * same length and buffers.
+     */
+    public function equals(self $other): bool
+    {
+        return $this->durationMinutes === $other->durationMinutes
+            && $this->bufferBeforeMinutes === $other->bufferBeforeMinutes
+            && $this->bufferAfterMinutes === $other->bufferAfterMinutes;
     }
 }

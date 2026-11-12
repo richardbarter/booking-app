@@ -5,6 +5,9 @@ namespace Tests\Unit\Scheduling;
 use App\Scheduling\Availability;
 use App\Scheduling\DayAvailability;
 use App\Scheduling\LocalClock;
+use App\Scheduling\OfferedService;
+use App\Scheduling\ServiceFit;
+use App\Scheduling\ServiceTimes;
 use App\Scheduling\Slot;
 use App\Scheduling\SlotFinder;
 use App\Scheduling\TimeRange;
@@ -41,12 +44,30 @@ class SlotFinderRulesTest extends TestCase
     private const int SECONDS_IN_MINUTE = 60;
 
     /**
+     * Rule 12 tries every choice of start times only on pieces this long
+     * or shorter, and for every third slot of each day, so it stays quick.
+     * Neighbouring slots leave pieces one start time apart, so every third
+     * still covers pieces of every length.
+     */
+    private const int LONGEST_PIECE_TO_COUNT_SECONDS = 4 * 3600;
+
+    private const int SLOTS_PER_COUNT_CHECK = 3;
+
+    /**
      * For each seed and number of scenarios, and each rule: how many checks
      * passed, and the first failure.
      *
      * @var array<string, array<int, array{checks: int<0, max>, failure: ?string}>>
      */
     private static array $outcomes = [];
+
+    /**
+     * The current scenario's clock times on the interval for each date, as
+     * timestamps, worked out once for the rules that need them.
+     *
+     * @var array{scenario: ?string, dates: array<string, list<int>>}
+     */
+    private array $clockTimes = ['scenario' => null, 'dates' => []];
 
     public function test_rule_1_each_slots_times_agree_with_the_service(): void
     {
@@ -81,6 +102,36 @@ class SlotFinderRulesTest extends TestCase
     public function test_rule_7_there_is_one_day_for_each_date_in_order(): void
     {
         $this->assertRuleHolds(7);
+    }
+
+    public function test_rule_8_each_slots_waste_parts_are_0_or_more_and_add_up(): void
+    {
+        $this->assertRuleHolds(8);
+    }
+
+    public function test_rule_9_each_gaps_best_slot_has_extra_waste_0_and_the_others_are_measured_from_it(): void
+    {
+        $this->assertRuleHolds(9);
+    }
+
+    public function test_rule_10_a_slots_waste_does_not_depend_on_now(): void
+    {
+        $this->assertRuleHolds(10);
+    }
+
+    public function test_rule_11_stranded_minutes_match_a_brute_force_check(): void
+    {
+        $this->assertRuleHolds(11);
+    }
+
+    public function test_rule_12_counts_are_the_most_that_fit(): void
+    {
+        $this->assertRuleHolds(12);
+    }
+
+    public function test_rule_13_each_days_stranded_and_fragmented_gaps_match_their_definitions(): void
+    {
+        $this->assertRuleHolds(13);
     }
 
     private function assertRuleHolds(int $rule): void
@@ -173,6 +224,12 @@ class SlotFinderRulesTest extends TestCase
             5 => ['the slots are exactly those a brute-force check finds', $this->slotsMatchBruteForce(...)],
             6 => ['each day\'s free gaps are its working times minus blocked time, and each slot sits in one', $this->freeGapsMatch(...)],
             7 => ['there\'s one day for each date, in order', $this->oneDayForEachDate(...)],
+            8 => ['each slot\'s waste parts are 0 or more, and its waste is their sum', $this->wastePartsAddUp(...)],
+            9 => ['each free gap with slots has one with extra waste 0, and each slot\'s extra waste is how much more it is than that one', $this->bestInEachGap(...)],
+            10 => ['a slot\'s waste doesn\'t depend on now', $this->wasteIgnoresNow(...)],
+            11 => ['each slot\'s stranded minutes are those a brute-force check finds', $this->strandedMatchesBruteForce(...)],
+            12 => ['counts are the most that fit, found by trying every choice of start times', $this->countsMatchBruteForce(...)],
+            13 => ['each day\'s stranded and fragmented gaps match their definitions', $this->gapSummaryMatches(...)],
         ];
     }
 
@@ -382,6 +439,209 @@ class SlotFinderRulesTest extends TestCase
         $check($actual === $expected, 'days: '.implode(', ', $actual));
     }
 
+    /**
+     * @param  Closure(bool, string): void  $check
+     */
+    private function wastePartsAddUp(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        foreach ($this->slotsOf($availability) as [$day, $slot]) {
+            $waste = $slot->waste;
+
+            $check(
+                $waste->strandedMinutes >= 0
+                    && $waste->lostRoomMinutes >= 0
+                    && $waste->splitMinutes >= 0
+                    && $waste->minutes === $waste->strandedMinutes + $waste->lostRoomMinutes + $waste->splitMinutes,
+                "{$day->date}: {$this->describe($slot)}",
+            );
+        }
+    }
+
+    /**
+     * @param  Closure(bool, string): void  $check
+     */
+    private function bestInEachGap(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        foreach ($availability->days as $day) {
+            $byGap = [];
+
+            foreach ($day->slots as $slot) {
+                $byGap[$slot->gap->start->getTimestamp()][] = $slot;
+            }
+
+            foreach ($byGap as $slots) {
+                $lowest = min(array_map(fn (Slot $slot): int => $slot->waste->minutes, $slots));
+
+                foreach ($slots as $slot) {
+                    $check(
+                        $slot->waste->extraMinutes === $slot->waste->minutes - $lowest,
+                        "{$day->date}: lowest waste in the gap {$lowest}, {$this->describe($slot)}",
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs the same search with now three days earlier, which moves the
+     * booking window, and compares the slots offered both times.
+     *
+     * @param  Closure(bool, string): void  $check
+     */
+    private function wasteIgnoresNow(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        $earlier = (new SlotFinder)->find(
+            $scenario->diary(),
+            $scenario->service,
+            $scenario->settings,
+            $scenario->dates,
+            $scenario->now->subDays(3),
+        );
+        $earlierWaste = [];
+
+        foreach ($this->slotsOf($earlier) as [, $slot]) {
+            $earlierWaste[$slot->startsAt->getTimestamp()] = $slot->waste->minutes;
+        }
+
+        foreach ($this->slotsOf($availability) as [$day, $slot]) {
+            $start = $slot->startsAt->getTimestamp();
+
+            if (isset($earlierWaste[$start])) {
+                $check(
+                    $earlierWaste[$start] === $slot->waste->minutes,
+                    "{$day->date}: waste {$slot->waste->minutes}, but {$earlierWaste[$start]} three days earlier, {$this->describe($slot)}",
+                );
+            }
+        }
+    }
+
+    /**
+     * For each piece a slot leaves, tries every clock time on the interval
+     * and every offered service, whatever its weight. The piece is stranded
+     * exactly when none fits.
+     *
+     * @param  Closure(bool, string): void  $check
+     */
+    private function strandedMatchesBruteForce(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        foreach ($this->slotsOf($availability) as [$day, $slot]) {
+            $times = $this->clockTimesOn($scenario, $day->date);
+            $expected = 0;
+
+            foreach ($this->piecesLeftBy($slot) as [$from, $until]) {
+                if (! $this->anyServiceFits($scenario->offeredServices, $times, $from, $until)) {
+                    $expected += intdiv($until - $from, self::SECONDS_IN_MINUTE);
+                }
+            }
+
+            $check(
+                $slot->waste->strandedMinutes === $expected,
+                "{$day->date}: expected {$expected} stranded minutes, got {$slot->waste->strandedMinutes}, {$this->describe($slot)}",
+            );
+        }
+    }
+
+    /**
+     * On each piece of up to four hours that every third slot leaves,
+     * ServiceFit's count of each kind is the most found by trying every
+     * choice of start times. Its counts in the two pieces never add up to
+     * more than in the gap.
+     *
+     * @param  Closure(bool, string): void  $check
+     */
+    private function countsMatchBruteForce(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        $clock = new LocalClock($scenario->settings->timezone);
+
+        foreach ($availability->days as $day) {
+            if ($day->slots === []) {
+                continue;
+            }
+
+            $times = $this->clockTimesOn($scenario, $day->date);
+            $fit = new ServiceFit($clock->startTimesOn(CarbonImmutable::parse($day->date, 'UTC'), $scenario->settings->slotIntervalMinutes));
+
+            foreach ($day->slots as $index => $slot) {
+                if ($index % self::SLOTS_PER_COUNT_CHECK !== 0) {
+                    continue;
+                }
+
+                $pieces = $this->piecesLeftBy($slot);
+                [$gapStart, $gapEnd] = $this->wholeSecondsOf($slot->gap);
+
+                foreach ($scenario->offeredServices as $offered) {
+                    $kind = $offered->times;
+                    $inPieces = 0;
+
+                    foreach ($pieces as [$from, $until]) {
+                        $count = $fit->count($kind, $from, $until);
+                        $inPieces += $count;
+
+                        if ($until - $from <= self::LONGEST_PIECE_TO_COUNT_SECONDS) {
+                            $most = $this->mostThatFit($kind, $times, $from, $until);
+                            $check($count === $most, "{$day->date}: counted {$count} of {$this->describeKind($kind)}, but {$most} fit in {$this->describeRange($from, $until)}");
+                        }
+                    }
+
+                    $inGap = $fit->count($kind, $gapStart, $gapEnd);
+                    $check($inPieces <= $inGap, "{$day->date}: {$inPieces} of {$this->describeKind($kind)} in the pieces, but {$inGap} in the gap, {$this->describe($slot)}");
+                }
+            }
+        }
+    }
+
+    /**
+     * Works out which free gaps are stranded and fragmented by trying every
+     * clock time on the interval, with the kinds' weights added up here.
+     *
+     * @param  Closure(bool, string): void  $check
+     */
+    private function gapSummaryMatches(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        $weights = [];
+
+        foreach ($scenario->offeredServices as $offered) {
+            $key = $this->describeKind($offered->times);
+            $weights[$key] = [$offered->times, ($weights[$key][1] ?? 0) + $offered->roomWeight];
+        }
+
+        $weighted = array_values(array_filter($weights, fn (array $kind): bool => $kind[1] > 0));
+        $longest = $weighted === [] ? null : max(array_map(fn (array $kind): int => $kind[0]->diaryMinutes(), $weighted));
+        $longestKinds = array_values(array_map(
+            fn (array $kind): OfferedService => new OfferedService($kind[0]),
+            array_filter($weighted, fn (array $kind): bool => $kind[0]->diaryMinutes() === $longest),
+        ));
+
+        foreach ($availability->days as $day) {
+            $times = $this->clockTimesOn($scenario, $day->date);
+            $summary = $day->gapSummary;
+            $expectedStranded = [];
+            $expectedFragmented = [];
+
+            foreach ($day->freeGaps as $gap) {
+                [$from, $until] = $this->wholeSecondsOf($gap);
+
+                if (! $this->anyServiceFits($scenario->offeredServices, $times, $from, $until)) {
+                    $expectedStranded[] = $gap;
+                } elseif ($longestKinds !== [] && ! $this->anyServiceFits($longestKinds, $times, $from, $until)) {
+                    $expectedFragmented[] = $gap;
+                }
+            }
+
+            $check(
+                $this->timestamps($summary->stranded) === $this->timestamps($expectedStranded)
+                    && $this->timestamps($summary->fragmented) === $this->timestamps($expectedFragmented),
+                "{$day->date}: stranded ".json_encode($this->timestamps($summary->stranded)).', fragmented '.json_encode($this->timestamps($summary->fragmented))
+                    .', expected '.json_encode($this->timestamps($expectedStranded)).' and '.json_encode($this->timestamps($expectedFragmented)),
+            );
+            $check(
+                $summary->strandedMinutes() === $this->wholeMinutes($expectedStranded)
+                    && $summary->fragmentedMinutes() === $this->wholeMinutes($expectedFragmented),
+                "{$day->date}: {$summary->strandedMinutes()} stranded and {$summary->fragmentedMinutes()} fragmented minutes",
+            );
+        }
+    }
+
     private function setting(string $name, int $default): int
     {
         $value = getenv($name);
@@ -494,6 +754,155 @@ class SlotFinderRulesTest extends TestCase
             fn (int $timestamp): string => CarbonImmutable::createFromTimestamp($timestamp, $zone)->format('H:i T'),
             $timestamps,
         )).']';
+    }
+
+    /**
+     * The date's clock times on the interval, as timestamps, worked out once
+     * for the current scenario. They come from LocalClock::startTimesOn(),
+     * which rule 5 checks against startTimeOn() for every date.
+     *
+     * @return list<int>
+     */
+    private function clockTimesOn(Scenario $scenario, string $date): array
+    {
+        $key = "{$scenario->seed}:{$scenario->number}";
+
+        if ($this->clockTimes['scenario'] !== $key) {
+            $this->clockTimes = ['scenario' => $key, 'dates' => []];
+        }
+
+        return $this->clockTimes['dates'][$date] ??= array_map(
+            fn (CarbonImmutable $time): int => $time->getTimestamp(),
+            (new LocalClock($scenario->settings->timezone))->startTimesOn(CarbonImmutable::parse($date, 'UTC'), $scenario->settings->slotIntervalMinutes),
+        );
+    }
+
+    /**
+     * The pieces of its gap a slot leaves before and after it, in whole
+     * seconds, with the gap's start rounded up and its end down.
+     *
+     * @return list<array{int, int}>
+     */
+    private function piecesLeftBy(Slot $slot): array
+    {
+        [$gapStart, $gapEnd] = $this->wholeSecondsOf($slot->gap);
+
+        return [[$gapStart, $slot->blockedFrom->getTimestamp()], [$slot->blockedUntil->getTimestamp(), $gapEnd]];
+    }
+
+    /**
+     * @return array{int, int}
+     */
+    private function wholeSecondsOf(TimeRange $range): array
+    {
+        $start = $range->start->getTimestamp();
+        $end = $range->end->getTimestamp();
+
+        return [$range->start->microsecond > 0 ? $start + 1 : $start, $end];
+    }
+
+    /**
+     * @param  list<TimeRange>  $gaps
+     */
+    private function wholeMinutes(array $gaps): int
+    {
+        $minutes = 0;
+
+        foreach ($gaps as $gap) {
+            [$from, $until] = $this->wholeSecondsOf($gap);
+            $minutes += intdiv($until - $from, self::SECONDS_IN_MINUTE);
+        }
+
+        return $minutes;
+    }
+
+    /**
+     * Whether any of the services, at any of the clock times, fits with its
+     * buffers inside the piece. The times are in order, so none from the
+     * end of the piece on can fit.
+     *
+     * @param  list<OfferedService>  $services
+     * @param  list<int>  $times
+     */
+    private function anyServiceFits(array $services, array $times, int $from, int $until): bool
+    {
+        foreach ($services as $offered) {
+            foreach ($times as $time) {
+                if ($time >= $until) {
+                    break;
+                }
+
+                [$blockedFrom, $blockedUntil] = $this->blockedAt($offered->times, $time);
+
+                if ($from <= $blockedFrom && $blockedUntil <= $until) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The most appointments of the kind that fit in the piece without
+     * overlapping, by trying every choice: each time that fits is either
+     * taken, and the next one tried is the first after it ends, or skipped.
+     * Working back from the last time, each answer is remembered, so it
+     * stays quick.
+     *
+     * @param  list<int>  $times
+     */
+    private function mostThatFit(ServiceTimes $kind, array $times, int $from, int $until): int
+    {
+        $candidates = [];
+
+        foreach ($times as $time) {
+            if ($time >= $until) {
+                break;
+            }
+
+            $blocked = $this->blockedAt($kind, $time);
+
+            if ($from <= $blocked[0] && $blocked[1] <= $until) {
+                $candidates[] = $blocked;
+            }
+        }
+
+        $count = count($candidates);
+        $most = array_fill(0, $count + 1, 0);
+
+        for ($index = $count - 1; $index >= 0; $index--) {
+            $next = $index + 1;
+
+            while ($next < $count && $candidates[$next][0] < $candidates[$index][1]) {
+                $next++;
+            }
+
+            $most[$index] = max($most[$index + 1], 1 + $most[$next]);
+        }
+
+        return $most[0];
+    }
+
+    /**
+     * @return array{int, int}
+     */
+    private function blockedAt(ServiceTimes $kind, int $time): array
+    {
+        return [
+            $time - $kind->bufferBeforeMinutes * self::SECONDS_IN_MINUTE,
+            $time + ($kind->durationMinutes + $kind->bufferAfterMinutes) * self::SECONDS_IN_MINUTE,
+        ];
+    }
+
+    private function describeKind(ServiceTimes $kind): string
+    {
+        return "{$kind->bufferBeforeMinutes}+{$kind->durationMinutes}+{$kind->bufferAfterMinutes} minutes";
+    }
+
+    private function describeRange(int $from, int $until): string
+    {
+        return CarbonImmutable::createFromTimestamp($from, 'UTC')->toIso8601String().' to '.CarbonImmutable::createFromTimestamp($until, 'UTC')->toIso8601String();
     }
 
     private function describe(Slot $slot): string

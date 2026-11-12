@@ -33,7 +33,7 @@ class CreateSampleBusinessTest extends TestCase
         [$practitioners, $services] = app(CurrentBusiness::class)->run($business, fn (): array => [
             Practitioner::query()->pluck('name')->all(),
             Service::query()->orderBy('id')->get()
-                ->map(fn (Service $service): array => $service->only(['name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_pence', 'is_active']))
+                ->map(fn (Service $service): array => $service->only(['name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_pence', 'is_active', 'room_weight']))
                 ->all(),
         ]);
         $this->assertSame(
@@ -42,9 +42,9 @@ class CreateSampleBusinessTest extends TestCase
         );
         $this->assertSame(['Alex Morgan'], $practitioners);
         $this->assertSame([
-            ['name' => 'Physio follow-up', 'duration_minutes' => 30, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0, 'price_pence' => 5000, 'is_active' => true],
-            ['name' => 'Physio assessment', 'duration_minutes' => 60, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0, 'price_pence' => 7000, 'is_active' => true],
-            ['name' => 'Sports massage, 90 minutes', 'duration_minutes' => 90, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0, 'price_pence' => 7500, 'is_active' => true],
+            ['name' => 'Physio follow-up', 'duration_minutes' => 30, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0, 'price_pence' => 5000, 'is_active' => true, 'room_weight' => 10],
+            ['name' => 'Physio assessment', 'duration_minutes' => 60, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0, 'price_pence' => 7000, 'is_active' => true, 'room_weight' => 10],
+            ['name' => 'Sports massage, 90 minutes', 'duration_minutes' => 90, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0, 'price_pence' => 7500, 'is_active' => true, 'room_weight' => 5],
         ], $services);
     }
 
