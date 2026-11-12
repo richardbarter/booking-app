@@ -71,35 +71,38 @@ class ShowAvailabilityTest extends TestCase
     }
 
     /**
-     * @return array<string, array{array<string, string>, string, string, list<string>}>
+     * Each case's lines, in the order they're printed.
+     *
+     * @return array<string, array{array<string, string>, list<string>}>
      */
     public static function strictnessTried(): array
     {
         return [
-            'the business\'s own' => [
-                [],
+            'the business\'s own' => [[], [
                 'Strictness     50: hides times with more than 60 min of extra waste',
                 'Offered times  22',
-                ['  09:00 09:30 09:45 10:00 10:15 10:30 10:45 11:00 11:15 11:30 12:00 14:00', 'Hidden times   2', '  09:15 11:45'],
-            ],
-            'the loosest' => [
-                ['--strictness' => '0'],
+                '  09:00 09:30 09:45 10:00 10:15 10:30 10:45 11:00 11:15 11:30 12:00 14:00',
+                'Hidden times   2',
+                '  09:15 11:45',
+            ]],
+            'the loosest' => [['--strictness' => '0'], [
                 'Strictness     0: every time that fits is offered (from --strictness, not saved)',
+                'Relaxation     48 hours, until 08:00 on Wednesday 4 November 2026: nothing is hidden at strictness 0',
                 'Offered times  24',
-                ['  09:00 09:15 09:30 09:45 10:00 10:15 10:30 10:45 11:00 11:15 11:30 11:45', 'Hidden times   0'],
-            ],
-            'just above the loosest' => [
-                ['--strictness' => '1'],
+                '  09:00 09:15 09:30 09:45 10:00 10:15 10:30 10:45 11:00 11:15 11:30 11:45',
+                'Hidden times   0',
+            ]],
+            'just above the loosest' => [['--strictness' => '1'], [
                 'Strictness     1: hides times with more than 118.8 min of extra waste (from --strictness, not saved)',
                 'Offered times  24',
-                ['Hidden times   0'],
-            ],
-            'the tightest' => [
-                ['--strictness' => '100'],
+                'Hidden times   0',
+            ]],
+            'the tightest' => [['--strictness' => '100'], [
                 'Strictness     100: hides times with more than 0 min of extra waste (from --strictness, not saved)',
                 'Offered times  4',
-                ['  09:00 12:00 14:00 16:30', 'Hidden times   20'],
-            ],
+                '  09:00 12:00 14:00 16:30',
+                'Hidden times   20',
+            ]],
         ];
     }
 
@@ -108,14 +111,11 @@ class ShowAvailabilityTest extends TestCase
      * @param  list<string>  $lines
      */
     #[DataProvider('strictnessTried')]
-    public function test_shows_the_day_at_another_strictness_without_saving_it(array $option, string $strictness, string $offered, array $lines): void
+    public function test_shows_the_day_at_another_strictness_without_saving_it(array $option, array $lines): void
     {
         $business = $this->sampleBusiness(strictness: 50);
         $assessment = $this->service($business, 'Physio assessment');
-
-        $command = $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => '2026-11-09', ...$option])
-            ->expectsOutput($strictness)
-            ->expectsOutput($offered);
+        $command = $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => '2026-11-09', ...$option]);
 
         foreach ($lines as $line) {
             $command->expectsOutput($line);

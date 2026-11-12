@@ -234,6 +234,18 @@ class BookSlotTest extends TestCase
         $this->assertNothingWritten();
     }
 
+    public function test_refuses_a_strictness_option_with_no_value_rather_than_ignoring_it(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('booking:create', ['business' => $business->id, 'service' => $assessment->id, 'start' => '2026-11-09 09:15', '--strictness' => null])
+            ->expectsOutput('The strictness must be a whole number from 0 to 100, got "".')
+            ->assertFailed();
+
+        $this->assertNothingWritten();
+    }
+
     public function test_refuses_to_run_in_production_before_reading_the_database(): void
     {
         $business = $this->sampleBusiness();

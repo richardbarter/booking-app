@@ -20,20 +20,21 @@ trait TriesAnotherStrictness
     /**
      * Sets the --strictness option's value on the business, if it was
      * given. Returns false, after printing why, when it isn't a whole
-     * number from 0 to 100.
+     * number from 0 to 100, including when the option is given with no
+     * value, which would otherwise be read as not given at all.
      */
     private function tryStrictnessOption(Business $business): bool
     {
         $option = $this->option('strictness');
 
-        if ($option === null) {
+        if ($option === null && ! $this->input->hasParameterOption('--strictness')) {
             return true;
         }
 
         $strictness = filter_var($option, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => BookingSettings::MAX_STRICTNESS]]);
 
         if ($strictness === false) {
-            $this->error(sprintf('The strictness must be a whole number from 0 to %d, got "%s".', BookingSettings::MAX_STRICTNESS, $option));
+            $this->error(sprintf('The strictness must be a whole number from 0 to %d, got "%s".', BookingSettings::MAX_STRICTNESS, $option ?? ''));
 
             return false;
         }

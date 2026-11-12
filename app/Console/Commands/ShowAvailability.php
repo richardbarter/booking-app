@@ -7,7 +7,6 @@ use App\Console\Commands\Concerns\TriesAnotherStrictness;
 use App\Exceptions\ServiceNotBookable;
 use App\Models\Business;
 use App\Models\Service;
-use App\Scheduling\BookingSettings;
 use App\Scheduling\DayAvailability;
 use App\Scheduling\LocalClock;
 use App\Scheduling\Slot;
@@ -129,22 +128,25 @@ class ShowAvailability extends Command
         $this->printTimes('Offered times  ', $day->slots, $timezone);
         $this->printTimes('Hidden times   ', $day->hiddenSlots, $timezone);
 
-        $slots = [...$day->slots, ...$day->hiddenSlots];
-        usort($slots, fn (Slot $first, Slot $second): int => $first->startsAt <=> $second->startsAt);
+        $shown = [
+            ...array_map(fn (Slot $slot): array => [$slot, 'Offered'], $day->slots),
+            ...array_map(fn (Slot $slot): array => [$slot, 'Hidden'], $day->hiddenSlots),
+        ];
+        usort($shown, fn (array $first, array $second): int => $first[0]->startsAt <=> $second[0]->startsAt);
 
-        if ($slots !== []) {
+        if ($shown !== []) {
             $this->newLine();
             $this->table(
                 ['Time', 'Shown', 'Extra waste', 'Waste', 'Stranded', 'Lost room', 'Split'],
-                array_map(fn (Slot $slot): array => [
-                    $slot->startsAt->setTimezone($timezone)->format('H:i'),
-                    in_array($slot, $day->hiddenSlots, true) ? 'Hidden' : 'Offered',
-                    $slot->waste->extraMinutes,
-                    $slot->waste->minutes,
-                    $slot->waste->strandedMinutes,
-                    $slot->waste->lostRoomMinutes,
-                    $slot->waste->splitMinutes,
-                ], $slots),
+                array_map(fn (array $row): array => [
+                    $row[0]->startsAt->setTimezone($timezone)->format('H:i'),
+                    $row[1],
+                    $row[0]->waste->extraMinutes,
+                    $row[0]->waste->minutes,
+                    $row[0]->waste->strandedMinutes,
+                    $row[0]->waste->lostRoomMinutes,
+                    $row[0]->waste->splitMinutes,
+                ], $shown),
             );
         }
     }
@@ -168,15 +170,18 @@ class ShowAvailability extends Command
     /**
      * The strictness and what it hides, such as "50: hides times with more
      * than 60 min of extra waste", saying so when it's --strictness's
-     * rather than the business's own. The threshold can be a tenth of a
-     * minute, such as 118.8 at 1.
+     * rather than the business's own. The threshold comes from
+     * StrictnessFilter, and can be part of a minute, such as 118.8 at 1.
+     * In v1 the business's strictness applies at every time; strictness by
+     * time of day will need this line to change.
      */
     private function describeStrictness(Business $business): string
     {
         $strictness = $business->strictness;
-        $tenths = intdiv(StrictnessFilter::MAX_THRESHOLD_MINUTES * (BookingSettings::MAX_STRICTNESS - $strictness), 10);
-        $threshold = $tenths % 10 === 0 ? (string) intdiv($tenths, 10) : sprintf('%d.%d', intdiv($tenths, 10), $tenths % 10);
-        $effect = $strictness === 0 ? 'every time that fits is offered' : "hides times with more than {$threshold} min of extra waste";
+        $tenths = StrictnessFilter::thresholdTenths($strictness);
+        $effect = $tenths === null
+            ? 'every time that fits is offered'
+            : sprintf('hides times with more than %s min of extra waste', $tenths % 10 === 0 ? intdiv($tenths, 10) : sprintf('%d.%d', intdiv($tenths, 10), $tenths % 10));
         $source = $business->isDirty('strictness') ? ' (from --strictness, not saved)' : '';
 
         return "{$strictness}: {$effect}{$source}";
@@ -184,17 +189,19 @@ class ShowAvailability extends Command
 
     /**
      * The relaxation window, when it ends, and whether strictness applies
-     * to all of the date, part of it or none of it. The window counts real
-     * hours from now, and a time exactly when it ends is inside it.
+     * to all of the date, part of it or none of it. The end comes from
+     * StrictnessFilter, from now as the command reads it, a moment after
+     * the search did.
      */
     private function describeRelaxation(Business $business, string $date): string
     {
         $timezone = $business->timezone;
-        $ends = now()->toImmutable()->utc()->addHours($business->relaxation_hours);
+        $ends = StrictnessFilter::relaxationEnds(now(), $business->relaxation_hours);
         $day = (new LocalClock(new DateTimeZone($timezone)))->day(CarbonImmutable::parse($date, 'UTC'));
         $localEnd = $ends->setTimezone($timezone);
 
         $effect = match (true) {
+            $business->strictness === 0 => 'nothing is hidden at strictness 0',
             $ends < $day->start => 'strictness applies all day',
             $ends >= $day->end => 'this date is inside it, so nothing is hidden',
             default => "strictness applies to times after {$localEnd->format('H:i')}",

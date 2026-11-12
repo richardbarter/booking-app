@@ -161,6 +161,32 @@ class StrictnessFilterTest extends TestCase
         $this->assertSame([[$atTheEdge], [$justAfter]], $split);
     }
 
+    /**
+     * @return array<string, array{int, ?int}>
+     */
+    public static function thresholds(): array
+    {
+        return [
+            '0, which has none' => [0, null],
+            '1, 118.8 minutes' => [1, 1188],
+            '50, 60 minutes' => [50, 600],
+            '100, 0' => [100, 0],
+        ];
+    }
+
+    #[DataProvider('thresholds')]
+    public function test_gives_the_threshold_in_tenths_of_a_minute(int $strictness, ?int $tenths): void
+    {
+        $this->assertSame($tenths, StrictnessFilter::thresholdTenths($strictness));
+    }
+
+    public function test_gives_the_end_of_the_relaxation_window_in_utc(): void
+    {
+        $ends = StrictnessFilter::relaxationEnds(CarbonImmutable::parse('2026-03-28 10:00', 'Europe/London'), 48);
+
+        $this->assertSame('2026-03-30T10:00:00+00:00', $ends->toIso8601String());
+    }
+
     private function sampleMorningAt(int $strictness): DayAvailability
     {
         $availability = (new SlotFinder)->find(

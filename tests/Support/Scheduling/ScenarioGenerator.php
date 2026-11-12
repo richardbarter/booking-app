@@ -43,6 +43,11 @@ final readonly class ScenarioGenerator
 
     public function __construct(private int $seed) {}
 
+    /**
+     * Strictness, the relaxation window and the compared strictness (07)
+     * are drawn last, so the scenarios from before them are the same as
+     * they were.
+     */
     public function scenario(int $number): Scenario
     {
         $random = new Randomizer(new Mt19937(crc32("{$this->seed}:{$number}")));
@@ -59,9 +64,6 @@ final readonly class ScenarioGenerator
         $maxAdvance = $random->getInt(1, 120);
         $now = $this->now($random, $first, $dateCount);
         $offeredServices = $this->offeredServices($random, $service);
-
-        // Drawn last, so the scenarios from before strictness (07) are the
-        // same as they were.
         $strictness = $this->strictness($random);
         $relaxationHours = $this->relaxationHours($random);
 
