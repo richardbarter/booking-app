@@ -16,6 +16,8 @@ use InvalidArgumentException;
  * 5. keeps the start times inside the booking window
  * 6. scores each one by how much room it would cost the bookings still to
  *    come, and finds the day's stranded and fragmented gaps (WasteScorer)
+ * 7. hides the ones that would waste too much room for the strictness at
+ *    their time, except inside the relaxation window (StrictnessFilter)
  *
  * It's given everything it works on, the current time included, and reads
  * no database or clock.
@@ -37,6 +39,7 @@ final readonly class SlotFinder
         $clock = new LocalClock($settings->timezone);
         $window = new BookingWindow($settings, $now);
         $scorer = new WasteScorer($diary->offeredServices);
+        $strictness = new StrictnessFilter($settings, $now);
         $days = [];
 
         foreach ($dates->dates() as $date) {
@@ -45,12 +48,14 @@ final readonly class SlotFinder
             $freeGaps = FreeGaps::between($workingTimes, $diary->blockedTimes);
             $startTimes = $freeGaps === [] ? [] : $clock->startTimesOn($day, $settings->slotIntervalMinutes);
             $fit = new ServiceFit($startTimes);
+            [$offered, $hidden] = $strictness->split(self::slots($startTimes, $freeGaps, $service, $window, $scorer, $fit));
 
             $days[] = new DayAvailability(
                 $date,
                 $workingTimes,
                 $freeGaps,
-                self::slots($startTimes, $freeGaps, $service, $window, $scorer, $fit),
+                $offered,
+                $hidden,
                 $scorer->gapSummary($freeGaps, $fit),
             );
         }

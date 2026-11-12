@@ -176,6 +176,76 @@ class BookSlotTest extends TestCase
         $this->assertSame(1, DB::table('customers')->count());
     }
 
+    public function test_refuses_a_time_strictness_hides_and_suggests_availability_show(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('booking:create', ['business' => $business->id, 'service' => $assessment->id, 'start' => '2026-11-09 09:15'])
+            ->expectsOutput("2026-11-09 09:15 isn't one of the times offered for Physio assessment. Run php artisan availability:show {$business->id} {$assessment->id} --date=2026-11-09 to see them.")
+            ->assertFailed();
+
+        $this->assertNothingWritten();
+    }
+
+    public function test_books_a_time_strictness_hides_at_another_strictness_without_saving_it(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('booking:create', ['business' => $business->id, 'service' => $assessment->id, 'start' => '2026-11-09 09:15', '--strictness' => '0'])
+            ->expectsOutputToContain('Booked Physio assessment for Monday 9 November 2026, 09:15–10:15 (Europe/London), booking ')
+            ->assertSuccessful();
+
+        $this->assertSame('2026-11-09T09:15:00+00:00', $this->bookingOf($business)->starts_at->toIso8601String());
+        $this->assertSame(50, $business->fresh()?->strictness);
+    }
+
+    public function test_suggests_availability_show_at_the_strictness_tried(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('booking:create', ['business' => $business->id, 'service' => $assessment->id, 'start' => '2026-11-09 09:45', '--strictness' => '100'])
+            ->expectsOutput("2026-11-09 09:45 isn't one of the times offered for Physio assessment. Run php artisan availability:show {$business->id} {$assessment->id} --date=2026-11-09 --strictness=100 to see them.")
+            ->assertFailed();
+
+        $this->assertNothingWritten();
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function strictnessNotAllowed(): array
+    {
+        return ['above 100' => ['101'], 'below 0' => ['-1'], 'not whole' => ['50.5'], 'not a number' => ['strict']];
+    }
+
+    #[DataProvider('strictnessNotAllowed')]
+    public function test_refuses_a_strictness_that_is_not_a_whole_number_from_0_to_100(string $strictness): void
+    {
+        $business = $this->sampleBusiness();
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('booking:create', ['business' => $business->id, 'service' => $assessment->id, 'start' => '2026-11-09 10:00', '--strictness' => $strictness])
+            ->expectsOutput("The strictness must be a whole number from 0 to 100, got \"{$strictness}\".")
+            ->assertFailed();
+
+        $this->assertNothingWritten();
+    }
+
+    public function test_refuses_a_strictness_option_with_no_value_rather_than_ignoring_it(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('booking:create', ['business' => $business->id, 'service' => $assessment->id, 'start' => '2026-11-09 09:15', '--strictness' => null])
+            ->expectsOutput('The strictness must be a whole number from 0 to 100, got "".')
+            ->assertFailed();
+
+        $this->assertNothingWritten();
+    }
+
     public function test_refuses_to_run_in_production_before_reading_the_database(): void
     {
         $business = $this->sampleBusiness();
@@ -190,11 +260,18 @@ class BookSlotTest extends TestCase
         $this->assertSame([], DB::getQueryLog());
     }
 
-    private function sampleBusiness(): Business
+    /**
+     * The sample business, at strictness 0 unless a test gives another,
+     * since most of these tests are about booking what fits, not what
+     * strictness hides (07).
+     */
+    private function sampleBusiness(int $strictness = 0): Business
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-02 08:00', 'Europe/London'));
+        $business = app(CreateSampleBusiness::class)->handle();
+        $business->update(['strictness' => $strictness]);
 
-        return app(CreateSampleBusiness::class)->handle();
+        return $business;
     }
 
     private function service(Business $business, string $name): Service

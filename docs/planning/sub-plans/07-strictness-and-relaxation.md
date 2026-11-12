@@ -60,7 +60,7 @@ The threshold falls steadily as strictness rises:
 - **50 hides times that waste more than 60 minutes more than the best time in their gap.**
 - **100 hides everything above 0,** so only the best times in each gap stay.
 
-The comparison uses whole numbers, `100 × extra > 120 × (100 − strictness)`, so a time exactly on the threshold is kept.
+The comparison uses whole numbers, in tenths of a minute: `10 × extra > 12 × (100 − strictness)`, so a time exactly on the threshold is kept.
 
 **Every free gap with room still offers a time.** The best time in each gap has extra waste 0, and 0 is never above any threshold. That's the overview's rule, held by the design rather than by extra code.
 
@@ -136,7 +136,7 @@ Existing businesses (sandboxes in production, by the time this deploys) get the 
 - **`BookingSettings`:**
   - gains `strictness` (checked 0 to 100) and `relaxationHours` (checked 0 to 720)
   - gains `strictnessAt()`, above
-- **`StrictnessFilter`:** a new step after `WasteScorer`, holding the constant `MAX_THRESHOLD_MINUTES = 120`. For each day, it splits the scored slots into offered and hidden, by the three rules above, using the `now` the engine is given.
+- **`StrictnessFilter`:** a new step after `WasteScorer`, holding the constant `MAX_THRESHOLD_MINUTES = 120`. For each day, it splits the scored slots into offered and hidden, by the three rules above, using the `now` the engine is given. Its static `thresholdTenths()` and `relaxationEnds()` give the threshold at a strictness and the end of the window, so `availability:show` describes the settings with the engine's own formulas.
 - **`DayAvailability`** gains `hiddenSlots` (`list<Slot>`, in time order).
 - **`SlotFinder::find()`** keeps its signature.
 
@@ -147,7 +147,7 @@ It builds `BookingSettings` with the business's strictness and relaxation window
 ### `availability:show` (04 and 06)
 
 - It lists the hidden times with their extra waste, beside the offered ones.
-- It says whether the date is within the relaxation window.
+- It says when the relaxation window ends, and whether the date is inside it, after it, or partly inside it.
 - A new `--strictness=` option (0 to 100) shows the day at another strictness without changing the business, to try settings before the playground exists. The command sets the value on the business it has loaded, without saving it, and `AvailabilityService` reads it from there. An invalid value is refused with exit code 1, and a test checks the stored strictness is unchanged afterwards.
 
 ### `booking:create` (05)
@@ -179,7 +179,7 @@ As in 04 and 06: engine tests extend `PHPUnit\Framework\TestCase`, method names 
   - across the night the clocks go forward, 48 hours means 48 real hours
 - **Hidden slots:** `hiddenSlots` holds exactly the slots removed, in time order, each with its waste score.
 
-**Unit: randomised rules**, added to `SlotFinderRulesTest` and numbered 14 to 19, after 04's rules 1 to 7 and 06's 8 to 13. The generator also picks a random strictness and relaxation window.
+**Unit: randomised rules**, added to `SlotFinderRulesTest` and numbered 14 to 19, after 04's rules 1 to 7 and 06's 8 to 13. The generator also picks a random strictness and relaxation window, and a second strictness that each diary is searched at too, for the rules that compare two. It picks them after everything else, so 04's and 06's scenarios stay as they were. Rules 1 to 13 check every slot that fits, offered or hidden, since strictness changes neither which slots fit nor their scores, so their 282,477 checks don't change either.
 
 14. **Raising strictness only hides times.** For two random strictness values, the higher one's offered times are among the lower one's.
 15. At strictness 0, nothing is hidden.
@@ -218,11 +218,17 @@ These are the overview's last three rules (section 10), plus the checks that the
 
 ## Done when
 
-- [ ] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
-- [ ] `php artisan availability:show 1 <assessment's ID> --date=<a Monday at least 3 days ahead>` shows offered and hidden times locally, and `--strictness=0` shows them all
-- [ ] `php artisan booking:create 1 <assessment's ID> "<that Monday> <a hidden time>" --strictness=0` books a time that `availability:show` lists as hidden, locally
+- [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
+- [x] `php artisan availability:show 1 <assessment's ID> --date=<a Monday at least 3 days ahead>` shows offered and hidden times locally, and `--strictness=0` shows them all
+- [x] `php artisan booking:create 1 <assessment's ID> "<that Monday> <a hidden time>" --strictness=0` books a time that `availability:show` lists as hidden, locally
 - [ ] The deploy after merging runs the migration on Neon (Fly's release command succeeds)
-- [ ] `tracking.md` marks 07 as done, and with 03 to 06 done, the engine is complete for the playground (08)
+- [x] `tracking.md` marks 07 as done, and with 03 to 06 done, the engine is complete for the playground (08)
+
+## Pull requests
+
+**Estimate:** about 300 lines of app code and 700 of tests, so about 1,100 in all with the docs. The plan was drafted before plans had this section, so the estimate was made when the build started (2026-11-12), against 06's code. The build came to about 350 lines of app code and 1,070 of tests.
+
+**One pull request,** on `feature/07-strictness-and-relaxation`, ticking every item in **Done when** except the deploy's, which is checked after the merge. It's within the guide of about 500 lines of app code and 1,500 in all.
 
 ## Notes
 
@@ -236,7 +242,7 @@ Learning from history (19) and the simulator (20) can later replace them with da
 **For later sub-plans**
 - **08:**
   - the slider changes the sandbox business's strictness
-  - "show hidden times" uses `hiddenSlots` and their waste scores
+  - "show hidden times" uses `hiddenSlots` and their waste scores, and `StrictnessFilter::thresholdTenths()` gives the threshold a hidden time is over
   - "how far ahead" shows the relaxation window at work
   - the defaults and the 120-minute scale get tuned here
 - **10:**
@@ -245,4 +251,4 @@ Learning from history (19) and the simulator (20) can later replace them with da
   - the preview counts `slots` against `slots` plus `hiddenSlots`
 - **11:** the public API sends `slots` only. Hidden times never leave the server, and booking one is refused.
 - **13:** whether the owner can book a hidden time by hand. If so, `CreateBooking` needs an option that skips strictness, and only the admin area may use it.
-- **Strictness by time of day (later):** add the data behind `strictnessAt()`, and the screens to set it.
+- **Strictness by time of day (later):** add the data behind `strictnessAt()`, and the screens to set it. `availability:show`'s Strictness line describes one strictness for the day, so it changes too.
