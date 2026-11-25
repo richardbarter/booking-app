@@ -67,7 +67,7 @@ class BookingWindowTest extends TestCase
     private function window(string $zone, int $minNoticeMinutes, int $maxAdvanceDays, string $nowInUtc): BookingWindow
     {
         return new BookingWindow(
-            new BookingSettings(new DateTimeZone($zone), 15, $minNoticeMinutes, $maxAdvanceDays),
+            new BookingSettings(new DateTimeZone($zone), 15, $minNoticeMinutes, $maxAdvanceDays, strictness: 0, relaxationHours: 48),
             $this->utc($nowInUtc),
         );
     }

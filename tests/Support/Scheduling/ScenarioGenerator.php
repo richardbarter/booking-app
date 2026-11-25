@@ -43,6 +43,11 @@ final readonly class ScenarioGenerator
 
     public function __construct(private int $seed) {}
 
+    /**
+     * Strictness, the relaxation window and the compared strictness (07)
+     * are drawn last, so the scenarios from before them are the same as
+     * they were.
+     */
     public function scenario(int $number): Scenario
     {
         $random = new Randomizer(new Mt19937(crc32("{$this->seed}:{$number}")));
@@ -54,13 +59,13 @@ final readonly class ScenarioGenerator
         $editedDays = $this->editedDays($random, $first, $dateCount, $changeDate);
         $blockedTimes = $this->blockedTimes($random, $first, $dateCount);
         $service = $this->serviceTimes($random);
-        $settings = new BookingSettings(
-            $zone,
-            BookingSettings::SLOT_INTERVALS[$random->getInt(0, count(BookingSettings::SLOT_INTERVALS) - 1)],
-            $random->getInt(0, 1) === 0 ? $random->getInt(0, 180) : $random->getInt(0, 3 * self::MINUTES_IN_DAY),
-            $random->getInt(1, 120),
-        );
+        $slotInterval = BookingSettings::SLOT_INTERVALS[$random->getInt(0, count(BookingSettings::SLOT_INTERVALS) - 1)];
+        $minNotice = $random->getInt(0, 1) === 0 ? $random->getInt(0, 180) : $random->getInt(0, 3 * self::MINUTES_IN_DAY);
+        $maxAdvance = $random->getInt(1, 120);
         $now = $this->now($random, $first, $dateCount);
+        $offeredServices = $this->offeredServices($random, $service);
+        $strictness = $this->strictness($random);
+        $relaxationHours = $this->relaxationHours($random);
 
         return new Scenario(
             seed: $this->seed,
@@ -69,10 +74,11 @@ final readonly class ScenarioGenerator
             editedDays: $editedDays,
             blockedTimes: $blockedTimes,
             service: $service,
-            settings: $settings,
+            settings: new BookingSettings($zone, $slotInterval, $minNotice, $maxAdvance, $strictness, $relaxationHours),
             dates: DateRange::between($first, $last),
             now: $now,
-            offeredServices: $this->offeredServices($random, $service),
+            offeredServices: $offeredServices,
+            comparedStrictness: $this->strictness($random),
         );
     }
 
@@ -263,6 +269,33 @@ final readonly class ScenarioGenerator
     private function roomWeight(Randomizer $random): int
     {
         return $random->getInt(0, 3) === 0 ? 0 : $random->getInt(1, OfferedService::MAX_ROOM_WEIGHT);
+    }
+
+    /**
+     * A sixth of the time 0, which hides nothing, and a sixth 100, the
+     * tightest. Otherwise anything between.
+     */
+    private function strictness(Randomizer $random): int
+    {
+        return match ($random->getInt(0, 5)) {
+            0 => 0,
+            1 => BookingSettings::MAX_STRICTNESS,
+            default => $random->getInt(1, BookingSettings::MAX_STRICTNESS - 1),
+        };
+    }
+
+    /**
+     * A quarter of the time 0, so strictness applies to every time. Mostly
+     * up to 4 days, so the window often ends part-way through the dates,
+     * and sometimes up to the most allowed, 30 days.
+     */
+    private function relaxationHours(Randomizer $random): int
+    {
+        return match ($random->getInt(0, 3)) {
+            0 => 0,
+            1 => $random->getInt(1, BookingSettings::MAX_RELAXATION_HOURS),
+            default => $random->getInt(1, 96),
+        };
     }
 
     /**

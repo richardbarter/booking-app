@@ -62,6 +62,8 @@ class AvailabilityService
             $business->slot_interval_minutes,
             $business->min_notice_minutes,
             $business->max_advance_days,
+            $business->strictness,
+            $business->relaxation_hours,
         );
         [$offeredServices, $searchedFor] = $this->offeredServices($business, $service);
         $practitioner = $business->practitioners()->sole();
