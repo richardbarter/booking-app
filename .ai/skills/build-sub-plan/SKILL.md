@@ -52,7 +52,7 @@ Only build a plan that's merged into `main`, since a plan still on a `docs/` bra
 
 1. Run the narrowest tests that cover it: a file path or `--filter` with `php artisan test --compact`, in the `app` container or on the host.
 2. Run Pint on the changed files (`vendor/bin/pint --dirty --format agent`) and Larastan (`composer types:check`).
-3. Once 04 has set up Infection, run `composer test:mutation` if `app/Scheduling` changed.
+3. Run `composer test:mutation` if `app/Scheduling` or its tests changed. `composer ci:check` doesn't include it.
 4. Commit.
 
 A problem is then found close to where it was made, and every commit works. Checkpoints are for checking, not for waiting: carry on to the next part unless something in section 4 applies. If the session may end before the plan is built, say in `tracking.md`'s notes for the next session where the build got to and what's left.
@@ -134,7 +134,7 @@ The user reviews the pull request too, but a bug found now is cheaper to fix tha
 
 The pull request is what the user reviews, and merging it deploys, so it has to show what was built and the evidence that it works, without the user rerunning anything.
 
-1. **Run the checks CI runs,** after the review's fixes: `composer ci:check`, and `npm run build` too if the frontend changed (CI's `checks` job runs both). They must pass. If one fails, fix the cause, not the check.
+1. **Run the checks CI runs,** after the review's fixes: `composer ci:check`, `composer test:mutation` too if the scheduling engine or its tests changed, and `npm run build` if the frontend changed (CI's `checks` job runs all three). They must pass. If one fails, fix the cause, not the check.
 2. **Tick each "Done when" item** that this pull request covers, and give its evidence in the pull request description: the test, the command and what it printed, or the measurement. An item that can only be checked after the merge, such as a migration running on Neon, stays unticked, under **After the merge**.
 3. **Update `tracking.md`:**
    - the plan's status becomes **Done**, or for a part before the last, stays **In progress**, with the notes saying which parts are merged. Its PR column adds the build's pull request to the plan's (`Plan #7, build #9`, or `build #17, #18` for parts), and its notes give what's worth knowing, such as measurements the plan asked for
@@ -145,7 +145,7 @@ The pull request is what the user reviews, and merging it deploys, so it has to 
 5. **Write the description** in the style of the earlier ones (`gh pr view 1`):
    - a first line naming the sub-plan and its file, and for a part, which part it is (part 1 of 2)
    - **What's in it:** what was built, by area
-   - **Checked:** `composer ci:check`, each "Done when" item with its evidence, the security check and the review pass
+   - **Checked:** `composer ci:check` (and `composer test:mutation` if the engine changed), each "Done when" item with its evidence, the security check and the review pass
    - **Deviations from the plan:** each one, why, and where it's recorded, or "None"
    - **After the merge:** the checks that wait for the merge, and anything the user needs to do
 6. **Don't merge it.** The user reviews and merges, and the merge deploys.

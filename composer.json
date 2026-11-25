@@ -68,8 +68,7 @@
             "npm run check",
             "npm run types:check",
             "npm run test -- --run",
-            "@test",
-            "@test:mutation"
+            "@test"
         ],
         "types:check": [
             "phpstan analyse --memory-limit=1G"

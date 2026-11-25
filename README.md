@@ -29,7 +29,7 @@ Run the tests with `docker compose exec app php artisan test` and `npm run test`
 
 Bookalive runs on one Fly.io Machine in London, with its PostgreSQL database on Neon, also in London, and Laravel Nightwatch for monitoring.
 
-- `main` only accepts pull requests, and only once CI's `checks` and `audit` jobs pass. Run `composer ci:check` before opening one: it runs everything `checks` does except the build.
+- `main` only accepts pull requests, and only once CI's `checks` and `audit` jobs pass. Run `composer ci:check` before opening one: it runs everything `checks` does except the build and mutation testing. If the scheduling engine or its tests changed, run `composer test:mutation` too, as `checks` does.
 - Merging a pull request deploys it automatically. The `deploy` job in `.github/workflows/ci.yml` runs `flyctl deploy`, Fly builds the image from the Dockerfile's `php` stage, and Fly's release command runs the migrations before the new version starts. The site is down for a few seconds while the only Machine restarts.
 - When nobody's visiting, the Machine suspends and Neon's database goes to sleep, so the first visit after a quiet spell takes about a second longer.
 - Secrets never go in the repo. The app's secrets (`APP_KEY`, `DB_URL` and `NIGHTWATCH_TOKEN`) live in Fly, and the deploy token (`FLY_API_TOKEN`) lives in the GitHub `production` environment. Settings that aren't secret are in `fly.toml`.
