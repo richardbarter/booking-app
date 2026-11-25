@@ -15,10 +15,10 @@ namespace App\Scheduling;
  * - split: a small cost when it would leave free time on both sides
  *
  * Extra waste is how much more it is than the lowest score among the slots
- * offered in the same free gap, so the best there has 0. It depends on
- * which slots the booking window offers, so it can change as today's
- * earliest times pass the minimum notice. Strictness (07) compares extra
- * waste, since some of every score can't be avoided.
+ * that fit in the same free gap inside the booking window, so the best
+ * there has 0. It depends on which slots the window allows, so it can
+ * change as today's earliest times pass the minimum notice. Strictness (07)
+ * compares extra waste, since some of every score can't be avoided.
  */
 final readonly class WasteScore
 {

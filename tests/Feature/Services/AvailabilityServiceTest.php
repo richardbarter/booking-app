@@ -44,6 +44,48 @@ class AvailabilityServiceTest extends TestCase
         $this->assertCount(24, $offered);
     }
 
+    public function test_at_strictness_50_hides_the_two_most_wasteful_assessment_times_on_an_empty_monday(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+
+        $day = $this->availability($business, 'Physio assessment', '2026-11-09', '2026-11-09')->day('2026-11-09');
+
+        $this->assertNotNull($day);
+        $this->assertSame(
+            [...array_values(array_diff($this->every15('09:00', '12:00'), ['09:15', '11:45'])), ...$this->every15('14:00', '16:30')],
+            $this->localTimes($day->slots),
+        );
+        $this->assertSame(['09:15', '11:45'], $this->localTimes($day->hiddenSlots));
+    }
+
+    public function test_offers_every_time_that_fits_inside_the_relaxation_window(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $this->travelTo(CarbonImmutable::parse('2026-11-08 12:00', 'Europe/London'));
+
+        $day = $this->availability($business, 'Physio assessment', '2026-11-09', '2026-11-09')->day('2026-11-09');
+
+        $this->assertNotNull($day);
+        $this->assertCount(24, $day->slots);
+        $this->assertSame([], $day->hiddenSlots);
+    }
+
+    public function test_reads_the_strictness_from_the_business(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $business->update(['strictness' => 100]);
+
+        $this->assertSame(['09:00', '12:00', '14:00', '16:30'], $this->offered($business, 'Physio assessment', '2026-11-09'));
+    }
+
+    public function test_reads_the_relaxation_window_from_the_business(): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $business->update(['relaxation_hours' => 200]);
+
+        $this->assertCount(24, $this->offered($business, 'Physio assessment', '2026-11-09'));
+    }
+
     public function test_offers_only_the_morning_on_the_tuesday_with_time_off_from_14_00(): void
     {
         $business = $this->sampleBusiness();
@@ -392,12 +434,15 @@ class AvailabilityServiceTest extends TestCase
     }
 
     /**
-     * The sample business, made the current business.
+     * The sample business, made the current business. It's at strictness 0
+     * unless a test gives another, since most of these tests are about what
+     * fits, not what strictness hides (07).
      */
-    private function sampleBusiness(): Business
+    private function sampleBusiness(int $strictness = 0): Business
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-02 08:00', 'Europe/London'));
         $business = app(CreateSampleBusiness::class)->handle();
+        $business->update(['strictness' => $strictness]);
         app(CurrentBusiness::class)->set($business);
 
         return $business;
@@ -426,7 +471,16 @@ class AvailabilityServiceTest extends TestCase
         $day = $this->availability($business, $serviceName, $date, $date)->day($date);
         $this->assertNotNull($day);
 
-        return array_map(fn (Slot $slot): string => $slot->startsAt->setTimezone('Europe/London')->format('H:i'), $day->slots);
+        return $this->localTimes($day->slots);
+    }
+
+    /**
+     * @param  list<Slot>  $slots
+     * @return list<string>
+     */
+    private function localTimes(array $slots): array
+    {
+        return array_map(fn (Slot $slot): string => $slot->startsAt->setTimezone('Europe/London')->format('H:i'), $slots);
     }
 
     /**

@@ -334,7 +334,7 @@ class SlotFinderTest extends TestCase
 
     private function settings(int $intervalMinutes = 15, int $minNoticeMinutes = 0, int $maxAdvanceDays = 90, string $zone = 'Europe/London'): BookingSettings
     {
-        return new BookingSettings(new DateTimeZone($zone), $intervalMinutes, $minNoticeMinutes, $maxAdvanceDays);
+        return new BookingSettings(new DateTimeZone($zone), $intervalMinutes, $minNoticeMinutes, $maxAdvanceDays, strictness: 0, relaxationHours: 48);
     }
 
     private function dates(string $from, string $to): DateRange
