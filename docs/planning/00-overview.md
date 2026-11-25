@@ -75,7 +75,7 @@ Use these names consistently in code, UI and docs.
 | Slot interval | The step between possible start times, set for the whole business: 10, 15, 20, 30 or 60 minutes. Default 15, aligned to the clock (:00, :15, :30, :45). |
 | Booking window | How soon (minimum notice) and how far ahead (maximum advance) customers can book. Set for the business. Default 2 hours and 90 days. The maximum counts whole dates in the business's time zone: with 90, customers can book on dates up to 90 days after today. With staff, each practitioner can have their own. |
 | Waste score | How much room a slot would cost the bookings still to come if it were booked, in minutes: the stranded time it leaves, the room it takes from each kind of appointment (by room weight), and a small cost for splitting a free gap. Worked out from the diary alone; strictness decides how much to tolerate. |
-| Extra waste | How much more a slot's waste score is than the best slot offered in the same free gap. The best has 0. |
+| Extra waste | How much more a slot's waste score is than the best slot that fits in the same free gap, inside the booking window. The best has 0, so strictness never hides it. |
 | Room weight | How much the waste score protects room for a service, from 0 (not at all) to 10 (fully, the default). Set by the owner for services booked more or less often. |
 | Strictness | A business setting from 0 to 100, default 50. 0 offers every slot that fits; higher settings hide slots with more extra waste; 100 offers only the least wasteful ones in each free gap. |
 | Relaxation window | How close to an appointment time strictness stops applying, so late bookings aren't turned away. Default 48 hours; strictness switches off all at once. |
@@ -122,7 +122,7 @@ Every possible slot gets a waste score, in minutes, before anyone books it. It s
 - **Lost room:** for each kind of appointment, how many fewer the gap can still take, valued at the diary time each takes (buffers included) and weighted by each service's **room weight**, so a rarely booked long service doesn't restrict everyone else. Splitting a 90-minute gap into two 30-minute pieces scores worse than taking 30 minutes from one end of it.
 - **Splitting a gap:** a small cost (5 minutes) when the booking leaves free time on both sides, because two pieces can't hold the same mixes of appointments as one. At the tightest setting, bookings are packed together from the edges of each gap.
 
-A time's **extra waste** is how much more it scores than the best time offered in the same gap. Part of every score can't be avoided, so strictness (5.4) compares extra waste. The formula is in sub-plan 06, a first version to be tuned with the playground and the simulator.
+A time's **extra waste** is how much more it scores than the best time that fits in the same gap. Part of every score can't be avoided, so strictness (5.4) compares extra waste. The formula is in sub-plan 06, a first version to be tuned with the playground and the simulator.
 
 ### 5.4 Strictness slider
 

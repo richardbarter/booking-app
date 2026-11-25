@@ -82,8 +82,9 @@ final readonly class SlotFinder
     /**
      * Start times are checked in whole seconds, since a day has up to 144
      * of them, and the slots' other times are only worked out with Carbon
-     * for the ones that fit. Each gap's offered slots are scored together,
-     * so extra waste compares the offered slots in the same gap.
+     * for the ones that fit. Each gap's fitting slots are scored together,
+     * so extra waste compares the fitting slots in the same gap, before
+     * strictness hides any.
      *
      * @param  list<CarbonImmutable>  $startTimes
      * @param  list<TimeRange>  $freeGaps
@@ -102,19 +103,19 @@ final readonly class SlotFinder
 
         foreach ($freeGaps as $gap) {
             [$gapStart, $gapEnd] = $gap->wholeSecondsInside();
-            $offered = [];
+            $fitting = [];
 
             foreach ($startTimes as $index => $startsAt) {
                 [$blockedFrom, $blockedUntil] = $blockedTimes[$index];
 
                 if ($gapStart <= $blockedFrom && $blockedUntil <= $gapEnd && $window->allows($startsAt)) {
-                    $offered[] = [$startsAt, $blockedTimes[$index]];
+                    $fitting[] = [$startsAt, $blockedTimes[$index]];
                 }
             }
 
-            $scores = $scorer->scores(array_column($offered, 1), $gapStart, $gapEnd, $fit);
+            $scores = $scorer->scores(array_column($fitting, 1), $gapStart, $gapEnd, $fit);
 
-            foreach ($offered as $index => [$startsAt]) {
+            foreach ($fitting as $index => [$startsAt]) {
                 $endsAt = $startsAt->addMinutes($service->durationMinutes);
                 $slots[] = new Slot(
                     $startsAt,
