@@ -100,8 +100,10 @@ final readonly class WasteScorer
      * Each slot is its blocked time, and the gap its start and end, all in
      * whole seconds, with the gap rounded inwards
      * (TimeRange::wholeSecondsInside()). Extra waste compares each slot
-     * with the lowest score among them, so give only the slots that are
-     * offered. The gap's counts are worked out once for all of them.
+     * with the lowest score among them, so give every slot that fits the
+     * gap inside the booking window. Strictness (07) hides some afterwards,
+     * from these scores. The gap's counts are worked out once for all of
+     * them.
      *
      * @param  list<array{int, int}>  $slots  blocked from and blocked until
      * @return list<WasteScore>

@@ -39,31 +39,223 @@ class ShowAvailabilityTest extends TestCase
             ->assertSuccessful();
     }
 
-    public function test_prints_each_offered_times_waste_score(): void
+    public function test_prints_each_times_waste_score_and_whether_strictness_hides_it(): void
     {
-        $business = $this->sampleBusiness();
+        $business = $this->sampleBusiness(strictness: 75);
         $followUp = $this->service($business, 'Physio follow-up');
 
         $this->artisan('availability:show', ['business' => $business->id, 'service' => $followUp->id, '--date' => '2026-11-14'])
             ->expectsOutput('Saturday 14 November 2026, Europe/London')
-            ->expectsTable(['Time', 'Extra waste', 'Waste', 'Stranded', 'Lost room', 'Split'], [
-                ['09:00', 0, 36, 0, 36, 0],
-                ['09:15', 32, 68, 15, 48, 5],
-                ['09:30', 5, 41, 0, 36, 5],
-                ['09:45', 59, 95, 0, 90, 5],
-                ['10:00', 23, 59, 0, 54, 5],
-                ['10:15', 35, 71, 0, 66, 5],
-                ['10:30', 5, 41, 0, 36, 5],
-                ['10:45', 41, 77, 0, 72, 5],
-                ['11:00', 5, 41, 0, 36, 5],
-                ['11:15', 35, 71, 0, 66, 5],
-                ['11:30', 23, 59, 0, 54, 5],
-                ['11:45', 59, 95, 0, 90, 5],
-                ['12:00', 5, 41, 0, 36, 5],
-                ['12:15', 32, 68, 15, 48, 5],
-                ['12:30', 0, 36, 0, 36, 0],
+            ->expectsOutput('Offered times  8')
+            ->expectsOutput('  09:00 09:30 10:00 10:30 11:00 11:30 12:00 12:30')
+            ->expectsOutput('Hidden times   7')
+            ->expectsOutput('  09:15 09:45 10:15 10:45 11:15 11:45 12:15')
+            ->expectsTable(['Time', 'Shown', 'Extra waste', 'Waste', 'Stranded', 'Lost room', 'Split'], [
+                ['09:00', 'Offered', 0, 36, 0, 36, 0],
+                ['09:15', 'Hidden', 32, 68, 15, 48, 5],
+                ['09:30', 'Offered', 5, 41, 0, 36, 5],
+                ['09:45', 'Hidden', 59, 95, 0, 90, 5],
+                ['10:00', 'Offered', 23, 59, 0, 54, 5],
+                ['10:15', 'Hidden', 35, 71, 0, 66, 5],
+                ['10:30', 'Offered', 5, 41, 0, 36, 5],
+                ['10:45', 'Hidden', 41, 77, 0, 72, 5],
+                ['11:00', 'Offered', 5, 41, 0, 36, 5],
+                ['11:15', 'Hidden', 35, 71, 0, 66, 5],
+                ['11:30', 'Offered', 23, 59, 0, 54, 5],
+                ['11:45', 'Hidden', 59, 95, 0, 90, 5],
+                ['12:00', 'Offered', 5, 41, 0, 36, 5],
+                ['12:15', 'Hidden', 32, 68, 15, 48, 5],
+                ['12:30', 'Offered', 0, 36, 0, 36, 0],
             ])
             ->assertSuccessful();
+    }
+
+    /**
+     * Each case's lines, in the order they're printed.
+     *
+     * @return array<string, array{array<string, string>, list<string>}>
+     */
+    public static function strictnessTried(): array
+    {
+        return [
+            'the business\'s own' => [[], [
+                'Strictness     50: hides times with more than 60 min of extra waste',
+                'Offered times  22',
+                '  09:00 09:30 09:45 10:00 10:15 10:30 10:45 11:00 11:15 11:30 12:00 14:00',
+                'Hidden times   2',
+                '  09:15 11:45',
+            ]],
+            'the loosest' => [['--strictness' => '0'], [
+                'Strictness     0: every time that fits is offered (from --strictness, not saved)',
+                'Relaxation     48 hours, until 08:00 on Wednesday 4 November 2026: nothing is hidden at strictness 0',
+                'Offered times  24',
+                '  09:00 09:15 09:30 09:45 10:00 10:15 10:30 10:45 11:00 11:15 11:30 11:45',
+                'Hidden times   0',
+            ]],
+            'just above the loosest' => [['--strictness' => '1'], [
+                'Strictness     1: hides times with more than 118.8 min of extra waste (from --strictness, not saved)',
+                'Offered times  24',
+                'Hidden times   0',
+            ]],
+            'the tightest' => [['--strictness' => '100'], [
+                'Strictness     100: hides times with more than 0 min of extra waste (from --strictness, not saved)',
+                'Offered times  4',
+                '  09:00 12:00 14:00 16:30',
+                'Hidden times   20',
+            ]],
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $option
+     * @param  list<string>  $lines
+     */
+    #[DataProvider('strictnessTried')]
+    public function test_shows_the_day_at_another_strictness_without_saving_it(array $option, array $lines): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+        $command = $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => '2026-11-09', ...$option]);
+
+        foreach ($lines as $line) {
+            $command->expectsOutput($line);
+        }
+
+        $command->assertSuccessful();
+        $this->assertSame(50, $business->fresh()?->strictness);
+    }
+
+    /**
+     * From Monday 2 November at 08:00, the 48-hour window ends at 08:00 on
+     * Wednesday 4 November.
+     *
+     * @return array<string, array{string, string}>
+     */
+    public static function datesAndTheRelaxationWindow(): array
+    {
+        return [
+            'already passed' => ['2026-11-01', 'this date has passed'],
+            'inside it' => ['2026-11-03', 'this date is inside it, so nothing is hidden'],
+            'partly inside it' => ['2026-11-04', 'strictness applies to times after 08:00'],
+            'after it' => ['2026-11-05', 'strictness applies all day'],
+        ];
+    }
+
+    #[DataProvider('datesAndTheRelaxationWindow')]
+    public function test_says_whether_the_date_is_inside_the_relaxation_window(string $date, string $effect): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => $date])
+            ->expectsOutput("Relaxation     48 hours, until 08:00 on Wednesday 4 November 2026: {$effect}")
+            ->assertSuccessful();
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function datesWithNoRelaxationWindow(): array
+    {
+        return [
+            'already passed' => ['2026-11-01', 'this date has passed'],
+            'today' => ['2026-11-02', 'strictness applies to times after 08:00'],
+            'tomorrow' => ['2026-11-03', 'strictness applies all day'],
+        ];
+    }
+
+    #[DataProvider('datesWithNoRelaxationWindow')]
+    public function test_says_there_is_no_relaxation_window_at_0_hours(string $date, string $effect): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+        $business->update(['relaxation_hours' => 0]);
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => $date])
+            ->expectsOutput("Relaxation     none: {$effect}")
+            ->assertSuccessful();
+    }
+
+    /**
+     * From midnight at the start of Tuesday 3 November in Auckland, 13
+     * hours ahead of UTC, the 24-hour window ends as Wednesday starts.
+     *
+     * @return array<string, array{string, string}>
+     */
+    public static function datesAndAWindowEndingAtMidnight(): array
+    {
+        return [
+            'inside it, to the end of the day' => ['2026-11-03', 'this date is inside it, so nothing is hidden'],
+            'starting as it ends' => ['2026-11-04', 'strictness applies to times after 00:00'],
+            'after it' => ['2026-11-05', 'strictness applies all day'],
+        ];
+    }
+
+    #[DataProvider('datesAndAWindowEndingAtMidnight')]
+    public function test_works_out_the_relaxation_window_in_the_business_time_zone(string $date, string $effect): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+        $business->update(['timezone' => 'Pacific/Auckland', 'relaxation_hours' => 24]);
+        $this->travelTo(CarbonImmutable::parse('2026-11-03 00:00', 'Pacific/Auckland'));
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => $date])
+            ->expectsOutput("Relaxation     24 hours, until 00:00 on Wednesday 4 November 2026: {$effect}")
+            ->assertSuccessful();
+    }
+
+    /**
+     * Worked out by hand. At 09:00 or 10:00 the two hours lose two of their
+     * four follow-ups, one of their two assessments and their one massage:
+     * (10 × 60 + 10 × 60 + 5 × 90) ÷ 25 = 66. At 09:15 or 09:45 they lose
+     * three, two and one (102), strand 15 and split. At 09:30 they lose
+     * two, two and one (90) and split.
+     */
+    public function test_prints_every_time_in_the_business_time_zone(): void
+    {
+        $business = $this->sampleBusiness(strictness: 75);
+        $assessment = $this->service($business, 'Physio assessment');
+        $business->update(['timezone' => 'Pacific/Auckland']);
+        app(CurrentBusiness::class)->run($business, fn () => $business->practitioners()->sole()->editedDays()->create([
+            'date' => '2026-11-12',
+            'hours' => [['09:00', '11:00']],
+        ]));
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => '2026-11-12'])
+            ->expectsOutput('Thursday 12 November 2026, Pacific/Auckland')
+            ->expectsOutput('Working hours  09:00–11:00')
+            ->expectsOutput('Free gaps      09:00–11:00')
+            ->expectsOutput('Offered times  3')
+            ->expectsOutput('  09:00 09:30 10:00')
+            ->expectsOutput('Hidden times   2')
+            ->expectsOutput('  09:15 09:45')
+            ->expectsTable(['Time', 'Shown', 'Extra waste', 'Waste', 'Stranded', 'Lost room', 'Split'], [
+                ['09:00', 'Offered', 0, 66, 0, 66, 0],
+                ['09:15', 'Hidden', 56, 122, 15, 102, 5],
+                ['09:30', 'Offered', 29, 95, 0, 90, 5],
+                ['09:45', 'Hidden', 56, 122, 15, 102, 5],
+                ['10:00', 'Offered', 0, 66, 0, 66, 0],
+            ])
+            ->assertSuccessful();
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function strictnessNotAllowed(): array
+    {
+        return ['above 100' => ['101'], 'below 0' => ['-1'], 'not whole' => ['50.5'], 'not a number' => ['strict']];
+    }
+
+    #[DataProvider('strictnessNotAllowed')]
+    public function test_fails_for_a_strictness_that_is_not_a_whole_number_from_0_to_100(string $strictness): void
+    {
+        $business = $this->sampleBusiness();
+        $assessment = $this->service($business, 'Physio assessment');
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => '2026-11-09', '--strictness' => $strictness])
+            ->expectsOutput("The strictness must be a whole number from 0 to 100, got \"{$strictness}\".")
+            ->assertFailed();
     }
 
     public function test_prints_the_days_stranded_and_fragmented_time(): void
@@ -271,11 +463,18 @@ class ShowAvailabilityTest extends TestCase
             ->assertFailed();
     }
 
-    private function sampleBusiness(): Business
+    /**
+     * The sample business, at strictness 0 unless a test gives another,
+     * since most of these tests are about what fits, not what strictness
+     * hides (07).
+     */
+    private function sampleBusiness(int $strictness = 0): Business
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-02 08:00', 'Europe/London'));
+        $business = app(CreateSampleBusiness::class)->handle();
+        $business->update(['strictness' => $strictness]);
 
-        return app(CreateSampleBusiness::class)->handle();
+        return $business;
     }
 
     private function service(Business $business, string $name): Service

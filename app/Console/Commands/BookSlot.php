@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Actions\CreateBooking;
 use App\Console\Commands\Concerns\FindsBusinessAndService;
+use App\Console\Commands\Concerns\TriesAnotherStrictness;
 use App\Enums\BookingSource;
 use App\Exceptions\ServiceNotBookable;
 use App\Exceptions\SlotNotAvailable;
@@ -22,7 +23,9 @@ use Illuminate\Support\Facades\Validator;
  * Books a time through CreateBooking, to try the engine around bookings of
  * your own before the playground: book a time, then run availability:show
  * for that date to see what changed. It's the counterpart of
- * availability:show.
+ * availability:show. --strictness books as if the business were at another
+ * strictness, without saving it, so a time strictness hides can be booked
+ * to see how a wasteful booking fragments the diary.
  *
  * It refuses to run in production, since it writes bookings and nothing can
  * cancel one until 12 and 13. Start again with php artisan migrate:fresh
@@ -36,11 +39,12 @@ use Illuminate\Support\Facades\Validator;
     {start : The start, as "YYYY-MM-DD HH:MM" in the business\'s time zone}
     {--name=Test Customer : The customer\'s name}
     {--email=test@example.com : The customer\'s email}
-    {--phone=07700900000 : The customer\'s phone}')]
+    {--phone=07700900000 : The customer\'s phone}
+    {--strictness= : Book as if the business were at this strictness, from 0 to 100, without saving it}')]
 #[Description('Book a time through CreateBooking, to try the engine locally')]
 class BookSlot extends Command
 {
-    use FindsBusinessAndService;
+    use FindsBusinessAndService, TriesAnotherStrictness;
 
     public function handle(CurrentBusiness $currentBusiness, CreateBooking $createBooking): int
     {
@@ -52,7 +56,7 @@ class BookSlot extends Command
 
         $business = $this->findBusiness();
 
-        if ($business === null) {
+        if ($business === null || ! $this->tryStrictnessOption($business)) {
             return self::FAILURE;
         }
 
@@ -82,12 +86,13 @@ class BookSlot extends Command
             return self::FAILURE;
         } catch (SlotNotAvailable) {
             $this->error(sprintf(
-                '%s isn\'t one of the times offered for %s. Run php artisan availability:show %d %d --date=%s to see them.',
+                '%s isn\'t one of the times offered for %s. Run php artisan availability:show %d %d --date=%s%s to see them.',
                 $this->argument('start'),
                 $service->name,
                 $business->id,
                 $service->id,
                 $startsAt->setTimezone($business->timezone)->format('Y-m-d'),
+                $business->isDirty('strictness') ? " --strictness={$business->strictness}" : '',
             ));
 
             return self::FAILURE;

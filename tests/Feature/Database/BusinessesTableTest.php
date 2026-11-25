@@ -17,11 +17,12 @@ class BusinessesTableTest extends TestCase
     {
         $id = DB::table('businesses')->insertGetId(['name' => 'Inserted directly']);
 
-        $stored = Business::findOrFail($id)->only(['timezone', 'slot_interval_minutes', 'min_notice_minutes', 'max_advance_days']);
-        $unsaved = (new Business)->only(['timezone', 'slot_interval_minutes', 'min_notice_minutes', 'max_advance_days']);
+        $settings = ['timezone', 'slot_interval_minutes', 'min_notice_minutes', 'max_advance_days', 'strictness', 'relaxation_hours'];
+        $stored = Business::findOrFail($id)->only($settings);
+        $unsaved = (new Business)->only($settings);
 
         $this->assertSame(
-            ['timezone' => 'Europe/London', 'slot_interval_minutes' => 15, 'min_notice_minutes' => 120, 'max_advance_days' => 90],
+            ['timezone' => 'Europe/London', 'slot_interval_minutes' => 15, 'min_notice_minutes' => 120, 'max_advance_days' => 90, 'strictness' => 50, 'relaxation_hours' => 48],
             $stored,
         );
         $this->assertSame($stored, $unsaved);
@@ -103,6 +104,53 @@ class BusinessesTableTest extends TestCase
      */
     #[DataProvider('bookingWindowsAtTheirLimits')]
     public function test_accepts_a_booking_window_at_its_limits(array $settings): void
+    {
+        $business = Business::factory()->create($settings);
+
+        $this->assertModelExists($business);
+    }
+
+    /**
+     * @return array<string, array{array<string, int>, string}>
+     */
+    public static function strictnessSettingsOutOfRange(): array
+    {
+        return [
+            'strictness below 0' => [['strictness' => -1], 'businesses_strictness_check'],
+            'strictness above 100' => [['strictness' => 101], 'businesses_strictness_check'],
+            'a negative relaxation window' => [['relaxation_hours' => -1], 'businesses_relaxation_hours_check'],
+            'a relaxation window over 30 days' => [['relaxation_hours' => 721], 'businesses_relaxation_hours_check'],
+        ];
+    }
+
+    /**
+     * @param  array<string, int>  $settings
+     */
+    #[DataProvider('strictnessSettingsOutOfRange')]
+    public function test_rejects_strictness_or_a_relaxation_window_out_of_range(array $settings, string $constraint): void
+    {
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage("\"{$constraint}\"");
+
+        Business::factory()->create($settings);
+    }
+
+    /**
+     * @return array<string, array{array<string, int>}>
+     */
+    public static function strictnessSettingsAtTheirLimits(): array
+    {
+        return [
+            'the loosest, with strictness always applying' => [['strictness' => 0, 'relaxation_hours' => 0]],
+            'the tightest, relaxing 30 days ahead' => [['strictness' => 100, 'relaxation_hours' => 720]],
+        ];
+    }
+
+    /**
+     * @param  array<string, int>  $settings
+     */
+    #[DataProvider('strictnessSettingsAtTheirLimits')]
+    public function test_accepts_strictness_and_a_relaxation_window_at_their_limits(array $settings): void
     {
         $business = Business::factory()->create($settings);
 
