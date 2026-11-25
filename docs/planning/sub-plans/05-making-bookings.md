@@ -125,7 +125,7 @@ A customer's name, email and phone are personal data:
   - `booking:create` gains `availability:show`'s `--strictness=` option
 - **08:**
   - the playground calls `CreateBooking` with `BookingSource::Playground`, and its "Fill randomly" makes many bookings through it
-  - deleting an expired sandbox can, very rarely, deadlock with a booking into it (Deadlocks, above). The booking that loses gets a `QueryException` with SQLSTATE `40P01`, not `SlotNotAvailable`, so 08 decides whether the playground retries it or shows a general error
+  - deleting an expired sandbox can, very rarely, deadlock with a booking into it (Deadlocks, above). The booking that loses gets a `QueryException` with SQLSTATE `40P01`, not `SlotNotAvailable`, so 08 decides whether the playground retries it or shows a general error. (08 found it can't happen: each request first moves the sandbox's expiry forward, so the clean-up never deletes one in use)
 - **11:** the public booking page catches `SlotNotAvailable` and `ServiceNotBookable` and shows the customer a clear message with updated times.
 - **12:**
   - adds the hashed manage token, created with the booking and sent in the confirmation email

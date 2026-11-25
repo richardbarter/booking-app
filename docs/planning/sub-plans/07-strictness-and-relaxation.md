@@ -95,7 +95,7 @@ Strictness stops applying to a time once it's within `relaxation_hours` of now, 
 
 **Why it exists** (`background.md`, sections 2 and 6): room kept for a longer appointment is only worth keeping while someone might still book it. Close to the date that's unlikely, so the time is released rather than left empty.
 
-Whether a time is within the window depends on when someone looks. So the same time can be hidden on Monday and offered on Wednesday, and the playground's "how far ahead" control shows exactly that.
+Whether a time is within the window depends on when someone looks. So the same time can be hidden on Monday and offered on Wednesday, which the playground's notice explains (08).
 
 ### What strictness applies at a time
 
@@ -127,7 +127,7 @@ In v1 it returns the business's strictness for every time. Strictness by time of
 | `strictness` | smallint | default 50; check: 0 to 100 |
 | `relaxation_hours` | smallint | default 48; check: 0 to 720 (30 days) |
 
-Existing businesses (sandboxes in production, by the time this deploys) get the defaults. The migration's `down()` drops both columns.
+Existing businesses get the defaults (production had none when this deployed, as sandboxes come with 08). The migration's `down()` drops both columns.
 
 ## Backend
 
@@ -243,7 +243,7 @@ Learning from history (19) and the simulator (20) can later replace them with da
 - **08:**
   - the slider changes the sandbox business's strictness
   - "show hidden times" uses `hiddenSlots` and their waste scores, and `StrictnessFilter::thresholdTenths()` gives the threshold a hidden time is over
-  - "how far ahead" shows the relaxation window at work
+  - a notice on days inside the relaxation window shows it at work (08 chose this over the overview's "how far ahead" control)
   - the defaults and the 120-minute scale get tuned here
 - **10:**
   - the settings screen sets both values

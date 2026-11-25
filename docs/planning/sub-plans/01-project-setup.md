@@ -24,7 +24,7 @@ Nothing. This is the first sub-plan.
 - GitHub repo, CI, Fly.io and Neon (02)
 - Any tables beyond the starter kit's own (03)
 - Playwright (08)
-- `scheduler`, `queue` and `reverb` containers (08, 12 and 17)
+- `scheduler`, `queue` and `reverb` containers (12 and 17)
 - Security headers and a Content Security Policy (sub-plan 02 decides when)
 
 ## What the starter kit ships with

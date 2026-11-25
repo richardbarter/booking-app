@@ -58,7 +58,7 @@ Use these names consistently in code, UI and docs.
 | Term | Meaning |
 |---|---|
 | Business | A tenant: one clinic, salon or independent practitioner. All other data belongs to a business. |
-| Sandbox | A temporary copy of the sample business, made for one playground visitor and deleted after 2 hours without a visit. It's an ordinary business underneath. |
+| Sandbox | A temporary copy of the sample business, made for one playground visitor. It ends after 2 hours without a visit, and is deleted when a later visitor starts one. It's an ordinary business underneath. |
 | Current business | The business a request or job is working for. Every query on tenant-owned data is filtered by it, and with none set the query fails. |
 | Practitioner | The person whose diary is booked. Hours, time off and bookings belong to the practitioner. In v1 each business has exactly one, the owner; staff come after v1. |
 | Service | Something a customer can book. Has a length, optional buffer time before and after it, and a price. In v1 the practitioner offers every active service. With staff, each service is offered by chosen practitioners, who can have their own length, buffers and price for it. |
@@ -142,7 +142,7 @@ While the owner drags the slider, the admin screen shows a live preview of a day
 
 ### 5.5 Scheduling playground
 
-A public page, with no sign-up, that shows the core idea in action. Each visitor gets their own sandbox: a temporary copy of the sample business from sub-plan 03 (an independent physio and sports massage therapist, with services from 30 to 90 minutes). A sandbox lasts as long as the visitor's session: it's deleted after 2 hours without a visit. Visitors never see or affect each other's bookings.
+A public page, with no sign-up, that shows the core idea in action. Each visitor gets their own sandbox: a temporary copy of the sample business from sub-plan 03 (an independent physio and sports massage therapist, with services from 30 to 90 minutes). It's made when the visitor presses Start, with an empty diary. A sandbox lasts as long as the visitor's session, ending after 2 hours without a visit, and starting a new one deletes the expired ones. Visitors never see or affect each other's bookings.
 
 On the page:
 - a day timeline showing bookings and free gaps, with stranded time highlighted
@@ -150,11 +150,11 @@ On the page:
 - the strictness slider, with the offered times updating as it moves
 - a "show hidden times" toggle that greys out the times strictness is hiding and says why, e.g. "would leave 15 minutes nobody can book"
 - each offered time's waste score, on request
-- a "how far ahead" control (e.g. two weeks away vs tomorrow) that shows the relaxation window in action
+- real dates, opening on a day at least a week away. A day inside the relaxation window has a notice saying that every time is offered, and how many strictness would hide further ahead
 - the day's figures, updated after every booking: booked time, stranded time and an efficiency score
 - "Fill randomly", which books a batch of random requests to show how a day fragments at different settings, and "Reset"
 
-The playground uses the real engine, booking rules and database constraint, because a sandbox is just an ordinary business. Nothing in it is throwaway: the timeline grows into the admin calendar, and the slider and preview are reused in the admin settings. Sandbox creation is rate-limited to stop bots filling the database.
+The playground uses the real engine, booking rules and database constraint, because a sandbox is just an ordinary business. Nothing in it is throwaway: the timeline grows into the admin calendar, and the slider and preview are reused in the admin settings. Making a sandbox is rate-limited to stop bots filling the database. Nothing about it runs on a timer.
 
 ### 5.6 Diary efficiency score
 
@@ -280,7 +280,7 @@ Exact versions are confirmed in sub-plan 01.
 | `app` | Nginx + PHP-FPM, code mounted from the host | 01 |
 | `vite` | Vite dev server with hot reload | 01 |
 | `mailpit` | Catches outgoing emails, viewable in the browser | 01 |
-| `scheduler` | Runs the Laravel scheduler (first job: deleting expired sandboxes) | 08 |
+| `scheduler` | Runs the Laravel scheduler (first job: reminders) | 12 |
 | `queue` | Queue worker | 12 |
 | `reverb` | WebSocket server | 17 |
 
@@ -293,7 +293,7 @@ The Docker and Fly setup uses a proven pattern:
 ### CI (GitHub Actions)
 
 - On every pull request, every push to `main` and once a week:
-  - the `checks` job: the build, Pint, Larastan, PHPUnit on PostgreSQL 18, Oxlint and Oxfmt, `vue-tsc` and Vitest. Infection joins them when the scheduling engine, its tests, or the tools and packages they use change, and in the weekly run (from 04). Playwright joins once end-to-end tests exist.
+  - the `checks` job: the build, Pint, Larastan, PHPUnit on PostgreSQL 18, Oxlint and Oxfmt, `vue-tsc` and Vitest. Infection joins them when the scheduling engine, its tests, or the tools and packages they use change, and in the weekly run (from 04). Playwright joins with the first pages (08), as a step after the others.
   - the `audit` job: `composer audit` and `npm audit`.
 - `main` only accepts pull requests, and only once `checks` and `audit` pass.
 - On `main`, after both pass: the `deploy` job deploys to Fly.io automatically.
@@ -305,7 +305,7 @@ The Docker and Fly setup uses a proven pattern:
 - **Nothing queries the database on a timer.** Neon's free plan only covers the database being awake about half the time, and Neon puts it to sleep after 5 minutes without queries, so only real visitors should wake it. Sub-plan 02 has the numbers.
 - **Always-on processes**, and how each follows that rule:
   - **Web:** one Machine that suspends after a few minutes without visitors and resumes on the next request. The first visit after a quiet spell wakes the Machine and Neon, and takes about a second longer. Fly's health checks call `/up`, which never touches the database.
-  - **Scheduler (08):** its own small Machine running `php artisan schedule:work`, always on. Tasks run hourly or less often where possible, so the database wakes once an hour at most.
+  - **Scheduler (12):** its own small Machine running `php artisan schedule:work`, always on. Tasks run hourly or less often where possible, so the database wakes once an hour at most.
   - **Queue worker (12):** Redis on Upstash, not the database queue, whose worker checks for jobs every few seconds and would keep Neon awake. The worker runs alongside the scheduler.
   - **Reverb (17):** decided then. Open WebSocket connections keep a Machine awake, but they don't touch the database.
 
@@ -419,13 +419,14 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | # | Sub-plan | Delivers |
 |---|---|---|
-| 08 | Scheduling playground | Public page with per-visitor sandboxes (5.5): timeline, booking panel, strictness slider, hidden-time explanations, day figures, fill randomly and reset; Playwright end-to-end tests with axe accessibility checks; first README with a GIF |
+| 08 | Scheduling playground | Public page with per-visitor sandboxes (5.5): timeline, booking panel, strictness slider, hidden-time explanations, day figures, fill randomly and reset; Playwright end-to-end tests with axe accessibility checks; a Bookalive home page; a GIF in the README |
 | ★ | **Playground milestone** | **The core idea is live and shareable** |
 
 ### Phase 4: Full product
 
 | # | Sub-plan | Delivers |
 |---|---|---|
+| 08b | Custom domain | The final domain, before owners can register passkeys, which are tied to it. bookalive.fly.dev redirects to it, so shared links keep working |
 | 09 | Accounts and sign-up | Owner sign-up creates the business, its practitioner and the one login; current business taken from the logged-in user |
 | 10 | Admin setup | Screens for services, working hours, time off and business settings, including the strictness slider with live preview. Working hours: new hours from a date, editing days and resetting them; bookings outside new hours are flagged |
 | 11 | Public booking page | Customer booking component; stateless booking API; hosted page at `/book/{business}`; logging of availability searches; Content Security Policy with `spatie/laravel-csp` |
@@ -445,7 +446,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 | 19 | Learning from history | Demand statistics from bookings, imports and the search log; history-weighted waste score and efficiency score |
 | 20 | Simulator | Simulation command comparing strictness settings |
 | 21 | Insights dashboard | Busy and quiet heatmap; simulator charts; added to the efficiency dashboard |
-| 22 | Final polish | Accessibility; performance; more end-to-end tests; custom domain |
+| 22 | Final polish | Accessibility; performance; more end-to-end tests |
 
 ## 13. Out of scope (for now)
 
@@ -468,14 +469,12 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | Question | Needed by |
 |---|---|
-| When to add the custom domain: before links are shared at the playground milestone, or in 22 as planned (`bookalive.io` was unregistered on 2026-10-27) | 08 / 22 |
-| Tune the first versions once the playground shows them working: the default strictness (50) and relaxation window (48 hours) from 07, the 120-minute strictness scale, and 06's waste score constants (5 minutes for splitting a gap, stranded minutes and lost room counting equally) | 08 |
-| Bookalive's colours: the primary, secondary, accent and other theme colours, in light and dark mode (today they're the starter kit's greys). v1 probably has one fixed theme that we choose, rather than colours each business can set. A session of its own, once there are basic pages to see the colours on while choosing them, perhaps starting from a palette generator such as Coolors. It covers the playground timeline's colours for offered, hidden, booked and stranded time, which must be clear in both modes without relying on colour alone, and whether the data model's per-business brand colour (10 or 11) stays in v1 | 08, once its first pages exist |
-| Whether to turn on Laravel's lazy-loading guard, `Model::preventLazyLoading(! $this->app->isProduction())` in `AppServiceProvider`, once pages list rows with their related data. It throws when code loads a relation row by row (an N+1 query), in development and tests only, so production is unchanged. Laravel's docs show it under "Configuring Eloquent Strictness", but it's off by default and the starter kit leaves it off. Its siblings, `preventSilentlyDiscardingAttributes()` and `preventAccessingMissingAttributes()` (`shouldBeStrict()` turns on all three), add less here, since Larastan already catches undefined model properties. Raised while reviewing 05 | 08 |
+| Which custom domain to register (`bookalive.io` was unregistered on 2026-10-27) | 08b |
+| Tune the first versions once the playground shows them working: the default strictness (50) and relaxation window (48 hours) from 07, the 120-minute strictness scale, and 06's waste score constants (5 minutes for splitting a gap, stranded minutes and lost room counting equally). With the sample business nothing is hidden below strictness 39, and 50 hardly differs from 0 (the numbers are in 08's notes) | 08, after part 6 |
+| Bookalive's colours: the primary, secondary, accent and other theme colours, in light and dark mode (today they're the starter kit's greys). v1 probably has one fixed theme that we choose, rather than colours each business can set. A session of its own, once there are basic pages to see the colours on while choosing them, perhaps starting from a palette generator such as Coolors. It covers the playground timeline's colours for offered, hidden, booked and stranded time, which must be clear in both modes without relying on colour alone, and whether the data model's per-business brand colour (10 or 11) stays in v1. The logo and favicon, still the starter kit's, may go with it | 08, after part 6 |
 | A second sample business: the original six services with 15-minute clean-ups after each and a rehab session with setup before, kept in sub-plan 03's notes. It would show buffers and services that share a length in the playground. When to add it, and whether visitors choose between sample businesses | After 08 |
 | Strictness by time of day and fixed start times (5.4). Where the settings are stored: with the working pattern, so they follow its cycle, or in a weekly schedule of their own, so they survive a change of hours (fixed times may suit the pattern, and busy and quiet times a schedule of their own). Which period a slot belongs to when it crosses a boundary (its start time is simplest). Whether the relaxation window opens up other times in a fixed period, or the fixed times are final. How the randomised checks treat fixed periods, which can leave a free gap with no time offered. Whether they come in 10 or after v1 | 07 / 10 |
-| Is rate limiting plus a honeypot enough to protect playground sandboxes and public bookings from bots, or should Cloudflare Turnstile be added? | 08 / 11 |
-| When a visitor's sandbox is made: on their first visit to the playground, or on their first action. Bots and link previews keep no cookies, so making one on every page view would make a business for each hit. Waiting for the first action avoids that, but the page then needs to show the sample diary before a sandbox exists | 08 |
+| Is rate limiting plus a honeypot enough to protect public bookings from bots, or should Cloudflare Turnstile be added? The playground uses rate limits only (08) | 11 |
 | Production email provider (e.g. Resend, Postmark, Amazon SES) | 12 |
 | Week templates and hours snapshots: saved weeks of hours to apply, and saved copies of a practitioner's hours to restore after experimenting. Decide once a first version of the hours and the dynamic slots can be tried. A template would copy its hours when applied; a snapshot would cover one practitioner. Should a snapshot include strictness? | After v1 |
 | Customer accounts: an optional account for returning customers, so they can see their bookings and book again quickly, perhaps signing up through Google. Google's sign-in page can't be shown inside the widget's iframe, so it would open in a popup window. A booking never changes an existing customer's details today (05); a customer who has proved their email could update their own | After v1 |
