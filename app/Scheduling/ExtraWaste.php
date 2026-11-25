@@ -16,7 +16,7 @@ namespace App\Scheduling;
 final readonly class ExtraWaste
 {
     /**
-     * @param  list<array{times: ServiceTimes, fewer: int}>  $lostRoom  each kind of appointment it takes more room from, and how many more, in the slot's order
+     * @param  list<array{times: ServiceTimes, fewer: int}>  $lostRoom  each kind of appointment the gap could take fewer of than after the best, and how many fewer, in the slot's order
      */
     public function __construct(
         public int $strandedMinutes,

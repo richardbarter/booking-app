@@ -85,9 +85,9 @@ class AvailabilityService
 
     /**
      * The first date after the given one with working hours, as Y-m-d, or
-     * null when there's none in the next 28 days. Only the calendar date
-     * given is read, in the business's time zone. Time off isn't considered,
-     * so every time that day may still be blocked.
+     * null when there's none in the next 28 days. Dates are in the business's
+     * time zone, and only the calendar date of $after is read. Time off
+     * isn't considered, so every time that day may still be blocked.
      *
      * @throws MissingCurrentBusiness when no current business is set
      * @throws LogicException when the current business is another one
