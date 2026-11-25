@@ -189,25 +189,29 @@ class ShowAvailability extends Command
 
     /**
      * The relaxation window, when it ends, and whether strictness applies
-     * to all of the date, part of it or none of it. The end comes from
-     * StrictnessFilter, from now as the command reads it, a moment after
-     * the search did.
+     * to all of the date, part of it or none of it, or the date has passed.
+     * The end comes from StrictnessFilter, from now as the command reads
+     * it, a moment after the search did. With no window, it ends now.
      */
     private function describeRelaxation(Business $business, string $date): string
     {
         $timezone = $business->timezone;
-        $ends = StrictnessFilter::relaxationEnds(now(), $business->relaxation_hours);
+        $now = now();
+        $ends = StrictnessFilter::relaxationEnds($now, $business->relaxation_hours);
         $day = (new LocalClock(new DateTimeZone($timezone)))->day(CarbonImmutable::parse($date, 'UTC'));
         $localEnd = $ends->setTimezone($timezone);
-
+        $window = $business->relaxation_hours === 0
+            ? 'none'
+            : "{$business->relaxation_hours} hours, until {$localEnd->format('H:i \o\n l j F Y')}";
         $effect = match (true) {
             $business->strictness === 0 => 'nothing is hidden at strictness 0',
+            $day->end <= $now => 'this date has passed',
             $ends < $day->start => 'strictness applies all day',
             $ends >= $day->end => 'this date is inside it, so nothing is hidden',
             default => "strictness applies to times after {$localEnd->format('H:i')}",
         };
 
-        return "{$business->relaxation_hours} hours, until {$localEnd->format('H:i \o\n l j F Y')}: {$effect}";
+        return "{$window}: {$effect}";
     }
 
     /**

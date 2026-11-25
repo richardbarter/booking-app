@@ -147,7 +147,7 @@ It builds `BookingSettings` with the business's strictness and relaxation window
 ### `availability:show` (04 and 06)
 
 - It lists the hidden times with their extra waste, beside the offered ones.
-- It says when the relaxation window ends, and whether the date is inside it, after it, or partly inside it.
+- It says when the relaxation window ends, and whether the date is inside it, after it, or partly inside it, or has passed. A window of 0 hours shows as none.
 - A new `--strictness=` option (0 to 100) shows the day at another strictness without changing the business, to try settings before the playground exists. The command sets the value on the business it has loaded, without saving it, and `AvailabilityService` reads it from there. An invalid value is refused with exit code 1, and a test checks the stored strictness is unchanged afterwards.
 
 ### `booking:create` (05)

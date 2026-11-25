@@ -134,6 +134,7 @@ class ShowAvailabilityTest extends TestCase
     public static function datesAndTheRelaxationWindow(): array
     {
         return [
+            'already passed' => ['2026-11-01', 'this date has passed'],
             'inside it' => ['2026-11-03', 'this date is inside it, so nothing is hidden'],
             'partly inside it' => ['2026-11-04', 'strictness applies to times after 08:00'],
             'after it' => ['2026-11-05', 'strictness applies all day'],
@@ -148,6 +149,93 @@ class ShowAvailabilityTest extends TestCase
 
         $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => $date])
             ->expectsOutput("Relaxation     48 hours, until 08:00 on Wednesday 4 November 2026: {$effect}")
+            ->assertSuccessful();
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function datesWithNoRelaxationWindow(): array
+    {
+        return [
+            'already passed' => ['2026-11-01', 'this date has passed'],
+            'today' => ['2026-11-02', 'strictness applies to times after 08:00'],
+            'tomorrow' => ['2026-11-03', 'strictness applies all day'],
+        ];
+    }
+
+    #[DataProvider('datesWithNoRelaxationWindow')]
+    public function test_says_there_is_no_relaxation_window_at_0_hours(string $date, string $effect): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+        $business->update(['relaxation_hours' => 0]);
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => $date])
+            ->expectsOutput("Relaxation     none: {$effect}")
+            ->assertSuccessful();
+    }
+
+    /**
+     * From midnight at the start of Tuesday 3 November in Auckland, 13
+     * hours ahead of UTC, the 24-hour window ends as Wednesday starts.
+     *
+     * @return array<string, array{string, string}>
+     */
+    public static function datesAndAWindowEndingAtMidnight(): array
+    {
+        return [
+            'inside it, to the end of the day' => ['2026-11-03', 'this date is inside it, so nothing is hidden'],
+            'starting as it ends' => ['2026-11-04', 'strictness applies to times after 00:00'],
+            'after it' => ['2026-11-05', 'strictness applies all day'],
+        ];
+    }
+
+    #[DataProvider('datesAndAWindowEndingAtMidnight')]
+    public function test_works_out_the_relaxation_window_in_the_business_time_zone(string $date, string $effect): void
+    {
+        $business = $this->sampleBusiness(strictness: 50);
+        $assessment = $this->service($business, 'Physio assessment');
+        $business->update(['timezone' => 'Pacific/Auckland', 'relaxation_hours' => 24]);
+        $this->travelTo(CarbonImmutable::parse('2026-11-03 00:00', 'Pacific/Auckland'));
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => $date])
+            ->expectsOutput("Relaxation     24 hours, until 00:00 on Wednesday 4 November 2026: {$effect}")
+            ->assertSuccessful();
+    }
+
+    /**
+     * Worked out by hand. At 09:00 or 10:00 the two hours lose two of their
+     * four follow-ups, one of their two assessments and their one massage:
+     * (10 × 60 + 10 × 60 + 5 × 90) ÷ 25 = 66. At 09:15 or 09:45 they lose
+     * three, two and one (102), strand 15 and split. At 09:30 they lose
+     * two, two and one (90) and split.
+     */
+    public function test_prints_every_time_in_the_business_time_zone(): void
+    {
+        $business = $this->sampleBusiness(strictness: 75);
+        $assessment = $this->service($business, 'Physio assessment');
+        $business->update(['timezone' => 'Pacific/Auckland']);
+        app(CurrentBusiness::class)->run($business, fn () => $business->practitioners()->sole()->editedDays()->create([
+            'date' => '2026-11-12',
+            'hours' => [['09:00', '11:00']],
+        ]));
+
+        $this->artisan('availability:show', ['business' => $business->id, 'service' => $assessment->id, '--date' => '2026-11-12'])
+            ->expectsOutput('Thursday 12 November 2026, Pacific/Auckland')
+            ->expectsOutput('Working hours  09:00–11:00')
+            ->expectsOutput('Free gaps      09:00–11:00')
+            ->expectsOutput('Offered times  3')
+            ->expectsOutput('  09:00 09:30 10:00')
+            ->expectsOutput('Hidden times   2')
+            ->expectsOutput('  09:15 09:45')
+            ->expectsTable(['Time', 'Shown', 'Extra waste', 'Waste', 'Stranded', 'Lost room', 'Split'], [
+                ['09:00', 'Offered', 0, 66, 0, 66, 0],
+                ['09:15', 'Hidden', 56, 122, 15, 102, 5],
+                ['09:30', 'Offered', 29, 95, 0, 90, 5],
+                ['09:45', 'Hidden', 56, 122, 15, 102, 5],
+                ['10:00', 'Offered', 0, 66, 0, 66, 0],
+            ])
             ->assertSuccessful();
     }
 
