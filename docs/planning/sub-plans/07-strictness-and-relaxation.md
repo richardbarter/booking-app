@@ -221,7 +221,7 @@ These are the overview's last three rules (section 10), plus the checks that the
 - [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
 - [x] `php artisan availability:show 1 <assessment's ID> --date=<a Monday at least 3 days ahead>` shows offered and hidden times locally, and `--strictness=0` shows them all
 - [x] `php artisan booking:create 1 <assessment's ID> "<that Monday> <a hidden time>" --strictness=0` books a time that `availability:show` lists as hidden, locally
-- [ ] The deploy after merging runs the migration on Neon (Fly's release command succeeds)
+- [x] The deploy after merging runs the migration on Neon (Fly's release command succeeds). Release v25 on 2026-11-25 ran it in 74ms
 - [x] `tracking.md` marks 07 as done, and with 03 to 06 done, the engine is complete for the playground (08)
 
 ## Pull requests
