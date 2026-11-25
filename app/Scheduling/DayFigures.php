@@ -23,7 +23,7 @@ final readonly class DayFigures
     ) {}
 
     /**
-     * @param  list<TimeRange>  $appointments  the day's, without their buffers
+     * @param  list<TimeRange>  $appointments  those that start on the day, without their buffers. Each counts its whole length, even outside the working hours
      */
     public static function of(DayAvailability $day, array $appointments): self
     {

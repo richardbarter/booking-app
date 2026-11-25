@@ -87,7 +87,8 @@ class AvailabilityService
      * The first date after the given one with working hours, as Y-m-d, or
      * null when there's none in the next 28 days. Dates are in the business's
      * time zone, and only the calendar date of $after is read. Time off
-     * isn't considered, so every time that day may still be blocked.
+     * and the booking window aren't considered, so the date may have no time
+     * to offer.
      *
      * @throws MissingCurrentBusiness when no current business is set
      * @throws LogicException when the current business is another one

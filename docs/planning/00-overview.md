@@ -166,7 +166,7 @@ Every night, for each practitioner and the day just ended, the app records:
 |---|---|
 | Working time | Total working hours that day |
 | Booked time | Time spent in appointments |
-| Free time | Working time that wasn't booked |
+| Free time | Working time in free gaps: not in an appointment, a buffer or time off |
 | Stranded time | Free time in gaps too short for any service the practitioner offers |
 | Fragmented time | Free time in gaps too short for the longest service the owner keeps room for |
 | Missed bookings | Searches that ended without a booking, on a day with enough free time in total for the service but not in one piece |
@@ -338,7 +338,7 @@ Child tables reference their parents through composite foreign keys that include
 ## 10. Testing strategy
 
 - **Availability engine and waste score:** unit tests that take a timetable and check the expected slots. They cover clock-change days, buffers, gap edges, the booking window, strictness levels and the relaxation window.
-- **Randomised rule checks for the engine:** hundreds of random diaries, generated from a fixed seed so any failure can be reproduced, checked against rules that must always hold. They're written in plain PHPUnit, with no extra package. They start in 04, and new rules are added in 06 and 07. Bookings (05) are blocked time, which the first rule already covers:
+- **Randomised rule checks for the engine:** hundreds of random diaries, generated from a fixed seed so any failure can be reproduced, checked against rules that must always hold. They're written in plain PHPUnit, with no extra package. They start in 04, and new rules are added in 06, 07 and 08. Bookings (05) are blocked time, which the first rule already covers:
   - every offered slot, plus its buffers, fits inside working hours, without overlapping time off or any booking's blocked time
   - every offered slot is inside the booking window
   - raising strictness only ever hides slots, never adds any, so strictness 100 offers a subset of strictness 0

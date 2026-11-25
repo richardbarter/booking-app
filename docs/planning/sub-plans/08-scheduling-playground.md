@@ -169,7 +169,7 @@ Plain PHP, as before, tested without the database and covered by Infection.
   - `public function relaxes(CarbonImmutable $startsAt): bool`: whether a time starting then is inside the relaxation window. `hides()` uses it
 - **`ExtraWaste`** (`final readonly`): `strandedMinutes`, `lostRoom` (as `WasteScore`'s, with only the kinds it takes more of) and `splits`. Made with `ExtraWaste::between(WasteScore $slot, WasteScore $best): self`. Parts where the slot does better than the best are left out.
 - **`DayAvailability::bestInGapOf(Slot $slot): Slot`**: the least wasteful slot in the same free gap, the earliest if several tie. It throws `InvalidArgumentException` for a slot that isn't the day's.
-- **`DayFigures`** (`final readonly`): `workingMinutes`, `bookedMinutes`, `freeMinutes`, `strandedMinutes` and `fragmentedMinutes`, made with `DayFigures::of(DayAvailability $day, list<TimeRange> $appointments): self`. Booked minutes are the appointments' own times, without buffers. `efficiency(): ?int` is the overview's formula (5.6), `booked ÷ (booked + stranded)` as a whole percentage with halves rounded up, and null when both are 0. 14 uses it for the days it records.
+- **`DayFigures`** (`final readonly`): `workingMinutes`, `bookedMinutes`, `freeMinutes`, `strandedMinutes` and `fragmentedMinutes`, made with `DayFigures::of(DayAvailability $day, list<TimeRange> $appointments): self`. Booked minutes are the appointments' own times, without buffers. Free minutes are those in the day's free gaps, so buffers and time off aren't free time, as 06's notes for 14 say of blocked time. `efficiency(): ?int` is the overview's formula (5.6), `booked ÷ (booked + stranded)` as a whole percentage with halves rounded up, and null when both are 0. 14 uses it for the days it records.
 
 ### Models and services
 
@@ -291,7 +291,7 @@ PHP feature tests fix the time with `travelTo()`. Where no other is given, it's 
 
 **Unit: the engine** (`tests/Unit/Scheduling`)
 - `StrictnessFilter::hiddenFrom()`: null for 0; 100 for 1; 51 for 60 and 50 for 61 (60 is exactly on the threshold at 50); 1 for 119 and for 500.
-- `relaxes()`: a time exactly at the window's end is inside, a minute later isn't, and none is with 0 hours.
+- `relaxes()`: a time exactly at the window's end is inside, a minute later isn't, and none after now is with 0 hours.
 - `ExtraWaste`: each part on its own, parts where the slot is better left out, and nothing for the best time itself. The sample morning's 09:15 follow-up strands 15 minutes more than 09:00.
 - `bestInGapOf()`: the earliest of several, per gap, for hidden and offered slots, and a slot from another day refused.
 - `DayFigures`: a day with bookings, a stranded gap and time off; buffers left out of booked time; efficiency rounded half up, 100 with nothing stranded, and null with nothing at all.
@@ -349,8 +349,8 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 
 ## Done when
 
-- [ ] 1. The engine's new tests pass, with Infection at 90% or more and the randomised rules 20 and 21 on five other seeds (part 1)
-- [ ] 2. The lazy-loading guard is on, with every test passing (part 1)
+- [x] 1. The engine's new tests pass, with Infection at 90% or more and the randomised rules 20 and 21 on five other seeds (part 1)
+- [x] 2. The lazy-loading guard is on, with every test passing (part 1)
 - [ ] 3. A visitor can start a sandbox, and the isolation, expiry, clean-up and limit tests pass (part 2)
 - [ ] 4. Playwright and axe run in CI and locally (part 2)
 - [ ] 5. The deploy of part 2 adds `sandbox_expires_at` on Neon, and starting a sandbox works on bookalive.fly.dev
@@ -371,7 +371,7 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 |---|---|---|---|---|
 | 1 | The engine's additions, `Business::bookingSettings()`, `nextWorkingDate()` and the lazy-loading guard | 270 | 500 | 1, 2 |
 | 2 | Sandboxes, rate limits, the start page, a first diary page (the business and its services), the public layout, and Playwright in CI | 560 | 500 | 3, 4 |
-| 3 | The diary: dates and the timeline | 520 | 400 | 6 |
+| 3 | The diary: dates and the timeline, with `Booking::overlapping()` | 520 | 400 | 6 |
 | 4 | Services, offered times and booking | 380 | 300 | 7 |
 | 5 | Strictness: the slider, hidden times with reasons, scores and the relaxation notice | 410 | 350 | 8 |
 | 6 | The figures, Fill randomly and Reset | 320 | 250 | 9 |
@@ -410,4 +410,4 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 - **11:** Turnstile is still open. The public API sends offered times only, never `hiddenFrom` or the scores.
 - **12:** adds the scheduler. It can call `DeleteExpiredSandboxes` too, if sandboxes ever need deleting sooner.
 - **13:** the calendar grows from `DayTimeline`, and shares `Booking::overlapping()`.
-- **14:** uses `DayFigures`, and decides how a no-show counts.
+- **14:** uses `DayFigures`, and decides how a no-show counts. It's given the appointments that start on the day: `Booking::overlapping()` tests blocked time, so it also finds one whose buffer alone reaches into the day.

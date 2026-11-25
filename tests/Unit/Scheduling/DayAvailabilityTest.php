@@ -16,6 +16,7 @@ use App\Scheduling\SlotFinder;
 use Carbon\CarbonImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
+use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -87,6 +88,18 @@ class DayAvailabilityTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         $this->monday()->bestInGapOf($slot);
+    }
+
+    public function test_refuses_to_guess_when_a_gap_has_no_best_among_the_offered_slots(): void
+    {
+        $monday = $this->monday();
+        $slot = $this->slotAt($monday, '09:15');
+        $withoutOffered = new DayAvailability(self::MONDAY, $monday->workingTimes, $monday->freeGaps, [], $monday->hiddenSlots, $monday->gapSummary);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('The free gap around 2026-11-09T09:15:00+00:00 on 2026-11-09 has no best time');
+
+        $withoutOffered->bestInGapOf($slot);
     }
 
     private function monday(): DayAvailability
