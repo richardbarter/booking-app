@@ -21,11 +21,11 @@ Put the code on GitHub with CI on every pull request, and deploy every merge to 
 - Error monitoring with Laravel Nightwatch
 - Larastan raised from level 7 to 9
 - The name Bookalive in the app, README and project guidelines
-- Deciding how background processes run without keeping Neon awake (built in 08, 12 and 17)
+- Deciding how background processes run without keeping Neon awake (built in 12 and 17)
 
 **Out of scope**
 - Custom domain (see the open question in the overview)
-- Scheduler, queue worker and Reverb processes (08, 12 and 17)
+- Scheduler, queue worker and Reverb processes (12 and 17)
 - Production email (12)
 - A Content Security Policy (11, see Notes)
 - Browser error monitoring (see Notes)
@@ -58,13 +58,13 @@ Neon's Free plan gives each project 100 CU-hours of compute a month. The smalles
 - Sessions and cache use the database, but only when someone visits.
 
 How each later background process follows the rule:
-- **Scheduler (08):** its own Fly process group running `php artisan schedule:work` on the smallest Machine, always on (about $2 a month). Tasks run hourly or less often where possible, so the database wakes briefly once an hour at most.
+- **Scheduler (12; first planned for 08):** its own Fly process group running `php artisan schedule:work` on the smallest Machine, always on (about $2 a month). Tasks run hourly or less often where possible, so the database wakes briefly once an hour at most.
 - **Queue (12):** Redis (Upstash), not the database queue. A database queue worker checks for new jobs every few seconds, which would keep Neon awake all the time. The worker runs alongside the scheduler. 12 chooses between Upstash through Fly or directly, and sets how often the worker polls, so it stays inside Upstash's free 500,000 commands a month.
 - **Reverb (17):** decided then. Open WebSocket connections keep a Machine awake, but they don't touch the database.
 
 ### Costs
 
-- **Fly** has no free plan for new organizations, only a short trial (2 hours of Machine time or 7 days), after which it needs a card. Organizations on the plans Fly discontinued in October 2024 keep those plans' free allowances, so an older account may cover some of this. The web Machine costs about $3.69 a month if it never suspends. While it's suspended, Fly charges only for its disk (about $0.15 per GB a month, and the image is about 1GB). A demo with light traffic should cost around $1 a month, plus about $2 for the scheduler Machine from 08. Use Fly's shared IPv4 address; a dedicated one costs $2 a month.
+- **Fly** has no free plan for new organizations, only a short trial (2 hours of Machine time or 7 days), after which it needs a card. Organizations on the plans Fly discontinued in October 2024 keep those plans' free allowances, so an older account may cover some of this. The web Machine costs about $3.69 a month if it never suspends. While it's suspended, Fly charges only for its disk (about $0.15 per GB a month, and the image is about 1GB). A demo with light traffic should cost around $1 a month, plus about $2 for the scheduler Machine from 12. Use Fly's shared IPv4 address; a dedicated one costs $2 a month.
 - **Neon, Nightwatch and GitHub:** free plans.
 
 ## Steps
@@ -284,7 +284,7 @@ Open the pull request from `feature/02-ci-deployment`. Once `checks` and `audit`
 - **The deploy token expires after a year.** CI deploys start failing when it does. Record the expiry date in `tracking.md`, and create a new token with the command in step 4.
 - **Watch Neon's usage in the first few weeks.** The console shows CU-hours used this month. If they're climbing faster than expected, something is waking the database.
 - **Watch Nightwatch's usage too.** Nightwatch suggests recording 10% of requests, but Bookalive starts at 100%, the default. A demo's traffic is far below the Free plan's 300,000 events a month, and full traces make early problems easier to find. Errors are recorded either way: when Nightwatch reports an exception from a request it skipped, it uses the exception rate, which stays at 100%. If bots push usage up, add `NIGHTWATCH_REQUEST_SAMPLE_RATE = "0.1"` to `[env]` in `fly.toml`. It's a setting, not a secret.
-- **Nightwatch covers the server side only.** It records errors, requests, queries, queued jobs, scheduled tasks and emails, which matters once the scheduler (08) and queue (12) arrive. Errors in the browser aren't covered. Sentry's Vue package can be added later for those, most likely with the widget (18), which runs on other people's sites.
+- **Nightwatch covers the server side only.** It records errors, requests, queries, queued jobs, scheduled tasks and emails, which matters once the scheduler and queue (12) arrive. Errors in the browser aren't covered. Sentry's Vue package can be added later for those, most likely with the widget (18), which runs on other people's sites.
 - **Nightwatch pauses free projects after 30 days without events.** That only matters if the site goes quiet for a month.
 - **The app uses Neon's owner role,** which can also run migrations. A separate role with fewer rights isn't worth the extra setup yet.
 - **05 needs the `btree_gist` extension** for the exclusion constraint. Neon supports it, but check when building 05.

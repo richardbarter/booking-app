@@ -471,7 +471,7 @@ Other cases:
 - **07:**
   - strictness is a step after the booking window, asking what strictness applies at each time
   - 07 decided that 05's check again applies strictness: only offered times can be booked
-- **08:** the playground's timeline draws a day from its `workingTimes`, `freeGaps` and `slots`, for any date, since only slots are limited by the booking window.
+- **08:** the playground's timeline draws a day from its `workingTimes`, `freeGaps` and `slots`, for any date, since only slots are limited by the booking window. It needs the day's bookings too, which the engine only sees as blocked time, so 08 reads them itself.
 - **10:** the time zone a business chooses must be a named zone, such as `Europe/London`, from `DateTimeZone::listIdentifiers()`. `LocalClock` refuses any other (an abbreviation or a fixed offset), so `AvailabilityService` would throw for that business
 - **11:**
   - the public API asks for at most a month or so at a time; `DateRange` refuses anything over 366 dates

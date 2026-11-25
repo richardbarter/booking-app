@@ -95,7 +95,7 @@ Strictness stops applying to a time once it's within `relaxation_hours` of now, 
 
 **Why it exists** (`background.md`, sections 2 and 6): room kept for a longer appointment is only worth keeping while someone might still book it. Close to the date that's unlikely, so the time is released rather than left empty.
 
-Whether a time is within the window depends on when someone looks. So the same time can be hidden on Monday and offered on Wednesday, and the playground's "how far ahead" control shows exactly that.
+Whether a time is within the window depends on when someone looks. So the same time can be hidden on Monday and offered on Wednesday, which the playground's notice explains (08).
 
 ### What strictness applies at a time
 
@@ -127,7 +127,7 @@ In v1 it returns the business's strictness for every time. Strictness by time of
 | `strictness` | smallint | default 50; check: 0 to 100 |
 | `relaxation_hours` | smallint | default 48; check: 0 to 720 (30 days) |
 
-Existing businesses (sandboxes in production, by the time this deploys) get the defaults. The migration's `down()` drops both columns.
+Existing businesses get the defaults (production had none when this deployed, as sandboxes come with 08). The migration's `down()` drops both columns.
 
 ## Backend
 
@@ -221,7 +221,7 @@ These are the overview's last three rules (section 10), plus the checks that the
 - [x] Every test above passes in CI on PostgreSQL 18, with Pint and Larastan at level 9 clean, and Infection at 90% or more
 - [x] `php artisan availability:show 1 <assessment's ID> --date=<a Monday at least 3 days ahead>` shows offered and hidden times locally, and `--strictness=0` shows them all
 - [x] `php artisan booking:create 1 <assessment's ID> "<that Monday> <a hidden time>" --strictness=0` books a time that `availability:show` lists as hidden, locally
-- [ ] The deploy after merging runs the migration on Neon (Fly's release command succeeds)
+- [x] The deploy after merging runs the migration on Neon (Fly's release command succeeds). Release v25 on 2026-11-25 ran it in 74ms
 - [x] `tracking.md` marks 07 as done, and with 03 to 06 done, the engine is complete for the playground (08)
 
 ## Pull requests
@@ -243,7 +243,7 @@ Learning from history (19) and the simulator (20) can later replace them with da
 - **08:**
   - the slider changes the sandbox business's strictness
   - "show hidden times" uses `hiddenSlots` and their waste scores, and `StrictnessFilter::thresholdTenths()` gives the threshold a hidden time is over
-  - "how far ahead" shows the relaxation window at work
+  - a notice on days inside the relaxation window shows it at work (08 chose this over the overview's "how far ahead" control)
   - the defaults and the 120-minute scale get tuned here
 - **10:**
   - the settings screen sets both values
