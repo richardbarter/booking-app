@@ -293,7 +293,7 @@ The Docker and Fly setup uses a proven pattern:
 ### CI (GitHub Actions)
 
 - On every pull request, every push to `main` and once a week:
-  - the `checks` job: the build, Pint, Larastan, PHPUnit on PostgreSQL 18, Oxlint and Oxfmt, `vue-tsc`, Vitest, and Infection on the scheduling engine (from 04). Playwright joins once end-to-end tests exist.
+  - the `checks` job: the build, Pint, Larastan, PHPUnit on PostgreSQL 18, Oxlint and Oxfmt, `vue-tsc` and Vitest. Infection joins them when the scheduling engine, its tests, or the tools and packages they use change, and in the weekly run (from 04). Playwright joins once end-to-end tests exist.
   - the `audit` job: `composer audit` and `npm audit`.
 - `main` only accepts pull requests, and only once `checks` and `audit` pass.
 - On `main`, after both pass: the `deploy` job deploys to Fly.io automatically.
@@ -344,7 +344,7 @@ Child tables reference their parents through composite foreign keys that include
   - raising strictness only ever hides slots, never adds any, so strictness 100 offers a subset of strictness 0
   - at any strictness, every free gap with room for the service still offers at least one time
   - within the relaxation window, strictness has no effect
-- **Mutation testing (Infection), on the scheduling engine only:** Infection makes small changes to the engine's code and checks that a test fails each time, which shows the tests would actually catch a bug. It's set up in 04, with the PCOV coverage driver, and works with PHPUnit 13 (checked for 04). It's too slow for the whole app, so it runs only the engine's tests, which need no database. It runs on every pull request, through `composer ci:check`, and fails below a score of 90%.
+- **Mutation testing (Infection), on the scheduling engine only:** Infection makes small changes to the engine's code and checks that a test fails each time, which shows the tests would actually catch a bug. It's set up in 04, with the PCOV coverage driver, and works with PHPUnit 13 (checked for 04). It's too slow for the whole app, so it runs only the engine's tests, which need no database. It runs with `composer test:mutation`, and fails below a score of 90%. CI runs it when the engine, its tests, or the tools and packages they use change, and once a week, since it takes longer than every other check together.
 - **Diary statistics:** a known diary produces known booked, stranded and fragmented minutes, and a known search log produces the right number of missed bookings.
 - **Imports:** sample CSV, Excel and .ics files; column detection; day-first and month-first dates; missing columns; cancelled appointments; calendar files that mix time zones.
 - **Feature tests:** every endpoint and policy, plus tenant isolation. One business must never see another's data, and one playground sandbox must never see another's.
@@ -410,7 +410,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | # | Sub-plan | Delivers |
 |---|---|---|
-| 04 | Availability engine | Slot calculation (5.1), including time zones, clock changes and the booking window; an `availability:show` command to try it; thorough unit tests; randomised rule checks; mutation testing with Infection on every pull request |
+| 04 | Availability engine | Slot calculation (5.1), including time zones, clock changes and the booking window; an `availability:show` command to try it; thorough unit tests; randomised rule checks; mutation testing with Infection |
 | 05 | Making bookings | Booking action; customers; locking + exclusion constraint; a `booking:create` command to try it locally |
 | 06 | Waste score | Waste score and extra waste (5.3) in the engine; room weights on services; a day's stranded and fragmented time |
 | 07 | Strictness and relaxation | Strictness filter and relaxation window in the engine (5.4), with strictness looked up for each time so it can vary by time of day later; settings stored on the business |

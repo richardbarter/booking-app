@@ -45,6 +45,31 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The commit before too, for the next step to compare with.
+          fetch-depth: 2
+
+      # Infection takes about 3 minutes, so it runs only when something it
+      # depends on changes: the scheduling engine, its tests, or the tools and
+      # packages they use. The weekly run always runs it. Both a pull request
+      # and a push to main check out a merge commit, whose first parent is
+      # main without the change. If the comparison fails, Infection runs.
+      - name: See whether Infection needs to run
+        id: infection
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != schedule ] && git diff --quiet HEAD^1 HEAD -- \
+            app/Scheduling \
+            tests/Unit/Scheduling \
+            tests/Support/Scheduling \
+            infection.json5 \
+            phpunit.xml \
+            composer.json \
+            composer.lock \
+            .github/workflows/ci.yml
+          then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
@@ -53,8 +78,7 @@ jobs:
           # The extensions the Dockerfile installs.
           extensions: pdo_pgsql, opcache, pcntl, bcmath, intl, gd, exif, zip
           tools: composer:v2
-          # Infection's mutation testing, in composer ci:check, needs a
-          # coverage driver.
+          # Infection needs a coverage driver.
           coverage: pcov
 
       - name: Set up Node
@@ -84,6 +108,10 @@ jobs:
           # Vitest loads vite.config.ts in dev-server mode, which the Laravel
           # Vite plugin refuses when CI is set. Nothing serves HMR here.
           LARAVEL_BYPASS_ENV_CHECK: '1'
+
+      - name: Mutation-test the scheduling engine
+        if: steps.infection.outputs.needed == 'true'
+        run: composer test:mutation
 
   # Reads only the lock files, so nothing needs installing.
   audit:

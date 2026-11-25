@@ -96,7 +96,7 @@ The user reviews every pull request before it merges, and merging deploys. A big
 - **Estimate the build's size** once the design and tests are settled. Count roughly the lines each part adds, as app code (everything that isn't a test or a doc: migrations, models, classes, commands, pages) and tests. Earlier builds are the best guide: 05's pull request (#17) added about 1,100 lines of app code and 1,100 of tests, more than is comfortable to review in one go.
 - **Aim for pull requests of up to about 500 lines of app code,** and about 1,500 lines in all with tests and docs. These are guides, not limits. A pull request a little over that which only makes sense whole is better than a split for its own sake.
 - **Split a bigger build along its build order,** so each part builds on the one before: for example the data model first, then the backend, then the pages. Each part must:
-  - work on its own, with its tests, and pass `composer ci:check`
+  - work on its own, with its tests, and pass `composer ci:check`, and `composer test:mutation` if it changes the engine
   - be safe to deploy on its own, since merging deploys. Nothing a visitor can reach may depend on a later part, such as a route or link to a page that isn't built yet, and the part's migrations must work with the code in that part
   - make sense to review alone, with a clear answer to "what does this part do?"
 - **Separate plans, or parts of one plan?** Work that could ship on its own and needs its own decisions becomes its own sub-plan, as 01b was split from 01. Layers of one feature that share one design stay in one plan, as parts.
