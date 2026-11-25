@@ -28,6 +28,8 @@ final readonly class StrictnessFilter
 {
     public const int MAX_THRESHOLD_MINUTES = 120;
 
+    private const int LOWEST_STRICTNESS = 1;
+
     private const int TENTHS_IN_MINUTE = 10;
 
     private CarbonImmutable $relaxationEnds;
@@ -63,6 +65,31 @@ final readonly class StrictnessFilter
     }
 
     /**
+     * The lowest strictness, from 1 to 100, that hides a slot with that much
+     * extra waste outside the relaxation window, or null when none does. A
+     * higher strictness always hides it too (rule 14), so the playground's
+     * slider (08) can show what each strictness hides without asking the
+     * server. It tries each strictness in turn, so thresholdTenths() stays
+     * the only formula.
+     */
+    public static function hiddenFrom(int $extraMinutes): ?int
+    {
+        return array_find(
+            range(self::LOWEST_STRICTNESS, BookingSettings::MAX_STRICTNESS),
+            fn (int $strictness): bool => self::isOverThreshold($extraMinutes, $strictness),
+        );
+    }
+
+    /**
+     * Whether a time starting then is inside the relaxation window, so it's
+     * offered whatever its waste.
+     */
+    public function relaxes(CarbonImmutable $startsAt): bool
+    {
+        return $startsAt <= $this->relaxationEnds;
+    }
+
+    /**
      * The slots offered and the slots hidden, each in the order given.
      *
      * @param  list<Slot>  $slots
@@ -86,10 +113,14 @@ final readonly class StrictnessFilter
 
     private function hides(Slot $slot): bool
     {
-        $threshold = self::thresholdTenths($this->settings->strictnessAt($slot->startsAt));
+        return ! $this->relaxes($slot->startsAt)
+            && self::isOverThreshold($slot->waste->extraMinutes, $this->settings->strictnessAt($slot->startsAt));
+    }
 
-        return $threshold !== null
-            && $slot->startsAt > $this->relaxationEnds
-            && self::TENTHS_IN_MINUTE * $slot->waste->extraMinutes > $threshold;
+    private static function isOverThreshold(int $extraMinutes, int $strictness): bool
+    {
+        $threshold = self::thresholdTenths($strictness);
+
+        return $threshold !== null && self::TENTHS_IN_MINUTE * $extraMinutes > $threshold;
     }
 }

@@ -180,6 +180,45 @@ class StrictnessFilterTest extends TestCase
         $this->assertSame($tenths, StrictnessFilter::thresholdTenths($strictness));
     }
 
+    /**
+     * 60 minutes is exactly the threshold at 50, so it's offered there.
+     *
+     * @return array<string, array{int, ?int}>
+     */
+    public static function extraWasteAndWhatHidesIt(): array
+    {
+        return [
+            'no extra waste, which nothing hides' => [0, null],
+            '1 minute' => [1, 100],
+            '60 minutes' => [60, 51],
+            '61 minutes' => [61, 50],
+            '119 minutes, over every threshold' => [119, 1],
+            'far over every threshold' => [500, 1],
+        ];
+    }
+
+    #[DataProvider('extraWasteAndWhatHidesIt')]
+    public function test_gives_the_lowest_strictness_that_hides_a_slot(int $extraMinutes, ?int $hiddenFrom): void
+    {
+        $this->assertSame($hiddenFrom, StrictnessFilter::hiddenFrom($extraMinutes));
+    }
+
+    public function test_relaxes_a_time_exactly_at_the_windows_end_and_not_one_a_minute_later(): void
+    {
+        $filter = $this->filter(100, relaxationHours: 48, now: '2026-11-07 08:00');
+
+        $this->assertTrue($filter->relaxes(CarbonImmutable::parse('2026-11-09 08:00', 'Europe/London')));
+        $this->assertFalse($filter->relaxes(CarbonImmutable::parse('2026-11-09 08:01', 'Europe/London')));
+    }
+
+    public function test_relaxes_no_time_after_now_with_no_relaxation_window(): void
+    {
+        $filter = $this->filter(100, relaxationHours: 0, now: '2026-11-07 08:00');
+
+        $this->assertFalse($filter->relaxes(CarbonImmutable::parse('2026-11-07 08:01', 'Europe/London')));
+        $this->assertFalse($filter->relaxes(CarbonImmutable::parse('2026-11-20 09:00', 'Europe/London')));
+    }
+
     public function test_gives_the_end_of_the_relaxation_window_in_utc(): void
     {
         $ends = StrictnessFilter::relaxationEnds(CarbonImmutable::parse('2026-03-28 10:00', 'Europe/London'), 48);

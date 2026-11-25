@@ -36,4 +36,15 @@ final readonly class WasteScore
     ) {
         $this->minutes = $strandedMinutes + $lostRoomMinutes + $splitMinutes;
     }
+
+    /**
+     * How many fewer of the kind of appointment its free gap could take, 0
+     * when it takes no room from it.
+     */
+    public function fewerOf(ServiceTimes $times): int
+    {
+        $kind = array_find($this->lostRoom, fn (array $kind): bool => $kind['times']->equals($times));
+
+        return $kind['fewer'] ?? 0;
+    }
 }

@@ -14,6 +14,8 @@ use InvalidArgumentException;
  */
 final readonly class TimeRange
 {
+    private const int SECONDS_IN_MINUTE = 60;
+
     public CarbonImmutable $start;
 
     public CarbonImmutable $end;
@@ -43,6 +45,14 @@ final readonly class TimeRange
     }
 
     /**
+     * Whether the two start and end at the same instants.
+     */
+    public function equals(self $other): bool
+    {
+        return $this->start->equalTo($other->start) && $this->end->equalTo($other->end);
+    }
+
+    /**
      * Its start and end as Unix timestamps, rounded inwards to whole
      * seconds, so a range of whole seconds fits inside them exactly when it
      * fits inside this range. Blocked time can end part-way through a
@@ -53,5 +63,16 @@ final readonly class TimeRange
     public function wholeSecondsInside(): array
     {
         return [$this->start->ceilSecond()->getTimestamp(), $this->end->floorSecond()->getTimestamp()];
+    }
+
+    /**
+     * Its whole minutes, counted in the whole seconds inside it, so it never
+     * counts as longer than it is.
+     */
+    public function wholeMinutes(): int
+    {
+        [$start, $end] = $this->wholeSecondsInside();
+
+        return intdiv($end - $start, self::SECONDS_IN_MINUTE);
     }
 }

@@ -5,12 +5,14 @@ namespace Tests\Unit\Scheduling;
 use App\Scheduling\Availability;
 use App\Scheduling\BookingSettings;
 use App\Scheduling\DayAvailability;
+use App\Scheduling\ExtraWaste;
 use App\Scheduling\LocalClock;
 use App\Scheduling\OfferedService;
 use App\Scheduling\ServiceFit;
 use App\Scheduling\ServiceTimes;
 use App\Scheduling\Slot;
 use App\Scheduling\SlotFinder;
+use App\Scheduling\StrictnessFilter;
 use App\Scheduling\TimeRange;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -38,8 +40,9 @@ use Tests\Support\Scheduling\ScenarioGenerator;
  *
  * Each scenario has a random strictness and relaxation window (07). Rules
  * 1 to 13 check every slot that fits, offered or hidden, since strictness
- * changes neither which slots fit nor their scores. Rules 14 to 19 check
- * strictness, and also search each diary at a second strictness.
+ * changes neither which slots fit nor their scores. Rules 14 to 19 and 21
+ * check strictness, and also search each diary at a second strictness.
+ * Rule 20 checks the reasons the playground gives (08), for every slot.
  */
 class SlotFinderRulesTest extends TestCase
 {
@@ -91,6 +94,13 @@ class SlotFinderRulesTest extends TestCase
      * @var array<string, Availability>
      */
     private array $comparedRun = [];
+
+    /**
+     * The lowest strictness that hides each extra waste, worked out once.
+     *
+     * @var array<int, ?int>
+     */
+    private array $hiddenFrom = [];
 
     public function test_rule_1_each_slots_times_agree_with_the_service(): void
     {
@@ -185,6 +195,16 @@ class SlotFinderRulesTest extends TestCase
     public function test_rule_19_hidden_slots_are_after_the_relaxation_window_and_above_the_threshold(): void
     {
         $this->assertRuleHolds(19);
+    }
+
+    public function test_rule_20_each_slot_with_extra_waste_differs_from_the_best_in_its_gap(): void
+    {
+        $this->assertRuleHolds(20);
+    }
+
+    public function test_rule_21_a_slot_is_hidden_exactly_when_it_is_not_relaxed_and_strictness_reaches_what_hides_it(): void
+    {
+        $this->assertRuleHolds(21);
     }
 
     private function assertRuleHolds(int $rule): void
@@ -291,6 +311,8 @@ class SlotFinderRulesTest extends TestCase
             17 => ['every free gap that offers a time at strictness 0 offers at least one at any strictness', $this->everyGapKeepsATime(...)],
             18 => ['the slots starting inside the relaxation window are the same at every strictness', $this->relaxationWindowIgnoresStrictness(...)],
             19 => ['each hidden slot starts after the relaxation window with extra waste above its threshold, and each offered slot after it is at or below', $this->hiddenSlotsAreAboveTheThreshold(...)],
+            20 => ['each slot with extra waste above 0 differs from the best in its free gap in at least one part', $this->extraWasteHasAReason(...)],
+            21 => ['a slot is hidden exactly when it isn\'t relaxed and the strictness is at or above what hides it', $this->hiddenFromDecides(...)],
         ];
     }
 
@@ -833,6 +855,71 @@ class SlotFinderRulesTest extends TestCase
                 }
             }
         }
+    }
+
+    /**
+     * The best must also be as much less wasteful as the slot's extra waste
+     * says.
+     *
+     * @param  Closure(bool, Closure(): string): void  $check
+     */
+    private function extraWasteHasAReason(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        foreach ($this->slotsOf($availability) as [$day, $slot]) {
+            if ($slot->waste->extraMinutes === 0) {
+                continue;
+            }
+
+            $best = $day->bestInGapOf($slot);
+            $extra = ExtraWaste::between($slot->waste, $best->waste);
+
+            $check(
+                $best->waste->minutes === $slot->waste->minutes - $slot->waste->extraMinutes
+                    && ($extra->strandedMinutes > 0 || $extra->lostRoom !== [] || $extra->splits),
+                fn (): string => "{$day->date}: extra waste {$slot->waste->extraMinutes}, {$this->describe($slot)}, against the best, {$this->describe($best)}",
+            );
+        }
+    }
+
+    /**
+     * At both strictness values, so the slider's answer is the engine's.
+     *
+     * @param  Closure(bool, Closure(): string): void  $check
+     */
+    private function hiddenFromDecides(Scenario $scenario, Availability $availability, Closure $check): void
+    {
+        $filter = new StrictnessFilter($scenario->settings, $scenario->now);
+
+        foreach ($this->runsOf($scenario, $availability) as [$strictness, $run]) {
+            foreach ($run->days as $day) {
+                foreach ([[$day->slots, false], [$day->hiddenSlots, true]] as [$slots, $hidden]) {
+                    foreach ($slots as $slot) {
+                        $hiddenFrom = $this->hiddenFrom($slot->waste->extraMinutes);
+
+                        $check(
+                            $hidden === (! $filter->relaxes($slot->startsAt) && $hiddenFrom !== null && $strictness >= $hiddenFrom),
+                            fn (): string => sprintf(
+                                '%s: at strictness %d, %s a slot hidden from %s, %s',
+                                $day->date,
+                                $strictness,
+                                $hidden ? 'hid' : 'offered',
+                                $hiddenFrom ?? 'none',
+                                $this->describe($slot),
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    private function hiddenFrom(int $extraMinutes): ?int
+    {
+        if (! array_key_exists($extraMinutes, $this->hiddenFrom)) {
+            $this->hiddenFrom[$extraMinutes] = StrictnessFilter::hiddenFrom($extraMinutes);
+        }
+
+        return $this->hiddenFrom[$extraMinutes];
     }
 
     /**
