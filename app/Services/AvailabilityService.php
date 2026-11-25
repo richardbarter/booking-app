@@ -11,9 +11,9 @@ use App\Models\Service;
 use App\Models\TimeOff;
 use App\Models\WorkingPattern;
 use App\Scheduling\Availability;
-use App\Scheduling\BookingSettings;
 use App\Scheduling\DateRange;
 use App\Scheduling\Diary;
+use App\Scheduling\Hours\PatternWeeks;
 use App\Scheduling\Hours\WorkingHours;
 use App\Scheduling\LocalClock;
 use App\Scheduling\OfferedService;
@@ -22,7 +22,6 @@ use App\Scheduling\SlotFinder;
 use App\Scheduling\TimeRange;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use DateTimeZone;
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use LogicException;
@@ -30,7 +29,7 @@ use LogicException;
 /**
  * Loads what the engine needs for a business's practitioner and runs it.
  * It's the only part of the engine that reads the database: six queries
- * whatever the range.
+ * for a search, whatever the range, and three for the next working date.
  *
  * In v1 the practitioner offers every active service, at the service's
  * own length, buffers and room weight. That rule lives here, so the
@@ -38,6 +37,12 @@ use LogicException;
  */
 class AvailabilityService
 {
+    /**
+     * How far ahead to look for a working date: the longest pattern's whole
+     * cycle.
+     */
+    private const int WORKING_DATE_DAYS_AHEAD = 7 * PatternWeeks::MAX_WEEKS;
+
     public function __construct(
         private CurrentBusiness $currentBusiness,
         private SlotFinder $slotFinder,
@@ -57,14 +62,7 @@ class AvailabilityService
         $this->ensureBookable($business, $service);
 
         $dates = DateRange::between($from, $to);
-        $settings = new BookingSettings(
-            new DateTimeZone($business->timezone),
-            $business->slot_interval_minutes,
-            $business->min_notice_minutes,
-            $business->max_advance_days,
-            $business->strictness,
-            $business->relaxation_hours,
-        );
+        $settings = $business->bookingSettings();
         [$offeredServices, $searchedFor] = $this->offeredServices($business, $service);
         $practitioner = $business->practitioners()->sole();
         [$rangeStart, $rangeEnd] = $this->range(new LocalClock($settings->timezone), $dates);
@@ -83,6 +81,26 @@ class AvailabilityService
             $dates,
             now(),
         );
+    }
+
+    /**
+     * The first date after the given one with working hours, as Y-m-d, or
+     * null when there's none in the next 28 days. Only the calendar date
+     * given is read, in the business's time zone. Time off isn't considered,
+     * so every time that day may still be blocked.
+     *
+     * @throws MissingCurrentBusiness when no current business is set
+     * @throws LogicException when the current business is another one
+     */
+    public function nextWorkingDate(Business $business, CarbonInterface $after): ?string
+    {
+        $this->currentBusiness->ensureIs($business);
+
+        $day = CarbonImmutable::parse($after->format('Y-m-d'), 'UTC');
+        $dates = DateRange::between($day->addDay(), $day->addDays(self::WORKING_DATE_DAYS_AHEAD));
+        $hours = $this->workingHours($business->practitioners()->sole(), $dates);
+
+        return array_find($dates->dates(), fn (string $date): bool => ! $hours->on(CarbonImmutable::parse($date, 'UTC'))->isEmpty());
     }
 
     /**
