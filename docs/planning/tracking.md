@@ -68,7 +68,7 @@ Sub-plan 07 is done. Pull request #25 merged on 2026-11-25, and its run on `main
 
 Sub-plan 08 is being built, in seven parts. Its plan merged in pull request #35 on 2026-11-25 (merge commit bcc7095), and its run on `main` (45706200952) passed `checks`, `audit` and `deploy`. Afterwards `/`, `/login` and `/up` returned 200. The Infection step was skipped on #35, as expected for a change to the docs only.
 
-08's part 1 (the engine's additions) is built. Before the build, the plan was checked against 03 to 07's code and still matched. What part 1 built:
+08's part 1 (the engine's additions) is built, in pull request #36. Before the build, the plan was checked against 03 to 07's code and still matched. What part 1 built:
 - **The engine:** `StrictnessFilter::hiddenFrom()` gives the lowest strictness that hides a time, and `relaxes()` whether a time is inside the relaxation window. `ExtraWaste` holds how a time's waste differs from the best in its free gap, which `DayAvailability::bestInGapOf()` finds, for the reasons the page will give. `DayFigures` adds up a day's working, booked, free, stranded and fragmented minutes and its efficiency.
 - **Models and services:** `Business::bookingSettings()`, which `AvailabilityService` now uses, and `AvailabilityService::nextWorkingDate()`, in three queries.
 - **The lazy-loading guard** is on outside production. No existing test needed a change.
@@ -88,7 +88,7 @@ Sub-plan 08 is being built, in seven parts. Its plan merged in pull request #35 
 
 ## Next up
 
-1. Build 08 with the `build-sub-plan` skill, in seven parts. Part 1 (the engine's additions) is built, and part 2 (sandboxes, the start page and Playwright) follows once it's merged and its deploy checked. In part 2, download Playwright's Chromium locally (08, "Running Playwright"); the Ubuntu packages it needs are installed.
+1. Build 08 with the `build-sub-plan` skill, in seven parts. Part 1 (the engine's additions) is in review (#36), and part 2 (sandboxes, the start page and Playwright) follows once it's merged and its deploy checked. In part 2, download Playwright's Chromium locally (08, "Running Playwright"); the Ubuntu packages it needs are installed.
 2. After part 6, two sessions with the user: tuning the strictness defaults, then Bookalive's colours. Part 7 follows.
 3. After 08, the custom domain (08b), before 09.
 
@@ -109,7 +109,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 06 | Waste score | Done | Plan #7, revised #23, build #24 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised in #23 on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request. Built on 2026-11-11, with 584 PHPUnit tests and Infection at 100% (540 mutants). `AvailabilityService` for 31 days of the sample business: 48.5ms. Merged on 2026-11-12; release v23 ran its migration on Neon, and every check passed |
 | 07 | Strictness and relaxation | Done | Plan #7, build #25 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option. Its randomised rules renumbered 14 to 19 in #23 on 2026-11-11, after 06's. Built on 2026-11-12 in one pull request, with 661 PHPUnit tests, Infection at 100% (580 mutants) and the rules test at 10.6s on the host (18.4s in CI), so Infection's timeout went from 20s to 40s. Merged on 2026-11-25; release v25 ran its migration on Neon (74ms), and every check passed |
 | | **Phase 3: Playground** | | | |
-| 08 | Scheduling playground | In progress | Plan #35 | Drafted 2026-11-25, after 03 to 07's notes were checked against the code, and merged the same day. Built in seven parts, with sessions for tuning and colours after part 6. Part 1 (the engine's additions) built on 2026-11-25, with 714 PHPUnit tests and Infection at 100% (638 mutants) |
+| 08 | Scheduling playground | In progress | Plan #35, build #36 | Drafted 2026-11-25, after 03 to 07's notes were checked against the code, and merged the same day. Built in seven parts, with sessions for tuning and colours after part 6. Part 1 (the engine's additions) built on 2026-11-25, with 714 PHPUnit tests and Infection at 100% (638 mutants) |
 | ★ | **Playground milestone** | | | |
 | | **Phase 4: Full product** | | | |
 | 08b | Custom domain | Not started | | Added 2026-11-25, from 22. Before 09, because passkeys are tied to the domain |
