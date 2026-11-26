@@ -341,7 +341,7 @@ PHP feature tests fix the time with `travelTo()`. Where no other is given, it's 
 
 **Unit and database: 5 minutes** (part 2)
 - `BookingSettings` and the table's check each accept 5 and still refuse 7. Their existing tests list the choices, so they change with it.
-- The randomised rules try 5. Locally, with 5 in the list, every rule passed and the rules test took 14.8s, against 10.6s without it, with 520,120 assertions against 408,541. CI's runners have been up to about twice as slow as the host, which would make about 30s, under Infection's 40-second timeout. In part 2's first CI run it took 17.3s, and Infection took 3m17s on 3 threads.
+- The randomised rules try 5. Locally, with 5 in the list, every rule passed and the rules test took 14.8s, against 10.6s without it, with 520,120 assertions against 408,541. CI's runners have been up to about twice as slow as the host, which would make about 30s, under Infection's 40-second timeout. In part 2's CI runs it took 17.3s and then 33.4s, on a runner slow throughout, so part 2 raises the timeout to 60 seconds (see tracking's decisions log). Infection took 3m17s and 4m6s on 3 threads.
 - The migration rolls back and runs again cleanly (`migrate:rollback --step=1`, then `migrate`).
 
 **Feature: sandboxes**
