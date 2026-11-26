@@ -341,7 +341,7 @@ PHP feature tests fix the time with `travelTo()`. Where no other is given, it's 
 
 **Unit and database: 5 minutes** (part 2)
 - `BookingSettings` and the table's check each accept 5 and still refuse 7. Their existing tests list the choices, so they change with it.
-- The randomised rules try 5. Locally, with 5 in the list, every rule passed and the rules test took 14.8s, against 10.6s without it, with 520,120 assertions against 408,541. CI's runners have been up to about twice as slow as the host, which would make about 30s, under Infection's 40-second timeout. Part 2 checks the time in CI.
+- The randomised rules try 5. Locally, with 5 in the list, every rule passed and the rules test took 14.8s, against 10.6s without it, with 520,120 assertions against 408,541. CI's runners have been up to about twice as slow as the host, which would make about 30s, under Infection's 40-second timeout. In part 2's first CI run it took 17.3s, and Infection took 3m17s on 3 threads.
 - The migration rolls back and runs again cleanly (`migrate:rollback --step=1`, then `migrate`).
 
 **Feature: sandboxes**
@@ -397,7 +397,7 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 - [x] 1. The engine's new tests pass, with Infection at 90% or more and the randomised rules 20 and 21 on five other seeds (part 1)
 - [x] 2. The lazy-loading guard is on, with every test passing (part 1)
 - [x] 3. A visitor can start a sandbox, and the isolation, expiry, clean-up and limit tests pass. A slot interval can be 5 minutes, with its tests (part 2)
-- [ ] 4. Playwright and axe run in CI and locally (part 2)
+- [x] 4. Playwright and axe run in CI and locally (part 2)
 - [ ] 5. The deploy of part 2 adds `sandbox_expires_at` and the new slot interval check on Neon, and starting a sandbox works on bookalive.fly.dev
 - [ ] 6. The timeline and dates work, with their tests (part 3)
 - [ ] 7. A visitor can book an offered time, with its tests (part 4)
