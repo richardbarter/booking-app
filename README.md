@@ -23,7 +23,7 @@ docker compose up -d
 
 The containers share `vendor` and `node_modules` with your machine, which is why it needs to be Linux. They also run as your user, so the files they create are yours. If `id -u` or `id -g` isn't 1000, set `WWWUSER` and `WWWGROUP` in `.env` before starting them.
 
-Run the tests with `docker compose exec app php artisan test` and `npm run test`.
+Run the tests with `docker compose exec app php artisan test` and `npm run test`. The end-to-end tests run in Chromium against the app at http://localhost:8001: install it once with `npx playwright install chromium` (and the packages it needs with `npx playwright install-deps chromium`), then run `npm run test:e2e`.
 
 ## Deployment
 

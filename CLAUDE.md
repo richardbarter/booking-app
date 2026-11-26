@@ -23,6 +23,7 @@ Docker is the main way to run the app. The app is at http://localhost:8001 and M
 - `npm run test`: Vitest
 - `composer ci:check`: every check CI always runs (all of the above, plus a Pint check and PHPUnit). Run it before opening a pull request
 - `composer test:mutation`: Infection on the scheduling engine. Run it too when the engine or its tests change, as CI does
+- `npm run test:e2e`: Playwright's end-to-end tests, with axe, against the app at http://localhost:8001. Not part of `composer ci:check`, as they need the running app; CI runs them after it. Run `npx playwright install chromium` once first
 
 The containers share the code, `vendor` and `node_modules` with the host and run as the host user, so install packages once, on the host or in the `app` container. On Windows, the host is Ubuntu in WSL 2.
 

@@ -12,7 +12,7 @@ defineProps<{
 <template>
     <Head title="Scheduling playground" />
 
-    <div class="mx-auto max-w-2xl space-y-6">
+    <div class="max-w-2xl space-y-6">
         <h1 class="text-2xl font-semibold tracking-tight">
             Scheduling playground
         </h1>
