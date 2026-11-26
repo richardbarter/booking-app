@@ -16,6 +16,7 @@ use App\Scheduling\Slot;
 use App\Scheduling\TimeRange;
 use App\Services\AvailabilityService;
 use App\Services\CurrentBusiness;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -433,6 +434,114 @@ class AvailabilityServiceTest extends TestCase
         $this->assertSame([], DB::getQueryLog());
     }
 
+    public function test_the_next_working_date_skips_days_off(): void
+    {
+        $business = $this->sampleBusiness();
+
+        $this->assertSame('2026-11-03', $this->nextWorkingDate($business, '2026-11-02'));
+        $this->assertSame('2026-11-09', $this->nextWorkingDate($business, '2026-11-06'));
+        $this->assertSame('2026-11-14', $this->nextWorkingDate($business, '2026-11-12'));
+    }
+
+    public function test_the_next_working_date_follows_edited_days(): void
+    {
+        $business = $this->sampleBusiness();
+        $practitioner = $business->practitioners()->sole();
+        $practitioner->editedDays()->create(['date' => '2026-11-07', 'hours' => [['10:00', '12:00']]]);
+        $practitioner->editedDays()->create(['date' => '2026-11-09', 'hours' => []]);
+
+        $this->assertSame('2026-11-07', $this->nextWorkingDate($business, '2026-11-06'));
+        $this->assertSame('2026-11-10', $this->nextWorkingDate($business, '2026-11-07'));
+    }
+
+    public function test_the_next_working_date_does_not_consider_time_off(): void
+    {
+        $business = $this->sampleBusiness();
+        $business->practitioners()->sole()->timeOff()->create([
+            'starts_at' => CarbonImmutable::parse('2026-11-03 00:00', 'Europe/London'),
+            'ends_at' => CarbonImmutable::parse('2026-11-04 00:00', 'Europe/London'),
+        ]);
+
+        $this->assertSame('2026-11-03', $this->nextWorkingDate($business, '2026-11-02'));
+    }
+
+    /**
+     * The pattern ends on the Monday, and the only hours after it are on an
+     * edited day.
+     *
+     * @return array<string, array{string, ?string}>
+     */
+    public static function onlyHoursAhead(): array
+    {
+        return [
+            '28 days ahead' => ['2026-11-30', '2026-11-30'],
+            '29 days ahead' => ['2026-12-01', null],
+        ];
+    }
+
+    #[DataProvider('onlyHoursAhead')]
+    public function test_the_next_working_date_is_at_most_28_days_ahead(string $workingDate, ?string $expected): void
+    {
+        $business = $this->sampleBusiness();
+        $practitioner = $business->practitioners()->sole();
+        $practitioner->workingPatterns()->sole()->update(['ends_on' => '2026-11-02']);
+        $practitioner->editedDays()->delete();
+        $practitioner->editedDays()->create(['date' => $workingDate, 'hours' => [['10:00', '12:00']]]);
+
+        $this->assertSame($expected, $this->nextWorkingDate($business, '2026-11-02'));
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function momentsOnTheThird(): array
+    {
+        return [
+            'Auckland, where the UTC date is the day before' => ['2026-11-03 00:30', 'Pacific/Auckland'],
+            'New York, where the UTC date is the day after' => ['2026-11-03 23:30', 'America/New_York'],
+        ];
+    }
+
+    #[DataProvider('momentsOnTheThird')]
+    public function test_the_next_working_date_reads_only_the_calendar_date_given(string $after, string $timezone): void
+    {
+        $business = $this->sampleBusiness();
+
+        $this->assertSame('2026-11-04', app(AvailabilityService::class)->nextWorkingDate($business, CarbonImmutable::parse($after, $timezone)));
+    }
+
+    public function test_the_next_working_date_does_not_change_a_mutable_date_it_is_given(): void
+    {
+        $business = $this->sampleBusiness();
+        $after = Carbon::parse('2026-11-02 10:00', 'Europe/London');
+
+        app(AvailabilityService::class)->nextWorkingDate($business, $after);
+
+        $this->assertSame('2026-11-02T10:00:00+00:00', $after->toIso8601String());
+    }
+
+    public function test_the_next_working_date_takes_three_queries(): void
+    {
+        $business = $this->sampleBusiness();
+        DB::enableQueryLog();
+
+        $this->nextWorkingDate($business, '2026-11-02');
+
+        $this->assertCount(3, DB::getQueryLog());
+    }
+
+    public function test_rejects_a_next_working_date_for_a_business_that_is_not_the_current_one(): void
+    {
+        $business = $this->sampleBusiness();
+        $other = app(CreateSampleBusiness::class)->handle();
+        app(CurrentBusiness::class)->set($other);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage("asked for business {$business->id}, but the current business is {$other->id}");
+
+        $this->nextWorkingDate($business, '2026-11-02');
+    }
+
     /**
      * The sample business, made the current business. It's at strictness 0
      * unless a test gives another, since most of these tests are about what
@@ -446,6 +555,11 @@ class AvailabilityServiceTest extends TestCase
         app(CurrentBusiness::class)->set($business);
 
         return $business;
+    }
+
+    private function nextWorkingDate(Business $business, string $after): ?string
+    {
+        return app(AvailabilityService::class)->nextWorkingDate($business, CarbonImmutable::parse($after, $business->timezone));
     }
 
     private function service(string $name): Service

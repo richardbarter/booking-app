@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Scheduling\BookingSettings;
 use Carbon\CarbonImmutable;
 use Database\Factories\BusinessFactory;
+use DateTimeZone;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -50,6 +52,21 @@ class Business extends Model
         'strictness' => 50,
         'relaxation_hours' => 48,
     ];
+
+    /**
+     * The booking settings as the engine reads them.
+     */
+    public function bookingSettings(): BookingSettings
+    {
+        return new BookingSettings(
+            new DateTimeZone($this->timezone),
+            $this->slot_interval_minutes,
+            $this->min_notice_minutes,
+            $this->max_advance_days,
+            $this->strictness,
+            $this->relaxation_hours,
+        );
+    }
 
     /**
      * A business has exactly one practitioner in v1, which code gets with

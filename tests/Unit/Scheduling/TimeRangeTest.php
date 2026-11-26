@@ -123,6 +123,23 @@ class TimeRangeTest extends TestCase
         $this->assertSame([$range->start->getTimestamp(), $range->end->getTimestamp()], $range->wholeSecondsInside());
     }
 
+    public function test_counts_only_the_whole_minutes_in_its_whole_seconds(): void
+    {
+        $this->assertSame(15, $this->range('09:00', '09:15')->wholeMinutes());
+        $this->assertSame(15, $this->range('09:00', '09:15:59')->wholeMinutes());
+        $this->assertSame(14, $this->range('09:00:00.5', '09:15')->wholeMinutes());
+        $this->assertSame(0, $this->range('09:00:10', '09:01:09')->wholeMinutes());
+    }
+
+    public function test_equals_only_a_range_with_the_same_start_and_end(): void
+    {
+        $range = $this->range('09:00', '12:00');
+
+        $this->assertTrue($range->equals($this->range('09:00', '12:00')));
+        $this->assertFalse($range->equals($this->range('09:00', '11:00')));
+        $this->assertFalse($range->equals($this->range('10:00', '12:00')));
+    }
+
     private function range(string $start, string $end): TimeRange
     {
         return new TimeRange(

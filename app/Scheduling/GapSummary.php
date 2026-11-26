@@ -13,8 +13,6 @@ namespace App\Scheduling;
  */
 final readonly class GapSummary
 {
-    private const int SECONDS_IN_MINUTE = 60;
-
     /**
      * @param  list<TimeRange>  $stranded  in time order
      * @param  list<TimeRange>  $fragmented  in time order
@@ -35,20 +33,10 @@ final readonly class GapSummary
     }
 
     /**
-     * The whole minutes in the gaps, each counted in its whole seconds, so
-     * a gap never counts as longer than it is.
-     *
      * @param  list<TimeRange>  $gaps
      */
     private static function minutes(array $gaps): int
     {
-        $minutes = 0;
-
-        foreach ($gaps as $gap) {
-            [$start, $end] = $gap->wholeSecondsInside();
-            $minutes += intdiv($end - $start, self::SECONDS_IN_MINUTE);
-        }
-
-        return $minutes;
+        return array_sum(array_map(fn (TimeRange $gap): int => $gap->wholeMinutes(), $gaps));
     }
 }
