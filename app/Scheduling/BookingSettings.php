@@ -17,7 +17,7 @@ final readonly class BookingSettings
     /**
      * @var list<int>
      */
-    public const array SLOT_INTERVALS = [10, 15, 20, 30, 60];
+    public const array SLOT_INTERVALS = [5, 10, 15, 20, 30, 60];
 
     public const int MAX_STRICTNESS = 100;
 

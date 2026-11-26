@@ -16,7 +16,7 @@ class BookingSettingsTest extends TestCase
      */
     public static function slotIntervals(): array
     {
-        return ['10 minutes' => [10], '15 minutes' => [15], '20 minutes' => [20], '30 minutes' => [30], '60 minutes' => [60]];
+        return ['5 minutes' => [5], '10 minutes' => [10], '15 minutes' => [15], '20 minutes' => [20], '30 minutes' => [30], '60 minutes' => [60]];
     }
 
     #[DataProvider('slotIntervals')]
@@ -32,14 +32,14 @@ class BookingSettingsTest extends TestCase
      */
     public static function otherIntervals(): array
     {
-        return ['0 minutes' => [0], '5 minutes' => [5], '45 minutes' => [45], '120 minutes' => [120]];
+        return ['0 minutes' => [0], '7 minutes' => [7], '45 minutes' => [45], '120 minutes' => [120]];
     }
 
     #[DataProvider('otherIntervals')]
     public function test_rejects_any_other_slot_interval(int $minutes): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('must be 10, 15, 20, 30, 60 minutes');
+        $this->expectExceptionMessage('must be 5, 10, 15, 20, 30, 60 minutes');
 
         new BookingSettings(new DateTimeZone('Europe/London'), $minutes, 120, 90, 50, 48);
     }
