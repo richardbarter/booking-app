@@ -287,7 +287,7 @@ Moving to another date or service is a GET with the new query string, as a parti
 
 - **`layouts/PublicLayout.vue`:** the name linking home, a main area and the toaster. `app.ts` gives it to `playground/` pages, and to `Home` in part 7.
 - **`pages/playground/Start.vue`:** what the playground is, in a few sentences, and the Start button. **`pages/playground/Show.vue`** holds the rest.
-- **`pages/Home.vue`** replaces `Welcome.vue`: what Bookalive does, and a button to the playground. It has no sign-up or log-in links until 09.
+- **`pages/Home.vue`** replaces `Welcome.vue`: what Bookalive does, and a button to the playground. The button goes to `playground.start`, which goes on to the diary when there's a sandbox: an Inertia visit to `playground.show` without one would tell a new visitor their playground had ended. It has no sign-up or log-in links until 09.
 
 | Component | Folder | Does | Part |
 |---|---|---|---|
