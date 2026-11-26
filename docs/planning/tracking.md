@@ -76,7 +76,7 @@ Sub-plan 08 is being built, in seven parts. Its plan merged in pull request #35 
 - **Found in the review:** nothing gave a wrong result. `bestInGapOf()` blamed the caller for a gap with no best time, which would be the engine's fault, so it now throws a `LogicException` of its own. The comments on `nextWorkingDate()` and `DayFigures` say what they leave out.
 - **Size:** about 270 lines of app code and 690 of tests, against an estimate of 270 and 500.
 
-08's plan was revised on 2026-11-26, after part 1 merged, in pull request #PR. A slot interval can also be 5 minutes (part 2), with the default still 15, and the playground gets a slot interval picker beside the strictness slider (part 5). The tuning session after part 6 chooses the default.
+08's plan was revised on 2026-11-26, after part 1 merged, in pull request #37. A slot interval can also be 5 minutes (part 2), with the default still 15, and the playground gets a slot interval picker beside the strictness slider (part 5). The tuning session after part 6 chooses the default.
 
 **Development environment** (installed for 01b, 2026-10-27):
 - WSL 3.0.3, with Ubuntu 26.04 LTS as the default distro
@@ -90,7 +90,7 @@ Sub-plan 08 is being built, in seven parts. Its plan merged in pull request #35 
 
 ## Next up
 
-1. Build 08 with the `build-sub-plan` skill, in seven parts. Part 1 (the engine's additions) is merged and live (#36). Part 2 (sandboxes, the start page, Playwright and a 5-minute slot interval) follows once the plan's revision (#PR) is merged. In part 2, download Playwright's Chromium locally (08, "Running Playwright"); the Ubuntu packages it needs are installed.
+1. Build 08 with the `build-sub-plan` skill, in seven parts. Part 1 (the engine's additions) is merged and live (#36). Part 2 (sandboxes, the start page, Playwright and a 5-minute slot interval) follows once the plan's revision (#37) is merged. In part 2, download Playwright's Chromium locally (08, "Running Playwright"); the Ubuntu packages it needs are installed.
 2. After part 6, two sessions with the user: tuning the strictness defaults and choosing the slot interval's default, then Bookalive's colours. Part 7 follows.
 3. After 08, the custom domain (08b), before 09.
 
@@ -111,7 +111,7 @@ Status values: Not started, Planned (plan written), In progress, Done.
 | 06 | Waste score | Done | Plan #7, revised #23, build #24 | Drafted 2026-11-02 and merged with 03 to 05 and 07. Revised in #23 on 2026-11-11 after checking it against 04's and 05's code: buffers count in lost room, the service searched for must be offered, and the build is one pull request. Built on 2026-11-11, with 584 PHPUnit tests and Infection at 100% (540 mutants). `AvailabilityService` for 31 days of the sample business: 48.5ms. Merged on 2026-11-12; release v23 ran its migration on Neon, and every check passed |
 | 07 | Strictness and relaxation | Done | Plan #7, build #25 | Drafted 2026-11-02 and merged with 03 to 06. Revised in #9 on 2026-11-02 to give `booking:create` a `--strictness=` option. Its randomised rules renumbered 14 to 19 in #23 on 2026-11-11, after 06's. Built on 2026-11-12 in one pull request, with 661 PHPUnit tests, Infection at 100% (580 mutants) and the rules test at 10.6s on the host (18.4s in CI), so Infection's timeout went from 20s to 40s. Merged on 2026-11-25; release v25 ran its migration on Neon (74ms), and every check passed |
 | | **Phase 3: Playground** | | | |
-| 08 | Scheduling playground | In progress | Plan #35, revised #PR, build #36 | Drafted 2026-11-25, after 03 to 07's notes were checked against the code, and merged the same day. Revised on 2026-11-26 for a 5-minute slot interval and its picker. Built in seven parts, with sessions for tuning and colours after part 6. Part 1 (the engine's additions) built on 2026-11-25, with 714 PHPUnit tests and Infection at 100% (638 mutants), and merged on 2026-11-26; release v31 deployed it, with no migration |
+| 08 | Scheduling playground | In progress | Plan #35, revised #37, build #36 | Drafted 2026-11-25, after 03 to 07's notes were checked against the code, and merged the same day. Revised on 2026-11-26 for a 5-minute slot interval and its picker. Built in seven parts, with sessions for tuning and colours after part 6. Part 1 (the engine's additions) built on 2026-11-25, with 714 PHPUnit tests and Infection at 100% (638 mutants), and merged on 2026-11-26; release v31 deployed it, with no migration |
 | ★ | **Playground milestone** | | | |
 | | **Phase 4: Full product** | | | |
 | 08b | Custom domain | Not started | | Added 2026-11-25, from 22. Before 09, because passkeys are tied to the domain |
