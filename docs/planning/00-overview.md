@@ -72,7 +72,7 @@ Use these names consistently in code, UI and docs.
 | Diary | One practitioner's working hours and blocked time: what the engine works out free gaps and slots from. |
 | Free gap | A continuous stretch of time when a practitioner is working and not blocked. |
 | Slot | A possible start time for a service, practitioner and date. Slots are calculated, never stored. |
-| Slot interval | The step between possible start times, set for the whole business: 10, 15, 20, 30 or 60 minutes. Default 15, aligned to the clock (:00, :15, :30, :45). |
+| Slot interval | The step between possible start times, set for the whole business: 5, 10, 15, 20, 30 or 60 minutes. Default 15, aligned to the clock (:00, :15, :30, :45). |
 | Booking window | How soon (minimum notice) and how far ahead (maximum advance) customers can book. Set for the business. Default 2 hours and 90 days. The maximum counts whole dates in the business's time zone: with 90, customers can book on dates up to 90 days after today. With staff, each practitioner can have their own. |
 | Waste score | How much room a slot would cost the bookings still to come if it were booked, in minutes: the stranded time it leaves, the room it takes from each kind of appointment (by room weight), and a small cost for splitting a free gap. Worked out from the diary alone; strictness decides how much to tolerate. |
 | Extra waste | How much more a slot's waste score is than the best slot that fits in the same free gap, inside the booking window. The best has 0, so strictness never hides it. |
@@ -419,7 +419,7 @@ Sub-plan files are named `sub-plans/NN-short-name.md`, e.g. `sub-plans/01-projec
 
 | # | Sub-plan | Delivers |
 |---|---|---|
-| 08 | Scheduling playground | Public page with per-visitor sandboxes (5.5): timeline, booking panel, strictness slider, hidden-time explanations, day figures, fill randomly and reset; Playwright end-to-end tests with axe accessibility checks; a Bookalive home page; a GIF in the README |
+| 08 | Scheduling playground | Public page with per-visitor sandboxes (5.5): timeline, booking panel, strictness slider and slot interval picker, hidden-time explanations, day figures, fill randomly and reset; Playwright end-to-end tests with axe accessibility checks; a Bookalive home page; a GIF in the README |
 | ★ | **Playground milestone** | **The core idea is live and shareable** |
 
 ### Phase 4: Full product

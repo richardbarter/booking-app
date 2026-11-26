@@ -12,7 +12,8 @@ A public page, with no sign-up, where anyone can book appointments into a sample
 
 **In scope**
 - Sandboxes: made by a Start button, kept for the visitor's session, deleted once expired, and rate-limited
-- The playground page: day timeline, dates, services, offered times and booking, the strictness slider, hidden times with reasons, waste scores, the relaxation notice, the day's figures, "Fill randomly" and "Reset"
+- The playground page: day timeline, dates, services, offered times and booking, the strictness slider and a slot interval picker, hidden times with reasons, waste scores, the relaxation notice, the day's figures, "Fill randomly" and "Reset"
+- A 5-minute slot interval, alongside 10, 15, 20, 30 and 60, with the default still 15
 - What the engine is missing for that page: the reason a time is hidden, the strictness that hides it, and a day's figures
 - Laravel's lazy-loading guard
 - Playwright end-to-end tests with axe accessibility checks, in CI
@@ -49,6 +50,22 @@ How many follow-up times the engine offers on an ordinary Monday, at each strict
 | None | 28 | 28 | 26 | 13 | 8 | 4 |
 | One assessment at 11:00 | 23 | 23 | 21 | 11 | 6 | 6 |
 | The seeder's three | 13 | 13 | 13 | 9 | 7 | 7 |
+
+**Added on 2026-11-26,** after part 1 was merged:
+
+| Question | Answer |
+|---|---|
+| A 5-minute slot interval | **Allowed, with the default still 15, and a picker beside the slider** (see **The slot interval picker**). A 30-minute appointment with a 5-minute buffer takes 35 minutes, so on a 15-minute grid the next start is 10 minutes after its buffer ends: eight of them lose 80 minutes a day. A finer grid avoids that, but offers customers more times, some of them odd-looking (09:05). The picker lets the user compare the intervals on the sample business, and the tuning session chooses the default. Making 5 the default now was considered: 29 tests check the sample business's times and scores on the 15-minute grid, so they'd all change, and switching back would change them again. 03 left 5 out on 2026-10-30, because times like 09:05 look odd |
+
+How many follow-up times the same empty Monday offers at each slot interval, also checked with the engine:
+
+| Slot interval | 0 | 25 | 50 | 75 | 90 | 100 |
+|---|---|---|---|---|---|---|
+| 5 minutes | 80 | 80 | 70 | 17 | 8 | 4 |
+| 10 minutes | 41 | 41 | 37 | 15 | 8 | 4 |
+| 15 minutes (the default) | 28 | 28 | 26 | 13 | 8 | 4 |
+
+Most of the in-between times have a lot of extra waste, so from strictness 75 a 5-minute grid offers about as many times as a 15-minute one.
 
 ## Design
 
@@ -101,6 +118,15 @@ The offered times have to change while the slider is dragged, so the page can't 
 
 10's live preview ("18 start times next Tuesday, 32 at loosest") can use the same values.
 
+### The slot interval picker
+
+Beside the slider, a radio group labelled "Start times every" offers each of `BookingSettings::SLOT_INTERVALS` (5, 10, 15, 20, 30 and 60 minutes), with the sandbox's own selected. A new sandbox starts on 15, the default.
+- **It saves, then the page reloads,** rather than answering at once like the slider. A new interval gives new start times, each with its own waste score, so only the engine can work them out. The free gaps' kinds can change too, since whether a gap is stranded or fragmented depends on the start times that fit in it (06).
+- **Bookings already made stay where they are.** After a switch from 5 to 15 minutes, a booking at 09:05 is still blocked time. A booking sent from another tab for a time on the old grid is refused like a taken time.
+- **"Reset" keeps it,** as it keeps the strictness.
+- **A finer grid costs a little time.** One day's search for the sample business took a median of 9.4ms at 5 minutes, against 5.7ms at 15, and 31 days took 140ms against 54ms. A fill searches about 20 times, so at 5 minutes it should take about 80ms longer (an estimate).
+- Owners will set their own in 10's business settings, which can reuse the component.
+
 ### Why a time is hidden
 
 The reason compares the time with the best one in its free gap, since part of every score can't be avoided. `ExtraWaste` holds how the two differ: the extra stranded minutes, the kinds of appointment it takes more room from, and whether it splits the gap when the best doesn't. The page words it:
@@ -122,7 +148,7 @@ The customers are different each time. That's enough to show the idea: over 200 
 
 Locally, a fill took 135ms and 131 queries with 7 bookings made, so it has its own rate limit, and Nightwatch samples the playground (below).
 
-**"Reset"** deletes every booking in the sandbox, on all days. The strictness, the service and the date stay as they are, so a visitor can fill, reset, move the slider and fill again.
+**"Reset"** deletes every booking in the sandbox, on all days. The strictness, the slot interval, the service and the date stay as they are, so a visitor can fill, reset, move the slider and fill again.
 
 ### Rate limits
 
@@ -158,6 +184,11 @@ Visitors give none: no name, email or phone is asked for, and every booking belo
 
 Production has no businesses yet, and existing rows get null. `down()` drops the column.
 
+**The check on `slot_interval_minutes`** (03's `businesses_slot_interval_minutes_check`) also allows 5, in a migration of its own in part 2. The column's default stays 15.
+- `up()`: one `ALTER TABLE` drops the check and adds it again with 5, 10, 15, 20, 30 and 60. Every existing row already passes it.
+- `down()`: moves any business on 5 to 15, the default, then puts back the old check, so a rollback can't fail on a sandbox. Until 10, only sandboxes can be on 5.
+- Both were tried in PostgreSQL, in a transaction that was rolled back: after `up()`, 5 was accepted and 7 refused, and `down()` left the business on 15.
+
 ## Backend
 
 ### The engine (`app/Scheduling`, part 1)
@@ -170,6 +201,8 @@ Plain PHP, as before, tested without the database and covered by Infection.
 - **`ExtraWaste`** (`final readonly`): `strandedMinutes`, `lostRoom` (as `WasteScore`'s, with only the kinds it takes more of) and `splits`. Made with `ExtraWaste::between(WasteScore $slot, WasteScore $best): self`. Parts where the slot does better than the best are left out.
 - **`DayAvailability::bestInGapOf(Slot $slot): Slot`**: the least wasteful slot in the same free gap, the earliest if several tie. It throws `InvalidArgumentException` for a slot that isn't the day's.
 - **`DayFigures`** (`final readonly`): `workingMinutes`, `bookedMinutes`, `freeMinutes`, `strandedMinutes` and `fragmentedMinutes`, made with `DayFigures::of(DayAvailability $day, list<TimeRange> $appointments): self`. Booked minutes are the appointments' own times, without buffers. Free minutes are those in the day's free gaps, so buffers and time off aren't free time, as 06's notes for 14 say of blocked time. `efficiency(): ?int` is the overview's formula (5.6), `booked ÷ (booked + stranded)` as a whole percentage with halves rounded up, and null when both are 0. 14 uses it for the days it records.
+
+In part 2, `BookingSettings::SLOT_INTERVALS` gains 5, with the database's check (**Data model**). It's the engine's only change after part 1. The randomised rules pick each scenario's interval from that list, so they try 5 as well.
 
 ### Models and services
 
@@ -205,6 +238,7 @@ Every route has `Sample::rate(0.1)`. Those marked * also have `UseSandbox`.
 | `GET /playground` * | `playground.show` | `DiaryController@show` | 2 |
 | `POST /playground/bookings` * | `playground.bookings.store` | `BookingController@store` | 4 |
 | `PUT /playground/strictness` * | `playground.strictness.update` | `StrictnessController@update` | 5 |
+| `PUT /playground/slot-interval` * | `playground.slot-interval.update` | `SlotIntervalController@update` | 5 |
 | `POST /playground/fill` * | `playground.fill` | `FillController` (invokable) | 6 |
 | `POST /playground/reset` * | `playground.reset` | `ResetController` (invokable) | 6 |
 
@@ -216,6 +250,7 @@ Every route has `Sample::rate(0.1)`. Those marked * also have `UseSandbox`.
 - **`ShowDiaryRequest`:** `service` (an active service of the current business) and `date` (`Y-m-d`, from today to the last bookable date in the business's time zone), both optional. `service()` and `date()` give the values or the defaults. An invalid query string redirects to the plain `/playground` (`$redirectRoute`), since redirecting back to the same URL would loop.
 - **`StoreBookingRequest`:** `service_id`, and `starts_at` as `date_format:Y-m-d\TH:i:sp`, the form `toIso8601ZuluString()` gives (checked). The page sends back the string it was given.
 - **`UpdateStrictnessRequest`:** an integer from 0 to 100.
+- **`UpdateSlotIntervalRequest`:** an integer, one of `BookingSettings::SLOT_INTERVALS` (`Rule::in`), so the choices are defined in one place.
 - **`FillDayRequest`:** `date`, with `ShowDiaryRequest`'s rule, shared through a trait.
 
 `exists` rules don't use global scopes, so they name the current business's ID themselves.
@@ -243,6 +278,7 @@ Every route has `Sample::rate(0.1)`. Those marked * also have `UseSandbox`.
 | `day` | date, working times, free gaps (each usable, fragmented or stranded), bookings (ID, service name, start and end) | 3 |
 | `serviceId`, `times` | each offered time's start and end | 4 |
 | `times`, with the hidden ones | adds each time's waste score and its parts, how it differs from the best in its gap, `hiddenFrom` and `relaxed`; and when the relaxation window ends | 5 |
+| `business`, with its slot interval, and `slotIntervals` | the sandbox's slot interval, and the choices from `BookingSettings::SLOT_INTERVALS` | 5 |
 | `figures` | `DayFigures`, with the efficiency score | 6 |
 
 Moving to another date or service is a GET with the new query string, as a partial reload that keeps the page's state and scroll position.
@@ -259,6 +295,7 @@ Moving to another date or service is a GET with the new query string, as a parti
 | `DayPicker` | `components/playground` | arrows, quick buttons and a date field | 3 |
 | `TimeOptions` | `components/scheduling` | the times, as a grid of buttons, or a list with scores and reasons when a toggle is on | 4, 5 |
 | `StrictnessSlider` | `components/scheduling` | the slider, its ends labelled "Loosest" and "Tightest" | 5 |
+| `SlotIntervalPicker` | `components/scheduling` | "Start times every", as a radio group beside the slider | 5 |
 | `RelaxationNotice` | `components/scheduling` | the notice above | 5 |
 | `DayFigures` | `components/scheduling` | booked, free, stranded and fragmented time, and the efficiency score | 6 |
 
@@ -269,6 +306,7 @@ From shadcn-vue: `slider`, `switch` and `radio-group`. They need no new npm pack
 ### Behaviour
 
 - **Dragging** changes the times at once. The strictness is saved 300ms after the last change (`useDebounceFn`), because holding an arrow key changes it many times a second. While a save is waiting or any request is running, the time buttons, Fill and Reset are disabled, so a booking is never checked against an older strictness.
+- **Picking a slot interval** saves it straight away and reloads the times, the day and the figures. While it saves, the same buttons are disabled as during a strictness save.
 - **The two toggles,** "Show hidden times" and "Show waste scores", are off at first, and only change what the page shows. Hidden times are greyed, can't be booked, and have their reason beside them as text.
 - **A booking** shows a toast and updates the timeline. The button that was pressed disappears, so focus moves to the times' heading.
 - **Days with nothing to offer** say why: not working that day, fully booked for this service, or too late today.
@@ -276,8 +314,8 @@ From shadcn-vue: `slider`, `switch` and `radio-group`. They need no new npm pack
 ### Accessibility
 
 - The timeline is an ordered list in time order, each item with its times and what it is in words ("10:00 to 10:15, 15 minutes nobody can book"). Colour is never the only sign: stranded time is hatched and labelled.
-- Everything works from the keyboard: services are a radio group, and the slider takes arrow keys, Home and End.
-- A polite live region says "13 of 28 times offered" once the slider settles.
+- Everything works from the keyboard: services and the slot interval are radio groups, and the slider takes arrow keys, Home and End.
+- A polite live region says "13 of 28 times offered" once the slider settles, and again after a new slot interval loads.
 - Axe finds no violations in light or dark mode, and animations follow `prefers-reduced-motion`.
 - On a phone the panels stack, with no sideways scrolling.
 
@@ -299,6 +337,11 @@ PHP feature tests fix the time with `travelTo()`. Where no other is given, it's 
   - 20: every slot with extra waste above 0 differs from the best in its gap in at least one part
   - 21: a slot is hidden exactly when it isn't relaxed and the strictness is at or above its `hiddenFrom`, at both of the scenario's strictness values
 - Infection stays at 90% or more, with 7 timeouts, and the rules test's time is checked against the 40-second timeout.
+
+**Unit and database: 5 minutes** (part 2)
+- `BookingSettings` and the table's check each accept 5 and still refuse 7. Their existing tests list the choices, so they change with it.
+- The randomised rules try 5. Locally, with 5 in the list, every rule passed and the rules test took 14.8s, against 10.6s without it, with 520,120 assertions against 408,541. CI's runners have been up to about twice as slow as the host, which would make about 30s, under Infection's 40-second timeout. Part 2 checks the time in CI.
+- The migration rolls back and runs again cleanly (`migrate:rollback --step=1`, then `migrate`).
 
 **Feature: sandboxes**
 - `/playground` with no sandbox redirects to the start page, and makes no business.
@@ -322,6 +365,7 @@ PHP feature tests fix the time with `travelTo()`. Where no other is given, it's 
 **Feature: booking, strictness, fill and reset**
 - Booking an offered time saves it with `BookingSource::Playground` and the made-up customer. A hidden time, a taken one and a malformed start are refused with nothing written.
 - Saving a strictness changes only this sandbox's; -1, 101 and text are refused.
+- Saving a slot interval changes only this sandbox's, and the opening day's follow-up then offers 70 times at 5 minutes and strictness 50, all on the 5-minute grid. 0, 7 and text are refused. Reset keeps the interval.
 - A fill with a seeded `Randomizer` books only offered times, never overlapping, and counts those turned away. At strictness 100 it leaves no stranded time on an empty Monday. On a day off, all 10 are turned away.
 - Reset deletes every booking in this sandbox and none in another, keeps the strictness, and refuses a business that isn't a sandbox.
 - The fill's limit.
@@ -332,7 +376,7 @@ PHP feature tests fix the time with `travelTo()`. Where no other is given, it's 
 - Start, then the diary (part 2).
 - Moving between days with the keyboard (part 3).
 - Booking a time updates the timeline and takes the time away (part 4).
-- The End key on the slider changes the follow-up's times from 26 to 4 on the opening day, and showing hidden times gives reasons (part 5).
+- The End key on the slider changes the follow-up's times from 26 to 4 on the opening day, and showing hidden times gives reasons. Picking 5 minutes changes them from 26 to 70, and 15 changes them back (part 5).
 - Fill, then Reset, changes the figures and back (part 6).
 - The home page leads to the playground (part 7).
 - From part 4, a booking made with the keyboard alone, and no sideways scrolling at a phone's width.
@@ -351,36 +395,36 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 
 - [x] 1. The engine's new tests pass, with Infection at 90% or more and the randomised rules 20 and 21 on five other seeds (part 1)
 - [x] 2. The lazy-loading guard is on, with every test passing (part 1)
-- [ ] 3. A visitor can start a sandbox, and the isolation, expiry, clean-up and limit tests pass (part 2)
+- [ ] 3. A visitor can start a sandbox, and the isolation, expiry, clean-up and limit tests pass. A slot interval can be 5 minutes, with its tests (part 2)
 - [ ] 4. Playwright and axe run in CI and locally (part 2)
-- [ ] 5. The deploy of part 2 adds `sandbox_expires_at` on Neon, and starting a sandbox works on bookalive.fly.dev
+- [ ] 5. The deploy of part 2 adds `sandbox_expires_at` and the new slot interval check on Neon, and starting a sandbox works on bookalive.fly.dev
 - [ ] 6. The timeline and dates work, with their tests (part 3)
 - [ ] 7. A visitor can book an offered time, with its tests (part 4)
-- [ ] 8. The slider, hidden times, scores and notice work, with their tests (part 5)
+- [ ] 8. The slider, the slot interval picker, hidden times, scores and notice work, with their tests (part 5)
 - [ ] 9. The figures, Fill and Reset work, with their tests (part 6)
 - [ ] 10. Every page passes axe in light and dark mode, and the keyboard and phone-width tests pass
-- [ ] 11. The strictness defaults and the colours have each been looked at with the user, and the results recorded in `tracking.md`
+- [ ] 11. The strictness defaults, the slot interval's default and the colours have each been looked at with the user, and the results recorded in `tracking.md`
 - [ ] 12. The home page and the README's GIF are in (part 7), and `tracking.md` marks 08 as done and the playground milestone as reached
 - [ ] 13. After part 7's deploy, the home page leads to a working playground on bookalive.fly.dev, and after a quiet spell Neon goes to sleep with sandboxes still in the database
 
 ## Pull requests
 
-**Estimate:** about 2,600 lines of app code (PHP, Vue and TypeScript) and 2,400 of tests. That's far over one pull request, so it's split along the build order. The shadcn-vue components aren't counted.
+**Estimate:** about 2,700 lines of app code (PHP, Vue and TypeScript) and 2,500 of tests, with the slot interval added on 2026-11-26. That's far over one pull request, so it's split along the build order. The shadcn-vue components aren't counted.
 
 | Part | Contains | App | Tests | Ticks |
 |---|---|---|---|---|
 | 1 | The engine's additions, `Business::bookingSettings()`, `nextWorkingDate()` and the lazy-loading guard | 270 | 500 | 1, 2 |
-| 2 | Sandboxes, rate limits, the start page, a first diary page (the business and its services), the public layout, and Playwright in CI | 560 | 500 | 3, 4 |
+| 2 | Sandboxes, rate limits, the start page, a first diary page (the business and its services), the public layout, Playwright in CI, and a 5-minute slot interval | 590 | 520 | 3, 4 |
 | 3 | The diary: dates and the timeline, with `Booking::overlapping()` | 520 | 400 | 6 |
 | 4 | Services, offered times and booking | 380 | 300 | 7 |
-| 5 | Strictness: the slider, hidden times with reasons, scores and the relaxation notice | 410 | 350 | 8 |
+| 5 | Strictness: the slider, the slot interval picker, hidden times with reasons, scores and the relaxation notice | 490 | 410 | 8 |
 | 6 | The figures, Fill randomly and Reset | 320 | 250 | 9 |
 | 7 | The home page, and the README with its GIF | 150 | 100 | 10, 12 |
 
 - **Branches:** `feature/08-scheduling-playground-part-1` to `-part-7`, merged in order. Items 5 and 13 are checked after a merge.
-- **Where it splits:** part 1 is the only one that changes the engine, so Infection runs in CI for it, and for part 2, which changes `ci.yml`. Each later part adds one thing a visitor can do.
+- **Where it splits:** parts 1 and 2 are the only ones that change the engine, so Infection runs in CI for them. Part 2 changes it by adding 5 to the slot intervals, and also changes `ci.yml`. The 5-minute interval goes in part 2 rather than with its picker in part 5, so no later part needs Infection. Each later part adds one thing a visitor can do.
 - **Safe to deploy:** `/playground` works at every step, with less on it, and nothing links to it until part 7.
-- **Between parts 6 and 7,** two sessions with the user, each with its own pull request: `feature/08-tune-strictness`, then `feature/08-colours`. The GIF in part 7 then shows the final look. They tick 11.
+- **Between parts 6 and 7,** two sessions with the user, each with its own pull request: `feature/08-tune-strictness` (which also settles the slot interval's default), then `feature/08-colours`. The GIF in part 7 then shows the final look. They tick 11.
 
 ## Notes
 
@@ -397,6 +441,7 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 
 - **What to look at:** a smaller scale (about 75 would use the whole slider on this business), the default, and 06's constants. A change to the constants is a change to the engine, with Infection, and changes the numbers in 06, 07 and this plan's tests.
 - Random customers who'd take any offered time flatter high strictness. Real ones may leave if their time isn't offered, which only the simulator (20) and real data can show.
+- **The slot interval's default.** Compare 5, 10 and 15 minutes with the picker: the times offered (**Decisions**), and the figures after a few fills at each. Then choose the default. Changing it is a migration for the column's default and `Business`'s, and changes the sample business's tests: 29 of them at 5 minutes. On any grid, an appointment whose length and buffers aren't a multiple of the interval leaves the difference unused after it.
 
 **For the colours session:** the overview's open question lists what it covers. The logo and favicon are the starter kit's, so decide whether they change then too.
 
@@ -406,7 +451,7 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 
 **For later sub-plans**
 - **08b:** changing `APP_URL` changes the hosts Laravel trusts and the passkeys' domain. The old host must stay trusted for its redirect and for Fly's health checks, which send it.
-- **10:** the settings screen reuses `StrictnessSlider` and `RelaxationNotice`, and the preview can use `hiddenFrom`.
+- **10:** the settings screen reuses `StrictnessSlider`, `SlotIntervalPicker` and `RelaxationNotice`, and the preview can use `hiddenFrom`.
 - **11:** Turnstile is still open. The public API sends offered times only, never `hiddenFrom` or the scores.
 - **12:** adds the scheduler. It can call `DeleteExpiredSandboxes` too, if sandboxes ever need deleting sooner.
 - **13:** the calendar grows from `DayTimeline`, and shares `Booking::overlapping()`.
