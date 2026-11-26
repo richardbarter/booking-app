@@ -33,7 +33,7 @@ class BusinessesTableTest extends TestCase
      */
     public static function allowedSlotIntervals(): array
     {
-        return ['10' => [10], '15' => [15], '20' => [20], '30' => [30], '60' => [60]];
+        return ['5' => [5], '10' => [10], '15' => [15], '20' => [20], '30' => [30], '60' => [60]];
     }
 
     #[DataProvider('allowedSlotIntervals')]
@@ -49,16 +49,34 @@ class BusinessesTableTest extends TestCase
      */
     public static function disallowedSlotIntervals(): array
     {
-        return ['5' => [5], '25' => [25], '45' => [45]];
+        return ['7' => [7], '25' => [25], '45' => [45]];
     }
 
     #[DataProvider('disallowedSlotIntervals')]
-    public function test_rejects_a_slot_interval_outside_the_five_choices(int $minutes): void
+    public function test_rejects_a_slot_interval_outside_the_six_choices(int $minutes): void
     {
         $this->expectException(QueryException::class);
         $this->expectExceptionMessage('"businesses_slot_interval_minutes_check"');
 
         Business::factory()->create(['slot_interval_minutes' => $minutes]);
+    }
+
+    public function test_rolling_back_the_5_minute_interval_moves_businesses_on_it_to_15_and_refuses_5_again(): void
+    {
+        $onFive = Business::factory()->create(['slot_interval_minutes' => 5]);
+        $onTen = Business::factory()->create(['slot_interval_minutes' => 10]);
+        $migration = require database_path('migrations/2026_11_26_213521_allow_a_5_minute_slot_interval.php');
+
+        $migration->down();
+
+        $this->assertSame(15, $onFive->fresh()?->slot_interval_minutes);
+        $this->assertSame(10, $onTen->fresh()?->slot_interval_minutes);
+        $this->assertSlotIntervalRefused(5);
+
+        $migration->up();
+
+        $this->assertModelExists(Business::factory()->create(['slot_interval_minutes' => 5]));
+        $this->assertSlotIntervalRefused(7);
     }
 
     /**
@@ -155,5 +173,19 @@ class BusinessesTableTest extends TestCase
         $business = Business::factory()->create($settings);
 
         $this->assertModelExists($business);
+    }
+
+    /**
+     * Inside a savepoint, so the failed insert doesn't end the test's
+     * transaction.
+     */
+    private function assertSlotIntervalRefused(int $minutes): void
+    {
+        try {
+            DB::transaction(fn () => Business::factory()->create(['slot_interval_minutes' => $minutes]));
+            $this->fail("A slot interval of {$minutes} minutes was accepted.");
+        } catch (QueryException $exception) {
+            $this->assertStringContainsString('"businesses_slot_interval_minutes_check"', $exception->getMessage());
+        }
     }
 }

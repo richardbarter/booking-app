@@ -91,7 +91,7 @@ flowchart TD
 - **The visitor first:** the clean-up's delete waits for the row, sees it has changed, and deletes nothing.
 - **The clean-up first:** the visitor's update waits, then matches no row, and they're sent to the start page.
 
-So no sandbox is deleted while a request is using it, and nothing needs to retry a deadlock.
+So no sandbox is deleted while a request is using it, and nothing needs to retry a deadlock. The clean-up deletes up to 50 at a time, so its delete has a `LIMIT 50` subquery, and it repeats the expiry test outside that subquery too. When a delete has waited for a row, PostgreSQL checks its conditions again against the row's new version, but not the subquery's: tried with two sessions while building part 2, the test in the subquery alone deleted a sandbox whose expiry the visitor had just moved forward.
 
 ### Real dates and the relaxation notice
 
@@ -154,12 +154,13 @@ Locally, a fill took 135ms and 131 queries with 7 bookings made, so it has its o
 
 | Limiter | Applies to | Limit |
 |---|---|---|
-| `sandboxes` | `POST /playground/start` | 20 an hour for each IP address, then 500 an hour in all |
+| `sandboxes` | `POST /playground/start` | 20 an hour for each IP address (an IPv6 address's /64 network), then 500 an hour in all |
 | `playground` | the other writes | 120 a minute for each session |
 | `playground-fill` | Fill randomly | 10 a minute for each session, as well |
 
 - The limit for all visitors is a backstop, so the database can't fill. Laravel checks every limit before counting against any (checked in its source), so an address that's refused doesn't use it up. A flood from many addresses could use it up, and visitors would then see "The playground is busy" until the hour passes.
 - 20 an hour allows for several people behind one office or mobile address.
+- **An IPv6 address counts by its /64 network,** with `IpUtils::anonymize($ip, 0, 8)`, which keeps an IPv4 address whole. A connection is usually given a whole /64, so counting each IPv6 address on its own would let one visitor start 500 sandboxes from one connection and close the playground for an hour. Found in part 2's review; a /64 is one household or office, like one IPv4 address behind a router.
 - Going over a limit redirects (303) to the page they were on, with a toast, rather than showing a bare 429. Each limit needs its own `response()`.
 - The two `sandboxes` limits come from `config/playground.php` (`PLAYGROUND_SANDBOXES_PER_IP` and `PLAYGROUND_SANDBOXES_IN_ALL`), so `.env.example` can raise the first for the end-to-end tests, which start a sandbox each.
 - The limiters use the database cache, which only visitors' requests touch, so Neon can sleep.
@@ -218,14 +219,14 @@ In part 2, `BookingSettings::SLOT_INTERVALS` gains 5, with the database's check 
 ### Sandboxes (part 2)
 
 - **`App\Actions\Playground\StartSandbox`**, `handle(): Business`: makes the sample business and sets its expiry in one transaction, so a sample business without an expiry can never be left behind.
-- **`App\Actions\Playground\DeleteExpiredSandboxes`**, `handle(): int`: deletes up to 50 expired sandboxes, oldest first, in one query. The database's cascades take everything they own.
+- **`App\Actions\Playground\DeleteExpiredSandboxes`**, `handle(): int`: deletes up to 50 expired sandboxes, oldest first, in one query, which repeats the expiry test outside its subquery (see **A visitor's sandbox**). The database's cascades take everything they own.
 - **`App\Services\Playground\SandboxSession`**: the only class that knows the session key.
   - `current(): ?Business` finds the session's sandbox with the conditional update above, and forgets an ID that no longer has a live one
   - `remember(Business $sandbox): void`
   - `has(): bool`, whether the session remembers one, live or not. The middleware asks before `current()`, to know whether one has expired
 - **`App\Http\Middleware\UseSandbox`**: sets `CurrentBusiness` from `SandboxSession`. With none, it redirects to the start page. If the session's sandbox had expired, or the request is an Inertia one (so the page was open), it flashes "Your playground ended after 2 hours without a visit. Start a new one to carry on."
   - It's put before `SubstituteBindings` in the middleware priority list with `prependToPriorityList()` in `bootstrap/app.php`, so route model binding sees the current business. Checked: it then runs after `StartSession` and `ThrottleRequests`, and a redirect after a PATCH is still a 303, because Inertia's `EnsureGetOnRedirect` is a global middleware.
-- **Rate limiters** in `AppServiceProvider`, as above.
+- **Rate limiters** in `AppServiceProvider`, as above. Each comes with the first route it limits: `sandboxes` in part 2, `playground` with booking in part 4, and `playground-fill` in part 6.
 
 ### Routes (`routes/playground.php`, required by `routes/web.php`)
 
@@ -287,7 +288,7 @@ Moving to another date or service is a GET with the new query string, as a parti
 
 - **`layouts/PublicLayout.vue`:** the name linking home, a main area and the toaster. `app.ts` gives it to `playground/` pages, and to `Home` in part 7.
 - **`pages/playground/Start.vue`:** what the playground is, in a few sentences, and the Start button. **`pages/playground/Show.vue`** holds the rest.
-- **`pages/Home.vue`** replaces `Welcome.vue`: what Bookalive does, and a button to the playground. It has no sign-up or log-in links until 09.
+- **`pages/Home.vue`** replaces `Welcome.vue`: what Bookalive does, and a button to the playground. The button goes to `playground.start`, which goes on to the diary when there's a sandbox: an Inertia visit to `playground.show` without one would tell a new visitor their playground had ended. It has no sign-up or log-in links until 09.
 
 | Component | Folder | Does | Part |
 |---|---|---|---|
@@ -340,7 +341,7 @@ PHP feature tests fix the time with `travelTo()`. Where no other is given, it's 
 
 **Unit and database: 5 minutes** (part 2)
 - `BookingSettings` and the table's check each accept 5 and still refuse 7. Their existing tests list the choices, so they change with it.
-- The randomised rules try 5. Locally, with 5 in the list, every rule passed and the rules test took 14.8s, against 10.6s without it, with 520,120 assertions against 408,541. CI's runners have been up to about twice as slow as the host, which would make about 30s, under Infection's 40-second timeout. Part 2 checks the time in CI.
+- The randomised rules try 5. Locally, with 5 in the list, every rule passed and the rules test took 14.8s, against 10.6s without it, with 520,120 assertions against 408,541. CI's runners have been up to about twice as slow as the host, which would make about 30s, under Infection's 40-second timeout. In part 2's CI runs it took 17.3s and then 33.4s, on a runner slow throughout, so part 2 raises the timeout to 60 seconds (see tracking's decisions log). Infection took 3m17s and 4m6s on 3 threads.
 - The migration rolls back and runs again cleanly (`migrate:rollback --step=1`, then `migrate`).
 
 **Feature: sandboxes**
@@ -385,18 +386,18 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 
 ### Running Playwright
 
-`@playwright/test` 1.65.1 and `@axe-core/playwright` 4.14.1 join as dev dependencies, with the newest versions when part 2 is built. axe was approved on 2026-10-27, and Playwright has been in the overview's stack from the start. Chromium only.
-- Tests live in `tests/e2e/*.spec.ts`, with `playwright.config.ts` at the root and `npm run test:e2e` to run them. Vitest only reads `resources/js/**/*.test.ts`, so it leaves them alone. `tsconfig.json` includes them.
+`@playwright/test` 1.65.1 and `@axe-core/playwright` 4.14.1 join as dev dependencies, the newest releases when part 2 was built (2026-11-26). axe was approved on 2026-10-27, and Playwright has been in the overview's stack from the start. Chromium only.
+- Tests live in `tests/e2e/*.spec.ts`, with `playwright.config.ts` at the root and `npm run test:e2e` to run them. Vitest only reads `resources/js/**/*.test.ts`, so it leaves them alone. They have their own `tests/e2e/tsconfig.json`, which extends the app's and adds Node's types, and `npm run types:check` checks both. Adding Node's types to the app's `tsconfig.json`, as first planned, would have let code that runs in the browser use Node's globals without an error.
 - **Locally** they run against http://localhost:8001. Each test makes its own sandbox, so the development database needs no reset. The browser is installed once with `npx playwright install chromium`. The Ubuntu packages it needs come from `npx playwright install-deps chromium` **(you)**, with no `sudo` in front, since Playwright asks for `sudo` itself. That has been done locally: 27 packages, installed on 2026-11-25 and checked against Playwright 1.65.1. A dry run listed a Chromium build for Ubuntu 26.04.
-- **In CI** they're a step of the `checks` job after `composer ci:check`, so the required checks don't change and the build and database are reused. The step runs the migrations on the `testing` database and Playwright starts `php artisan serve --no-reload`, which passes the environment on (without `--no-reload`, `serve` drops most of it). The report is uploaded if a test fails.
+- **In CI** they're a step of the `checks` job after `composer ci:check`, so the required checks don't change and the build and database are reused. `npx playwright install --with-deps chromium` installs the browser and its packages. The step runs the migrations on the `testing` database and Playwright starts `php artisan serve --no-reload`, which passes the environment on (without `--no-reload`, `serve` drops most of it). It listens on 127.0.0.1, which the tests use in CI, since `localhost` can resolve to IPv6 first. The report is uploaded with `actions/upload-artifact` if a test fails.
 - They aren't part of `composer ci:check`, as they need a running app and a browser. `CLAUDE.md` (through `.ai/guidelines/project.md`) and the README gain the command.
 
 ## Done when
 
 - [x] 1. The engine's new tests pass, with Infection at 90% or more and the randomised rules 20 and 21 on five other seeds (part 1)
 - [x] 2. The lazy-loading guard is on, with every test passing (part 1)
-- [ ] 3. A visitor can start a sandbox, and the isolation, expiry, clean-up and limit tests pass. A slot interval can be 5 minutes, with its tests (part 2)
-- [ ] 4. Playwright and axe run in CI and locally (part 2)
+- [x] 3. A visitor can start a sandbox, and the isolation, expiry, clean-up and limit tests pass. A slot interval can be 5 minutes, with its tests (part 2)
+- [x] 4. Playwright and axe run in CI and locally (part 2)
 - [ ] 5. The deploy of part 2 adds `sandbox_expires_at` and the new slot interval check on Neon, and starting a sandbox works on bookalive.fly.dev
 - [ ] 6. The timeline and dates work, with their tests (part 3)
 - [ ] 7. A visitor can book an offered time, with its tests (part 4)
@@ -414,11 +415,11 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 | Part | Contains | App | Tests | Ticks |
 |---|---|---|---|---|
 | 1 | The engine's additions, `Business::bookingSettings()`, `nextWorkingDate()` and the lazy-loading guard | 270 | 500 | 1, 2 |
-| 2 | Sandboxes, rate limits, the start page, a first diary page (the business and its services), the public layout, Playwright in CI, and a 5-minute slot interval | 590 | 520 | 3, 4 |
-| 3 | The diary: dates and the timeline, with `Booking::overlapping()` | 520 | 400 | 6 |
-| 4 | Services, offered times and booking | 380 | 300 | 7 |
+| 2 | Sandboxes, the `sandboxes` rate limit, the start page, a first diary page (the business and its services), the public layout, Playwright in CI, and a 5-minute slot interval | 590 | 520 | 3, 4 |
+| 3 | The diary: dates and the timeline, with `Booking::overlapping()` and `ShowDiaryRequest` | 520 | 400 | 6 |
+| 4 | Services, offered times and booking, with the `playground` rate limit | 380 | 300 | 7 |
 | 5 | Strictness: the slider, the slot interval picker, hidden times with reasons, scores and the relaxation notice | 490 | 410 | 8 |
-| 6 | The figures, Fill randomly and Reset | 320 | 250 | 9 |
+| 6 | The figures, Fill randomly and Reset, with the `playground-fill` rate limit | 320 | 250 | 9 |
 | 7 | The home page, and the README with its GIF | 150 | 100 | 10, 12 |
 
 - **Branches:** `feature/08-scheduling-playground-part-1` to `-part-7`, merged in order. Items 5 and 13 are checked after a merge.
@@ -452,7 +453,7 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 **For later sub-plans**
 - **08b:** changing `APP_URL` changes the hosts Laravel trusts and the passkeys' domain. The old host must stay trusted for its redirect and for Fly's health checks, which send it.
 - **10:** the settings screen reuses `StrictnessSlider`, `SlotIntervalPicker` and `RelaxationNotice`, and the preview can use `hiddenFrom`.
-- **11:** Turnstile is still open. The public API sends offered times only, never `hiddenFrom` or the scores.
+- **11:** Turnstile is still open. The public API sends offered times only, never `hiddenFrom` or the scores. Its limits for each address should count an IPv6 address by its /64 network, as the playground's do.
 - **12:** adds the scheduler. It can call `DeleteExpiredSandboxes` too, if sandboxes ever need deleting sooner.
 - **13:** the calendar grows from `DayTimeline`, and shares `Booking::overlapping()`.
 - **14:** uses `DayFigures`, and decides how a no-show counts. It's given the appointments that start on the day: `Booking::overlapping()` tests blocked time, so it also finds one whose buffer alone reaches into the day.

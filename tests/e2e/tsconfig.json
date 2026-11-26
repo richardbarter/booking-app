@@ -1,0 +1,10 @@
+{
+    // The end-to-end tests and Playwright's config run in Node, so they get
+    // Node's types. The app's own tsconfig leaves them out, so code that
+    // runs in the browser can't use Node's globals by mistake.
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "types": ["node"]
+    },
+    "include": ["./**/*.ts", "../../playwright.config.ts"]
+}
