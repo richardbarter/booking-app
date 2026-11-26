@@ -56,6 +56,31 @@ class SandboxRateLimitTest extends TestCase
         $this->assertDatabaseCount('businesses', 2);
     }
 
+    public function test_ipv6_addresses_in_one_64_network_share_a_limit(): void
+    {
+        config(['playground.sandboxes_per_ip' => 2, 'playground.sandboxes_in_all' => 10]);
+        $this->startFrom('2001:db8:1:2::1');
+        $this->startFrom('2001:db8:1:2:aaaa:bbbb:cccc:dddd');
+
+        $refused = $this->startFrom('2001:db8:1:2:ffff::9');
+
+        $refused->assertStatus(303);
+        $this->assertDatabaseCount('businesses', 2);
+        $this->startFrom('2001:db8:1:3::1')->assertRedirectToRoute('playground.show');
+        $this->assertDatabaseCount('businesses', 3);
+    }
+
+    public function test_ipv4_addresses_written_as_ipv6_each_have_their_own_limit(): void
+    {
+        config(['playground.sandboxes_per_ip' => 1, 'playground.sandboxes_in_all' => 10]);
+        $this->startFrom('::ffff:203.0.113.1');
+
+        $response = $this->startFrom('::ffff:203.0.113.2');
+
+        $response->assertRedirectToRoute('playground.show');
+        $this->assertDatabaseCount('businesses', 2);
+    }
+
     /**
      * @return TestResponse<Response>
      */

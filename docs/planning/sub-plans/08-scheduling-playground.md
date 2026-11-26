@@ -154,12 +154,13 @@ Locally, a fill took 135ms and 131 queries with 7 bookings made, so it has its o
 
 | Limiter | Applies to | Limit |
 |---|---|---|
-| `sandboxes` | `POST /playground/start` | 20 an hour for each IP address, then 500 an hour in all |
+| `sandboxes` | `POST /playground/start` | 20 an hour for each IP address (an IPv6 address's /64 network), then 500 an hour in all |
 | `playground` | the other writes | 120 a minute for each session |
 | `playground-fill` | Fill randomly | 10 a minute for each session, as well |
 
 - The limit for all visitors is a backstop, so the database can't fill. Laravel checks every limit before counting against any (checked in its source), so an address that's refused doesn't use it up. A flood from many addresses could use it up, and visitors would then see "The playground is busy" until the hour passes.
 - 20 an hour allows for several people behind one office or mobile address.
+- **An IPv6 address counts by its /64 network,** with `IpUtils::anonymize($ip, 0, 8)`, which keeps an IPv4 address whole. A connection is usually given a whole /64, so counting each IPv6 address on its own would let one visitor start 500 sandboxes from one connection and close the playground for an hour. Found in part 2's review; a /64 is one household or office, like one IPv4 address behind a router.
 - Going over a limit redirects (303) to the page they were on, with a toast, rather than showing a bare 429. Each limit needs its own `response()`.
 - The two `sandboxes` limits come from `config/playground.php` (`PLAYGROUND_SANDBOXES_PER_IP` and `PLAYGROUND_SANDBOXES_IN_ALL`), so `.env.example` can raise the first for the end-to-end tests, which start a sandbox each.
 - The limiters use the database cache, which only visitors' requests touch, so Neon can sleep.
@@ -452,7 +453,7 @@ The end-to-end tests run at the real time, so they only use the opening day, whi
 **For later sub-plans**
 - **08b:** changing `APP_URL` changes the hosts Laravel trusts and the passkeys' domain. The old host must stay trusted for its redirect and for Fly's health checks, which send it.
 - **10:** the settings screen reuses `StrictnessSlider`, `SlotIntervalPicker` and `RelaxationNotice`, and the preview can use `hiddenFrom`.
-- **11:** Turnstile is still open. The public API sends offered times only, never `hiddenFrom` or the scores.
+- **11:** Turnstile is still open. The public API sends offered times only, never `hiddenFrom` or the scores. Its limits for each address should count an IPv6 address by its /64 network, as the playground's do.
 - **12:** adds the scheduler. It can call `DeleteExpiredSandboxes` too, if sandboxes ever need deleting sooner.
 - **13:** the calendar grows from `DayTimeline`, and shares `Booking::overlapping()`.
 - **14:** uses `DayFigures`, and decides how a no-show counts. It's given the appointments that start on the day: `Booking::overlapping()` tests blocked time, so it also finds one whose buffer alone reaches into the day.

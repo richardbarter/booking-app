@@ -15,9 +15,11 @@ use function Illuminate\Support\defer;
 /**
  * The playground's start page, and the Start button that makes a visitor's
  * sandbox (08). Both go to the diary if the session already has a live
- * sandbox, so pressing Start again makes no second one. There's nothing to
- * validate or authorise: the button sends nothing, and the limiter
- * (throttle:sandboxes) is the only guard.
+ * sandbox, so pressing Start again makes no second one. Two presses that
+ * arrive at the same moment can each make one; the session keeps the
+ * second, and the first expires unused. There's nothing to validate or
+ * authorise: the button sends nothing, and the limiter (throttle:sandboxes)
+ * is the only guard.
  */
 class SandboxController extends Controller
 {

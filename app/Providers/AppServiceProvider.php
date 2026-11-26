@@ -17,6 +17,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Laravel\Nightwatch\Facades\Nightwatch;
+use Symfony\Component\HttpFoundation\IpUtils;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -83,7 +84,7 @@ class AppServiceProvider extends ServiceProvider
     {
         RateLimiter::for('sandboxes', fn (Request $request): array => [
             Limit::perHour(config()->integer('playground.sandboxes_per_ip'))
-                ->by('ip:'.$request->ip())
+                ->by('network:'.self::networkOf($request))
                 ->response($this->backWithToast(
                     __('Too many playgrounds have been started from your connection in the last hour. Please try again later.'),
                     'playground.start',
@@ -95,6 +96,20 @@ class AppServiceProvider extends ServiceProvider
                     'playground.start',
                 )),
         ]);
+    }
+
+    /**
+     * Where a request comes from, for a limit for each visitor: an IPv4
+     * address, or an IPv6 address's /64 network. A connection is usually
+     * given a whole /64, so counting each IPv6 address on its own would let
+     * one visitor start sandboxes from as many addresses as they liked, and
+     * use up the limit for all visitors.
+     */
+    private static function networkOf(Request $request): string
+    {
+        $ip = $request->ip();
+
+        return $ip === null ? '' : IpUtils::anonymize($ip, v4Bytes: 0, v6Bytes: 8);
     }
 
     /**
