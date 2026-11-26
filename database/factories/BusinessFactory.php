@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Business;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -24,5 +25,13 @@ class BusinessFactory extends Factory
             'name' => fake()->company(),
             'timezone' => 'Europe/London',
         ];
+    }
+
+    /**
+     * A playground sandbox that ends at the given time (08).
+     */
+    public function sandbox(CarbonInterface $expiresAt): static
+    {
+        return $this->state(['sandbox_expires_at' => $expiresAt]);
     }
 }

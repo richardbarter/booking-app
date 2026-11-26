@@ -3,12 +3,16 @@
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\UseFlyClientIp;
+use App\Http\Middleware\UseSandbox;
 use Bepsvpt\SecureHeaders\SecureHeadersMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Laravel\Nightwatch\Http\Middleware\Sample;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -41,6 +45,13 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        // Nightwatch decides whether to record a request before a limiter can
+        // refuse it, so refused requests are sampled too. The playground's
+        // sandbox is the current business before route model binding, so
+        // bound models are the sandbox's own.
+        $middleware->prependToPriorityList(before: ThrottleRequests::class, prepend: Sample::class);
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: UseSandbox::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
